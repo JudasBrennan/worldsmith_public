@@ -540,6 +540,16 @@ export function initSystemPage(mountEl) {
   const wrap = document.createElement("div");
   wrap.className = "page";
   wrap.innerHTML = `
+    <div class="panel">
+      <div class="panel__header">
+        <h1 class="panel__title"><span class="ws-icon icon--system" aria-hidden="true"></span><span>Planetary System</span></h1>
+        <div class="badge">Interactive tool</div>
+      </div>
+      <div class="panel__body">
+        <div class="hint">Tune Spacing Factor and Orbit 1 to generate slot spacing, then assign inner planets to available orbit slots.</div>
+      </div>
+    </div>
+
     <div class="panel" id="posterPanel">
       <div class="panel__header" style="cursor:pointer" id="posterToggleHeader">
         <h2>System Poster ${tipIcon(TIP_LABEL["System poster"])}</h2>
@@ -575,16 +585,6 @@ export function initSystemPage(mountEl) {
         <div class="system-poster-wrap" id="posterWrap">
           <canvas id="systemPoster"></canvas>
         </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel__header">
-        <h1 class="panel__title"><span class="ws-icon icon--system" aria-hidden="true"></span><span>Planetary System</span></h1>
-        <div class="badge">Interactive tool</div>
-      </div>
-      <div class="panel__body">
-        <div class="hint">Tune Spacing Factor and Orbit 1 to generate slot spacing, then assign inner planets to available orbit slots.</div>
       </div>
     </div>
 
