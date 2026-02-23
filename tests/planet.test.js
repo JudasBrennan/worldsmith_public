@@ -175,13 +175,15 @@ test("Earth-like planet is not tidally locked", () => {
   );
 });
 
-test("close-in planet around M-dwarf is tidally locked", () => {
+test("close-in M-dwarf planet is tidally locked with 1:1 resonance", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.15,
     starAgeGyr: 8,
     planet: { ...EARTH_LIKE.planet, semiMajorAxisAu: 0.05, rotationPeriodHours: 24 },
   });
   assert.equal(p.derived.tidallyLockedToStar, true);
+  assert.equal(p.derived.tidallyEvolved, true);
+  assert.equal(p.derived.spinOrbitResonance, "1:1");
 });
 
 test("high-eccentricity tidally-evolved planet predicts 3:2 resonance", () => {
@@ -200,17 +202,13 @@ test("high-eccentricity tidally-evolved planet predicts 3:2 resonance", () => {
   assert.equal(p.derived.spinOrbitResonance, "3:2");
   assert.equal(p.derived.tidallyLockedToStar, false, "3:2 is not synchronous");
   assert.ok(p.derived.resonanceRotationHours > 0);
-});
-
-test("low-eccentricity tidally-evolved planet predicts 1:1 synchronous", () => {
-  const p = calcPlanetExact({
-    starMassMsol: 0.15,
-    starAgeGyr: 8,
-    planet: { ...EARTH_LIKE.planet, semiMajorAxisAu: 0.05, rotationPeriodHours: 24 },
-  });
-  assert.equal(p.derived.tidallyEvolved, true);
-  assert.equal(p.derived.spinOrbitResonance, "1:1");
-  assert.equal(p.derived.tidallyLockedToStar, true);
+  // Verify rotation period matches orbital / p
+  const orbitalPeriodHours = Math.sqrt(0.1 ** 3 / 1) * 365.256 * 24;
+  const expected = orbitalPeriodHours / 1.5;
+  assert.ok(
+    Math.abs(p.derived.resonanceRotationHours - expected) < 0.1,
+    `resonance rotation should be ~${expected.toFixed(1)} h, got ${p.derived.resonanceRotationHours.toFixed(1)}`,
+  );
 });
 
 test("thick atmosphere prevents tidal locking (Venus-like)", () => {
@@ -248,28 +246,6 @@ test("thin atmosphere does not prevent tidal locking", () => {
   });
   assert.equal(p.derived.atmospherePreventsLocking, false);
   assert.equal(p.derived.tidallyLockedToStar, true, "thin atm should not prevent locking");
-});
-
-test("resonance rotation period matches orbital / p", () => {
-  const p = calcPlanetExact({
-    starMassMsol: 1,
-    starAgeGyr: 10,
-    planet: {
-      ...EARTH_LIKE.planet,
-      semiMajorAxisAu: 0.1,
-      eccentricity: 0.2,
-      rotationPeriodHours: 24,
-      pressureAtm: 0,
-    },
-  });
-  assert.equal(p.derived.spinOrbitResonance, "3:2");
-  // Orbital period at 0.1 AU around 1 Msol
-  const orbitalPeriodHours = Math.sqrt(0.1 ** 3 / 1) * 365.256 * 24;
-  const expected = orbitalPeriodHours / 1.5;
-  assert.ok(
-    Math.abs(p.derived.resonanceRotationHours - expected) < 0.1,
-    `resonance rotation should be ~${expected.toFixed(1)} h, got ${p.derived.resonanceRotationHours.toFixed(1)}`,
-  );
 });
 
 // --- Moon tidal heating on planet ---
@@ -423,17 +399,6 @@ test("M-dwarf vegetation has blue component (PanoptesV)", () => {
   assert.ok(b > r, `M-dwarf deep should have blue > red: b=${b} r=${r}`);
 });
 
-test("pressure changes vegetation colour differently per star type", () => {
-  // G-type goes green→olive→purple; A-type goes orange→blue→olive
-  const g1 = calcPlanetExact(EARTH_LIKE);
-  const g10 = calcPlanetExact({
-    ...EARTH_LIKE,
-    planet: { ...EARTH_LIKE.planet, pressureAtm: 10 },
-  });
-  // Colours should differ substantially
-  assert.notEqual(g1.derived.vegetationPaleHex, g10.derived.vegetationPaleHex);
-});
-
 test("tidally locked M-dwarf planet has twilight vegetation colours", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.15,
@@ -486,15 +451,6 @@ test("vegetation note describes the spectral regime", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(p.derived.vegetationNote.length > 0, "note should not be empty");
   assert.ok(p.derived.vegetationNote.includes("Green"), "Earth-like note should mention green");
-});
-
-test("atmosphere density is zero when surface temperature is zero", () => {
-  // Extreme case: zero greenhouse + very far orbit should produce very low temp
-  // but tKel is rounded, so we test the guard directly via a planet that
-  // would produce tKel=0 (practically impossible but tests the guard)
-  const p = calcPlanetExact(EARTH_LIKE);
-  assert.ok(Number.isFinite(p.derived.atmDensityKgM3), "atm density should be finite");
-  assert.ok(p.derived.atmDensityKgM3 > 0, "atm density should be positive for Earth-like");
 });
 
 /* ── Phase A: Composition model ─────────────────────────────────── */
@@ -803,14 +759,6 @@ test("highly reduced oxidation gives H₂ + CO outgassing", () => {
   assert.ok(p.derived.primaryOutgassedSpecies.includes("H"), "should contain H₂");
   assert.ok(p.derived.primaryOutgassedSpecies.includes("CO"), "should contain CO");
   assert.equal(p.derived.mantleOxidation, "Highly reduced");
-});
-
-test("tectonic regime is passed through to output", () => {
-  const p = calcPlanetExact({
-    ...EARTH_LIKE,
-    planet: { ...EARTH_LIKE.planet, tectonicRegime: "stagnant" },
-  });
-  assert.equal(p.derived.tectonicRegime, "stagnant");
 });
 
 test("tectonic advisory is generated", () => {

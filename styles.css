@@ -3752,3 +3752,18 @@ input.auto-value {
     max-width: 100%;
   }
 }
+
+/* ── Sky canvas (apparent page) ─────────────────────────────── */
+.sky-canvas-wrap {
+  width: 100%;
+  aspect-ratio: 5 / 2;
+  min-height: 200px;
+  max-height: 400px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+.sky-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

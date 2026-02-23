@@ -40,7 +40,7 @@ const DEFAULT_MOON_INPUTS = {
   inclinationDeg: 5.15,
   massMoon: 1.0,
   densityGcm3: 3.34,
-  albedo: 0.136,
+  albedo: 0.11,
 };
 
 const STAR_MAP = {

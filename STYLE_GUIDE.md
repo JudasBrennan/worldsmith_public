@@ -632,11 +632,13 @@ When a new version ships, post a short announcement in Discord. Follow this form
 ### Template
 
 ```
-# **WorldSmith Web vX.Y.Z** is live! https://thebrokenwheel.co.uk/worldsmith/
+**WorldSmith Web vX.Y.Z** is live! https://thebrokenwheel.co.uk/worldsmith/
 
-## **Feature Name** — 1–2 sentence summary of the feature and why it matters.
-## **Feature Name** — 1–2 sentence summary.
-## **Feature Name** — 1–2 sentence summary.
+**Feature Name** — 1–2 sentence summary of the feature and why it matters.
+
+**Feature Name** — 1–2 sentence summary.
+
+**Feature Name** — 1–2 sentence summary.
 ```
 
 ### Rules
@@ -644,9 +646,10 @@ When a new version ships, post a short announcement in Discord. Follow this form
 | Rule              | Convention                                                                    |
 | ----------------- | ----------------------------------------------------------------------------- |
 | **Opening line**  | Bold version string + "is live!" + live URL                                   |
-| **Feature lines** | Bold feature name + em dash + concise description (1–2 sentences max)         |
+| **Feature lines** | Bold feature name + em dash + plain text description (1–2 sentences max)      |
 | **Tone**          | Excited but factual — highlight what users can do, not implementation details |
 | **Length**        | 3–6 feature lines; keep the whole post under ~200 words                       |
-| **Formatting**    | Discord markdown: `# **bold**` for headings, `## **bold**` for features       |
+| **Formatting**    | Discord markdown: `**bold**` for version line and feature names only          |
+| **Spacing**       | Blank line between each feature line                                          |
 | **Order**         | Biggest / most visible change first                                           |
 | **No changelogs** | This is a highlight reel — point users to the About page for full details     |

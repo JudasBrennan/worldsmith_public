@@ -44,7 +44,7 @@ const TIP_LABEL = {
   "Escape Velocity":
     "The speed required to escape the gravitational pull of the moon.\n\nOur Moon's escape velocity is about 2.38 km/s. Earth's escape velocity is 11.2 km/s.",
   Albedo:
-    "The moon's bond albedo. Albedo measures how reflective a body is, on a scale of 0 to 1.\n\n0 = a perfect absorber (absorbs 100% of incoming radiation).\n1 = a perfect reflector (reflects 100% of incoming radiation).\n\nMercury = 0.088\nVenus = 0.76\nEarth = 0.306\nMoon = 0.136\nJupiter = 0.503\nSaturn = 0.342\nUranus = 0.3\nNeptune = 0.29\nPluto = 0.49",
+    "The moon's bond albedo. Albedo measures how reflective a body is, on a scale of 0 to 1.\n\n0 = a perfect absorber (absorbs 100% of incoming radiation).\n1 = a perfect reflector (reflects 100% of incoming radiation).\n\nMercury = 0.068\nVenus = 0.77\nEarth = 0.306\nMoon = 0.11\nJupiter = 0.343\nSaturn = 0.342\nUranus = 0.30\nNeptune = 0.29\nPluto = 0.49",
   "Moon Zone (Inner)":
     "The closest a moon can orbit the planet. Any closer and tidal forces will tear it apart (the Roche limit).",
   "Moon Zone (Outer)":
@@ -606,7 +606,7 @@ export function initMoonPage(mountEl) {
       inclinationDeg: 5.15,
       massMoon: 1.0,
       densityGcm3: 3.34,
-      albedo: 0.136,
+      albedo: 0.11,
     };
     const wNow = loadWorld();
     updateMoon(wNow.moons.selectedId, {

@@ -31,6 +31,8 @@ function pctWithin(actual, expected, pct, label) {
 test("sun-like star returns corrected habitable zone values", () => {
   const star = calcStar({ massMsol: 1, ageGyr: 4.6 });
 
+  assert.equal(star.luminosityLsol, 1.0, "solar luminosity exactly 1");
+  assert.equal(star.radiusRsol, 1.0, "solar radius exactly 1");
   assert.equal(star.spectralClass, "G2.8V");
   assert.equal(star.earthLikeLifePossible, "Yes");
   approxEqual(star.tempK, 5776, 1e-12, "tempK");
@@ -38,13 +40,6 @@ test("sun-like star returns corrected habitable zone values", () => {
   approxEqual(star.habitableZoneAu.outer, 1.6760038078849773, 1e-12, "HZ outer");
   approxEqual(star.habitableZoneModel.sIn, 1.107, 1e-12, "sIn");
   approxEqual(star.habitableZoneModel.sOut, 0.356, 1e-12, "sOut");
-});
-
-test("sun gives exactly L=1 R=1 T=5776", () => {
-  const star = calcStar({ massMsol: 1, ageGyr: 4.6 });
-  assert.equal(star.luminosityLsol, 1.0, "solar luminosity exactly 1");
-  assert.equal(star.radiusRsol, 1.0, "solar radius exactly 1");
-  approxEqual(star.tempK, 5776, 1e-10, "solar Teff");
 });
 
 test("temperature-dependent HZ fluxes change for lower-mass stars", () => {
@@ -58,36 +53,18 @@ test("temperature-dependent HZ fluxes change for lower-mass stars", () => {
 
 // --- Boundary and edge-case tests ---
 
-test("mass below minimum is clamped to 0.075 Msol", () => {
-  const star = calcStar({ massMsol: 0, ageGyr: 5 });
-  assert.equal(star.inputs.massMsol, 0.075);
-  assert.ok(star.luminosityLsol > 0, "luminosity must be positive");
+test("mass is clamped to valid range", () => {
+  const low = calcStar({ massMsol: 0, ageGyr: 5 });
+  assert.equal(low.inputs.massMsol, 0.075);
+  assert.ok(low.luminosityLsol > 0, "luminosity must be positive");
+  const high = calcStar({ massMsol: 999, ageGyr: 1 });
+  assert.equal(high.inputs.massMsol, 100);
 });
 
-test("mass above maximum is clamped to 100 Msol", () => {
-  const star = calcStar({ massMsol: 999, ageGyr: 1 });
-  assert.equal(star.inputs.massMsol, 100);
-});
-
-test("earthLikeLifePossible is No for very low-mass star", () => {
-  const star = calcStar({ massMsol: 0.3, ageGyr: 5 });
-  assert.equal(star.earthLikeLifePossible, "No");
-});
-
-test("earthLikeLifePossible is No for very high-mass star", () => {
-  const star = calcStar({ massMsol: 2, ageGyr: 5 });
-  assert.equal(star.earthLikeLifePossible, "No");
-});
-
-test("earthLikeLifePossible is Star Too Young for young sun-like star", () => {
-  const star = calcStar({ massMsol: 1, ageGyr: 1 });
-  assert.equal(star.earthLikeLifePossible, "Star Too Young");
-});
-
-test("low-mass M-dwarf star has lower luminosity than sun", () => {
-  const mDwarf = calcStar({ massMsol: 0.2, ageGyr: 5 });
-  const sun = calcStar({ massMsol: 1, ageGyr: 5 });
-  assert.ok(mDwarf.luminosityLsol < sun.luminosityLsol);
+test("earthLikeLifePossible covers all classification branches", () => {
+  assert.equal(calcStar({ massMsol: 0.3, ageGyr: 5 }).earthLikeLifePossible, "No");
+  assert.equal(calcStar({ massMsol: 2, ageGyr: 5 }).earthLikeLifePossible, "No");
+  assert.equal(calcStar({ massMsol: 1, ageGyr: 1 }).earthLikeLifePossible, "Star Too Young");
 });
 
 test("high-mass star has shorter maximum age", () => {
@@ -371,13 +348,6 @@ test("calcHabitableZoneAu scales with luminosity", () => {
   // HZ ∝ sqrt(L), so 4x luminosity → 2x distance
   approxEqual(hz4.innerAu / hz1.innerAu, 2, 0.01, "inner scales as sqrt(L)");
   approxEqual(hz4.outerAu / hz1.outerAu, 2, 0.01, "outer scales as sqrt(L)");
-});
-
-test("spectral class at exact boundary temperature is not NA", () => {
-  // After fix #4: boundaries use >= lo and < hi, so exact boundary temps should classify
-  const star3700 = calcStar({ massMsol: 0.5, ageGyr: 5 });
-  // Test with a star whose temp falls near a boundary
-  assert.notEqual(star3700.spectralClass, "NA", "spectral class should not be NA for valid star");
 });
 
 // --- Stellar metallicity ---

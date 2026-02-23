@@ -595,7 +595,7 @@ test("work cycle duty mode shows correct active/rest labels on sequential days",
   }
 });
 
-test("rule debugger trace panel renders for selected day with holiday", () => {
+test("rule debugger trace panel renders with copy button for selected day with holiday", () => {
   const { click, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -626,29 +626,8 @@ test("rule debugger trace panel renders for selected day with holiday", () => {
     const traceText = traceDetails.textContent || "";
     assert.match(traceText, /debug test day/i);
     assert.match(traceText, /fixed-date/i);
-  } finally {
-    cleanup();
-  }
-});
 
-test("rule debugger copy button exists and contains trace text attribute", () => {
-  const { click, cleanup } = setupCalendarPage();
-  try {
-    click(getSectionToggle("special"));
-
-    const name = document.querySelector("#calHolidayName");
-    const dayOfMonth = document.querySelector("#calHolidayDayOfMonth");
-    const save = document.querySelector("#calHolidaySave");
-    assert.ok(name && dayOfMonth && save);
-
-    name.value = "Copy Test";
-    dayOfMonth.value = "2";
-    click(save);
-
-    const day2 = document.querySelector('button[data-cal-mini-day="2"]');
-    assert.ok(day2);
-    click(day2);
-
+    // Copy button
     const copyBtn = document.querySelector(".calendar-rule-trace__copy");
     assert.ok(copyBtn, "Copy to clipboard button should exist in trace");
     assert.match(copyBtn.textContent, /copy to clipboard/i);

@@ -60,7 +60,7 @@ test("CME throttles by activity limits", () => {
   assert.equal(maybeSpawnCME(1e35, mParams, 20, { teffK: 3000 }, { rng: () => 0 }), false);
 });
 
-test("flareClassFromEnergy returns correct class for each energy range", () => {
+test("flareClassFromEnergy returns correct class for each energy range and edge cases", () => {
   assert.equal(flareClassFromEnergy(1e29), "micro");
   assert.equal(flareClassFromEnergy(1e30), "micro");
   assert.equal(flareClassFromEnergy(5e30), "micro");
@@ -72,15 +72,13 @@ test("flareClassFromEnergy returns correct class for each energy range", () => {
   assert.equal(flareClassFromEnergy(5e33), "large");
   assert.equal(flareClassFromEnergy(1e34), "super");
   assert.equal(flareClassFromEnergy(1e35), "super");
-});
-
-test("flareClassFromEnergy handles edge cases", () => {
+  // Edge cases
   assert.equal(flareClassFromEnergy(0), "micro");
   assert.equal(flareClassFromEnergy(NaN), "micro");
   assert.equal(flareClassFromEnergy(null), "micro");
 });
 
-test("sampleFlareEnergyErg returns energy within bounds", () => {
+test("sampleFlareEnergyErg returns energy within bounds (derived and custom)", () => {
   const params = computeFlareParams({ teffK: 5770, ageGyr: 4.6 });
   const rng = createSeededRng("energy-test");
   for (let i = 0; i < 20; i++) {
@@ -88,13 +86,11 @@ test("sampleFlareEnergyErg returns energy within bounds", () => {
     assert.ok(e >= params.EminErg, `energy ${e} should be >= Emin ${params.EminErg}`);
     assert.ok(e <= params.EmaxErg, `energy ${e} should be <= Emax ${params.EmaxErg}`);
   }
-});
-
-test("sampleFlareEnergyErg respects custom bounds", () => {
+  // Custom bounds
   const custom = { alpha: 2.0, EminErg: 1e31, EmaxErg: 1e33 };
-  const rng = createSeededRng("custom-bounds");
+  const rng2 = createSeededRng("custom-bounds");
   for (let i = 0; i < 20; i++) {
-    const e = sampleFlareEnergyErg(custom, rng);
+    const e = sampleFlareEnergyErg(custom, rng2);
     assert.ok(e >= 1e31, `energy ${e} should be >= 1e31`);
     assert.ok(e <= 1e33, `energy ${e} should be <= 1e33`);
   }

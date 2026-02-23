@@ -32,7 +32,7 @@ const EARTH_PLANET = {
 const EARTH_MOON = {
   massMoon: 1.0,
   densityGcm3: 3.34,
-  albedo: 0.136,
+  albedo: 0.11,
   semiMajorAxisKm: 384748,
   eccentricity: 0.055,
   inclinationDeg: 5.15,
@@ -169,24 +169,12 @@ test("parentOverride: all outputs are finite", () => {
 
 // ── Composition from density ──
 
-test("composition class: Io density (3.53) → Rocky", () => {
-  assert.equal(compositionFromDensity(3.53).compositionClass, "Rocky");
-});
-
-test("composition class: Europa density (3.01) → Mixed rock/ice", () => {
-  assert.equal(compositionFromDensity(3.01).compositionClass, "Mixed rock/ice");
-});
-
-test("composition class: Enceladus density (1.61) → Icy", () => {
-  assert.equal(compositionFromDensity(1.61).compositionClass, "Icy");
-});
-
-test("composition class: density below 1.0 → Very icy", () => {
-  assert.equal(compositionFromDensity(0.7).compositionClass, "Very icy");
-});
-
-test("composition class: density above 5.0 → Iron-rich", () => {
+test("compositionFromDensity classifies all density brackets", () => {
   assert.equal(compositionFromDensity(5.5).compositionClass, "Iron-rich");
+  assert.equal(compositionFromDensity(3.53).compositionClass, "Rocky");
+  assert.equal(compositionFromDensity(3.01).compositionClass, "Mixed rock/ice");
+  assert.equal(compositionFromDensity(1.61).compositionClass, "Icy");
+  assert.equal(compositionFromDensity(0.7).compositionClass, "Very icy");
 });
 
 test("composition: rigidity interpolates smoothly (non-decreasing)", () => {
@@ -290,11 +278,6 @@ test("Earth-Moon recession is approximately 3.8 cm/yr outward", () => {
   const m = calcMoonExact(BASE);
   assert.ok(m.tides.recessionCmYr > 1, `recession ${m.tides.recessionCmYr} should be >1 cm/yr`);
   assert.ok(m.tides.recessionCmYr < 10, `recession ${m.tides.recessionCmYr} should be <10 cm/yr`);
-});
-
-test("fast-spinning planet → outward recession (positive)", () => {
-  const m = calcMoonExact(BASE); // Earth spins faster than Moon orbits
-  assert.ok(m.tides.recessionCmYr > 0, "should recede outward");
 });
 
 test("slow-spinning planet → inward recession (Phobos-like)", () => {

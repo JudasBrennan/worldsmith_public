@@ -2,6 +2,100 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.11.0
+
+### Apparent Size & Brightness
+
+**Moon distance bug fix + angular diameters + multi-moon support**
+(engine/apparent.js, ui/apparentPage.js)
+
+Fixed a bug in moon apparent magnitude where the heliocentric distance
+was squared (`home ** 2` instead of `home`). At 1 AU the error cancels
+(log₁₀(1) = 0), but at 2 AU moons appeared ~1.5 mag too dim.
+
+Added angular diameter computation for stars, planets, and moons.
+Results are returned as arcseconds and a smart label that switches
+between degrees, arcminutes, and arcseconds depending on magnitude.
+All three tables on the Apparent Size page now include an angular
+diameter column.
+
+Replaced the single-moon selector with automatic multi-moon rendering:
+the moon table now shows all moons assigned to the home world. A global
+phase slider applies to every moon. Added a Sol System References panel
+showing familiar objects (Sun, Full Moon, Venus, Jupiter, Mars, Sirius)
+for comparison.
+
+**Moon brightness calibration**
+(engine/apparent.js, ui/apparentPage.js, ui/store.js, engine/moon.js)
+
+Corrected default Moon Bond albedo from 0.136 to 0.11 (NASA factsheet).
+Added Bond-to-geometric albedo conversion in the UI using phase integral
+q ≈ 0.9 for regolith-covered rocky bodies. Updated the full-moon
+reference magnitude from −12.67 to −12.74. Moon brightness ratio now
+reads 1.0 for an Earth-like moon at 1 AU, matching observation.
+
+Updated Bond albedo tooltip references across Moon and Planet pages to
+match NASA factsheets: Mercury 0.068, Venus 0.77, Jupiter 0.343,
+Moon 0.11.
+
+**Tests** (tests/apparent.test.js, tests/nasa-validation.test.js)
+
+- 18 apparent engine tests updated for geometric albedo 0.12
+- 6 new NASA validation tests: absolute magnitudes for 7 planets,
+  Sun/Moon from Earth (magnitude + angular diameter), planets at
+  opposition, Galilean moons from Jupiter surface, summary table
+
+### Sol System Preset Accuracy
+
+**Updated 19 planets and moons to NASA/JPL reference values**
+(ui/solPreset.js)
+
+Audited every value in the Sol preset against NASA Planetary Fact
+Sheets and JPL Solar System Dynamics. Corrected semi-major axes,
+eccentricities, inclinations, densities, albedos, and rotation
+parameters across 4 rocky planets, 4 gas giants, and 11 moons.
+
+Notable fixes:
+
+| Body    | Parameter | Old     | New     |
+| ------- | --------- | ------- | ------- |
+| Venus   | albedo    | 0.76    | 0.77    |
+| Saturn  | radiusRj  | 0.843   | 0.862   |
+| Uranus  | radiusRj  | 0.357   | 0.366   |
+| Neptune | radiusRj  | 0.346   | 0.354   |
+| Triton  | inc (°)   | 156.885 | 157.345 |
+| Triton  | albedo    | 0.719   | 0.70    |
+
+Gas giant radii were systematically ~2.2% too small because the old
+values divided equatorial radius by Jupiter's equatorial radius
+(71,492 km), but the engine converts back using volumetric mean
+radius (69,911 km). Corrected all four to use equatorial / 69,911.
+
+### Sky Canvas
+
+**Angular size comparison chart with day/night toggle**
+(ui/apparentPage.js, styles.css)
+
+Added a canvas-based visualization to the Apparent Size page that
+renders all system objects as disks at their true relative angular
+sizes. The star is drawn with a radial gradient in its spectral
+colour, moons as grey disks with albedo-scaled lightness and a
+phase crescent that follows the moon phase slider, and planets as
+brightness-scaled point-source dots with glow halos.
+
+Dotted reference outlines overlay familiar Solar System objects
+(Sun, Luna, Venus, Jupiter, Mars) for intuitive comparison. The
+Sol outline on the star uses a high-contrast dark stroke when the
+star disk is larger than the Sun, switching to a light stroke when
+smaller. When the star is more than 10× larger than any other
+object, a split scale is used: the star appears at reduced scale
+on the left with moons and planets at full scale on the right.
+
+A Night/Day toggle switches the background between a starfield and
+the home world's computed sky colour (zenith-to-horizon gradient
+from the planet engine's spectral/pressure sky model). All labels
+use drop shadows for legibility against any sky background.
+
 ## 1.10.0
 
 ### Rocky Planet Composition

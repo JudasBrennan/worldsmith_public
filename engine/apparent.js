@@ -22,7 +22,7 @@ const PI = Math.PI;
 const AU_IN_KM = 149597870;
 const ARCSEC_PER_RAD = 206264.806;
 const EARTH_SUN_APP_MAG = -26.762;
-const FULL_MOON_APP_MAG = -12.67;
+const FULL_MOON_APP_MAG = -12.74;
 const JUPITER_RADIUS_KM = 69911;
 const EARTH_RADIUS_KM = 6371;
 const SUN_RADIUS_KM = 695700;
@@ -36,6 +36,23 @@ function angleFromCos(cosValue) {
   const c = clampCos(cosValue);
   if (!Number.isFinite(c)) return NaN;
   return (Math.acos(c) * 180) / PI;
+}
+
+/* ── Angular size helpers ───────────────────────────────────── */
+
+function angularDiameter(radiusKm, distanceKm) {
+  const diamRad = (2 * radiusKm) / distanceKm;
+  const arcsec = diamRad * ARCSEC_PER_RAD;
+  const arcmin = arcsec / 60;
+  const degrees = arcmin / 60;
+  return { radians: diamRad, arcsec, arcmin, degrees };
+}
+
+function formatAngularLabel(ang) {
+  if (!Number.isFinite(ang.arcsec)) return "NA";
+  if (ang.degrees >= 1) return `${ang.degrees.toFixed(2)}\u00b0`;
+  if (ang.arcmin >= 1) return `${ang.arcmin.toFixed(2)}\u2032`;
+  return `${ang.arcsec.toFixed(2)}\u2033`;
 }
 
 /* ── Body type classification (matches WS8 types 1-4) ────────── */
@@ -185,12 +202,18 @@ export function calcStarApparentAtOrbit({ starAbsoluteMagnitude, starRadiusRsol,
   const magnitude = starAbsoluteMagnitude + 5 * Math.log10(orbit / ARCSEC_PER_RAD) - 5;
   const brightnessRelativeToEarthSun = 2.512 ** (EARTH_SUN_APP_MAG - magnitude);
   const apparentSizeRelativeToEarthSun = toFinite(starRadiusRsol, 1) / orbit;
+  const starAngSize = angularDiameter(
+    toFinite(starRadiusRsol, 1) * SUN_RADIUS_KM,
+    orbit * AU_IN_KM,
+  );
 
   return {
     orbitAu: orbit,
     magnitude,
     brightnessRelativeToEarthSun,
     apparentSizeRelativeToEarthSun,
+    angularDiameterArcsec: starAngSize.arcsec,
+    angularDiameterLabel: formatAngularLabel(starAngSize),
   };
 }
 
@@ -281,6 +304,8 @@ export function calcBodyApparentFromHome({
     apparentMagnitude,
   });
 
+  const bodyAngSize = angularDiameter(radius, distanceAu * AU_IN_KM);
+
   return {
     absoluteMagnitude,
     apparentMagnitude,
@@ -295,6 +320,8 @@ export function calcBodyApparentFromHome({
     nakedEye: classifyNakedEye(apparentMagnitude),
     observable,
     visibility: classifyVisibility(apparentMagnitude, observable),
+    angularDiameterArcsec: bodyAngSize.arcsec,
+    angularDiameterLabel: formatAngularLabel(bodyAngSize),
   };
 }
 
@@ -330,7 +357,7 @@ function normalizeBodySample(item, index) {
 function normalizeMoonSample(item) {
   const radiusMoon = Math.max(0.000001, toFinite(item?.radiusMoon, 1));
   const semiMajorAxisKm = Math.max(1, toFinite(item?.semiMajorAxisKm, 384748));
-  const geometricAlbedo = clamp(toFinite(item?.geometricAlbedo, 0.113), 0.000001, 1);
+  const geometricAlbedo = clamp(toFinite(item?.geometricAlbedo, 0.12), 0.000001, 1);
   const phaseDeg = clamp(toFinite(item?.phaseDeg, 0), 0, 180);
   return {
     name: String(item?.name || "Moon"),
@@ -388,7 +415,7 @@ export function calcMoonApparentFromHome({
 
   const phaseTerm = bowellHG(moon.phaseDeg, 0.28);
 
-  const distanceFactor = home ** 2 * (moon.semiMajorAxisKm / AU_IN_KM);
+  const distanceFactor = home * (moon.semiMajorAxisKm / AU_IN_KM);
 
   const apparentMagnitude = !Number.isFinite(phaseTerm)
     ? NaN
@@ -401,12 +428,15 @@ export function calcMoonApparentFromHome({
   const apparentSizeRelativeToReference = (moon.radiusMoon / moon.semiMajorAxisKm) * 384748;
   const starApparentSizeRelativeToReference = starRadius / home;
 
-  const moonAngularRadiusRad = moonRadiusToKm(moon.radiusMoon) / moon.semiMajorAxisKm;
+  const moonRadiusKm = moonRadiusToKm(moon.radiusMoon);
+  const moonAngularRadiusRad = moonRadiusKm / moon.semiMajorAxisKm;
   const starAngularRadiusRad = (starRadius * SUN_RADIUS_KM) / (home * AU_IN_KM);
   const eclipseType =
     moonAngularRadiusRad >= starAngularRadiusRad
       ? "Total Eclipses Possible"
       : "Annular Eclipses Only";
+
+  const moonAngSize = angularDiameter(moonRadiusKm, moon.semiMajorAxisKm);
 
   return {
     ...moon,
@@ -416,6 +446,8 @@ export function calcMoonApparentFromHome({
     apparentSizeRelativeToReference,
     starApparentSizeRelativeToReference,
     eclipseType,
+    angularDiameterArcsec: moonAngSize.arcsec,
+    angularDiameterLabel: formatAngularLabel(moonAngSize),
   };
 }
 
@@ -439,6 +471,7 @@ export function calcApparentModel({
   orbitSamples = [],
   bodySamples = [],
   moonSample = null,
+  moonSamples = [],
 }) {
   const star = calcStar({ massMsol: toFinite(starMassMsol, 1), ageGyr: 4.5 });
   const homeOrbit = Math.max(0.000001, toFinite(homeOrbitAu, 1));
@@ -482,12 +515,25 @@ export function calcApparentModel({
     }),
   }));
 
-  const moon = calcMoonApparentFromHome({
-    starLuminosityLsol: star.luminosityLsol,
-    homeOrbitAu: homeOrbit,
-    starRadiusRsol: star.radiusRsol,
-    moonSample,
-  });
+  const allMoonSamples = moonSamples.length > 0 ? moonSamples : moonSample ? [moonSample] : [];
+
+  const moons = allMoonSamples.map((sample) =>
+    calcMoonApparentFromHome({
+      starLuminosityLsol: star.luminosityLsol,
+      homeOrbitAu: homeOrbit,
+      starRadiusRsol: star.radiusRsol,
+      moonSample: sample,
+    }),
+  );
+
+  const moon =
+    moons[0] ||
+    calcMoonApparentFromHome({
+      starLuminosityLsol: star.luminosityLsol,
+      homeOrbitAu: homeOrbit,
+      starRadiusRsol: star.radiusRsol,
+      moonSample: null,
+    });
 
   return {
     inputs: {
@@ -502,8 +548,52 @@ export function calcApparentModel({
     starByOrbit,
     bodiesFromHome,
     moon,
+    moons,
   };
 }
+
+/**
+ * Sol system reference values for familiar comparison.
+ * All values are as seen from Earth.
+ */
+export const SOL_REFERENCES = [
+  { name: "Sun", appMag: -26.74, angDiamArcmin: 31.6, angDiamArcsec: 1896, note: "from Earth" },
+  {
+    name: "Full Moon",
+    appMag: -12.74,
+    angDiamArcmin: 31.1,
+    angDiamArcsec: 1866,
+    note: "from Earth",
+  },
+  {
+    name: "Venus (brightest)",
+    appMag: -4.6,
+    angDiamArcmin: null,
+    angDiamArcsec: 64,
+    note: "inferior conjunction",
+  },
+  {
+    name: "Jupiter (opposition)",
+    appMag: -2.7,
+    angDiamArcmin: null,
+    angDiamArcsec: 50,
+    note: "at opposition",
+  },
+  {
+    name: "Mars (closest)",
+    appMag: -2.9,
+    angDiamArcmin: null,
+    angDiamArcsec: 25,
+    note: "at closest approach",
+  },
+  {
+    name: "Sirius",
+    appMag: -1.46,
+    angDiamArcmin: null,
+    angDiamArcsec: null,
+    note: "brightest star",
+  },
+];
 
 export function convertPlanetRadiusEarthToKm(radiusEarth) {
   return Math.max(0.000001, toFinite(radiusEarth, 1)) * EARTH_RADIUS_KM;
@@ -527,4 +617,4 @@ export function bondToGeometricAlbedo(bondAlbedo, bodyType) {
   return bond / q;
 }
 
-export { classifyBodyType, BODY_TYPE_LABEL };
+export { classifyBodyType, BODY_TYPE_LABEL, formatAngularLabel };

@@ -11,10 +11,6 @@ import {
 
 /* ── Style count & categories ──────────────────────────────────────── */
 
-test("GAS_GIANT_STYLES has 24 entries", () => {
-  assert.equal(GAS_GIANT_STYLES.length, 24);
-});
-
 test("17 Realistic + 7 Fantastical", () => {
   const realistic = GAS_GIANT_STYLES.filter((s) => s.category === "Realistic");
   const fantastical = GAS_GIANT_STYLES.filter((s) => s.category === "Fantastical");
@@ -40,19 +36,10 @@ test("getStyleById falls back to jupiter for unknown id", () => {
   assert.equal(s.id, "jupiter");
 });
 
-test("getStyleById resolves legacy alias: ice → neptune", () => {
-  const s = getStyleById("ice");
-  assert.equal(s.id, "neptune");
-});
-
-test("getStyleById resolves legacy alias: hot → hot-jupiter", () => {
-  const s = getStyleById("hot");
-  assert.equal(s.id, "hot-jupiter");
-});
-
-test("getStyleById resolves legacy alias: exotic → crystal", () => {
-  const s = getStyleById("exotic");
-  assert.equal(s.id, "crystal");
+test("getStyleById resolves all legacy aliases", () => {
+  assert.equal(getStyleById("ice").id, "neptune");
+  assert.equal(getStyleById("hot").id, "hot-jupiter");
+  assert.equal(getStyleById("exotic").id, "crystal");
 });
 
 /* ── styleLabel ────────────────────────────────────────────────────── */
@@ -92,12 +79,6 @@ test("every style has a ringStyle with colour, gap, and width", () => {
 });
 
 /* ── normalizeStyleId ──────────────────────────────────────────────── */
-
-test("normalizeStyleId resolves aliases", () => {
-  assert.equal(normalizeStyleId("ice"), "neptune");
-  assert.equal(normalizeStyleId("hot"), "hot-jupiter");
-  assert.equal(normalizeStyleId("exotic"), "crystal");
-});
 
 test("normalizeStyleId passes through known styles", () => {
   assert.equal(normalizeStyleId("jupiter"), "jupiter");

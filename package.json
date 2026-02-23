@@ -1,6 +1,6 @@
 {
   "name": "worldsmith-web",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,8 +12,9 @@
     "format:check": "prettier --check .",
     "test:engine": "node --test --test-path-pattern=\"^(?!.*\\.ui\\.test\\.js$).*\\.test\\.js$\" tests/",
     "test:ui": "node --test \"tests/**/*.ui.test.js\"",
-    "test": "node --test \"tests/**/*.test.js\"",
-    "check": "node scripts/check-syntax.mjs && eslint . && prettier --check . && node --test \"tests/**/*.test.js\"",
+    "test": "node --test --test-reporter=./scripts/test-reporter.mjs \"tests/**/*.test.js\"",
+    "test:report": "node --test --test-reporter=./scripts/test-reporter-md.mjs --test-reporter-destination=test-results.md \"tests/**/*.test.js\"",
+    "check": "node scripts/check-syntax.mjs && eslint . && prettier --check . && node --test --test-reporter=./scripts/test-reporter.mjs \"tests/**/*.test.js\"",
     "build": "node scripts/build.mjs"
   },
   "devDependencies": {

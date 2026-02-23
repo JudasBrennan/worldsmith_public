@@ -343,7 +343,7 @@ function defaultWorld() {
             inclinationDeg: 5.15,
             massMoon: 1.0,
             densityGcm3: 3.34,
-            albedo: 0.136,
+            albedo: 0.11,
             compositionOverride: null,
           },
         },
@@ -359,7 +359,7 @@ function defaultWorld() {
       inclinationDeg: 5.15,
       massMoon: 1.0,
       densityGcm3: 3.34,
-      albedo: 0.136,
+      albedo: 0.11,
       compositionOverride: null,
     },
   };
@@ -457,7 +457,7 @@ function migrateWorld(world) {
           inclinationDeg: 5.15,
           massMoon: 1.0,
           densityGcm3: 3.34,
-          albedo: 0.136,
+          albedo: 0.11,
         };
     const planetId = world.planets?.selectedId || "p1";
     const m1 = {

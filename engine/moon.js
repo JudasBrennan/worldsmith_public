@@ -230,7 +230,7 @@ export function calcMoonExact({ starMassMsol, starAgeGyr, planet, moon, parentOv
 
   const mMoonMM = clamp(moon.massMoon ?? 1.0, 0.001, 10000);
   const rhoMoonGcm3 = clamp(moon.densityGcm3 ?? 3.34, 0.1, 100);
-  const albedo = clamp(moon.albedo ?? 0.136, 0, 0.95);
+  const albedo = clamp(moon.albedo ?? 0.11, 0, 0.95);
 
   const aMoonKmInput = clamp(moon.semiMajorAxisKm ?? 384748, 10, 1e9);
   const eMoon = clamp(moon.eccentricity ?? 0.055, 0, 0.99);

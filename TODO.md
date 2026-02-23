@@ -4,12 +4,10 @@
 
 - [ ] Icy planets (Ganymede, for example)
 - [ ] Lagrange Points in the visualiser.
-- [ ] Overhaul ground composition for rocky planets.
 
 ## Definitely
 
 - [ ] Limit local cluster to 25 ly radius OR improve star generation logic so there isn't a soft cap on number of objects
-- [ ] Second pass on apparent size page
 - [ ] Implement calculated planet colour logic
 - [ ] Improve planet colour logic in system visualiser
 - [ ] Add support for binary, ternary, and quaternary home systems.
@@ -19,7 +17,6 @@
 ## Maybe?
 
 - [ ] Planet & satellite visualiser?
-- [ ] Ambitious idea for the Apparent Size page. A canvas with a view over the shoulder of a person, showing the day or night sky, comparing the apparent size of celestial objects to ones in the Sol system from earth
 - [ ] Galaxy viewer. Displays galaxy in overview (not rendering each star), with your local and orbit around the SMBH, and the GHZ.
 
 ## Complete
@@ -35,3 +32,6 @@
 - [x] Maths page displaying all of the formulae and what we used them for.
 - [x] Improve Ap/Pe symbols (5-sided arrows above the orbit?)
 - [x] Hill Spheres on visualiser.
+- [x] Overhaul ground composition for rocky planets.
+- [x] Second pass on apparent size page
+- [x] Ambitious idea for the Apparent Size page. A canvas with a view over the shoulder of a person, showing the day or night sky, comparing the apparent size of celestial objects to ones in the Sol system from earth

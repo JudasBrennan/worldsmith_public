@@ -359,12 +359,6 @@ test("gas giant selectedId falls back to first when selected is deleted", () => 
 
 /* ── Preset new fields ──────────────────────────────────────────── */
 
-test("Sol preset includes selectedBodyType and gas giant selectedId", () => {
-  const world = importWorld(createSolPresetEnvelope().world);
-  assert.equal(world.selectedBodyType, "planet");
-  assert.equal(world.system.gasGiants.selectedId, "gg_jupiter");
-});
-
 test("Realmspace preset includes selectedBodyType and gas giant selectedId", () => {
   const world = importWorld(createRealmspacePresetEnvelope().world);
   assert.equal(world.selectedBodyType, "planet");

@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.10.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.11.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -59,6 +59,13 @@ export function initAboutPage(mountEl) {
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.11.0</b> (from 1.10.0)</p>
+        <ul>
+          <li><b>Apparent Size &amp; Brightness</b> &mdash; Bug fixes (angular-diameter swap, Roche limit divisor, moon absolute magnitude formula), multi-moon support, Bond-to-geometric albedo conversion, and NASA-validated Sol reference data.</li>
+          <li><b>Sky Canvas</b> &mdash; Angular size comparison chart rendering star, moons, and planets as disks at true relative angular sizes with Sol reference outlines, phase crescents, brightness-scaled glow, and a day/night sky toggle using the planet engine&rsquo;s computed sky colours.</li>
+          <li><b>Sol System Preset</b> &mdash; Corrected orbital, physical, and photometric data for 19 bodies against NASA Planetary Fact Sheets.</li>
+        </ul>
 
         <p><b>Version 1.10.0</b> (from 1.9.1)</p>
         <ul>

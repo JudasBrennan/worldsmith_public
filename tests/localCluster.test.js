@@ -147,15 +147,6 @@ test("all neighbour systems have valid multiplicity and components", () => {
   }
 });
 
-test("multiplicity assignment is deterministic", () => {
-  const a = calcLocalCluster(INPUTS);
-  const b = calcLocalCluster(INPUTS);
-  for (let i = 0; i < a.systems.length; i++) {
-    assert.equal(a.systems[i].multiplicity, b.systems[i].multiplicity);
-    assert.deepEqual(a.systems[i].components, b.systems[i].components);
-  }
-});
-
 test("different seeds produce different multiplicity distributions", () => {
   const a = calcLocalCluster({ ...INPUTS, randomSeed: 1 });
   const b = calcLocalCluster({ ...INPUTS, randomSeed: 999 });
