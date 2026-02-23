@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.11.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.11.1</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -59,6 +59,11 @@ export function initAboutPage(mountEl) {
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.11.1</b> (from 1.11.0)</p>
+        <ul>
+          <li><b>System Poster</b> &mdash; Dynamic solar system lineup visualization on the Planetary System page. Star glows on the left; rocky planets, gas giants, debris disks, and moons are arranged by orbital distance with power-law sizing. Includes curved orbital arcs for habitable zone and debris disks, irregular asteroid particle effects, control panel toggles, logarithmic/linear scale, fullscreen mode, and PNG export.</li>
+        </ul>
 
         <p><b>Version 1.11.0</b> (from 1.10.0)</p>
         <ul>

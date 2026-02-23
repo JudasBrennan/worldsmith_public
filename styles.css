@@ -3767,3 +3767,48 @@ input.auto-value {
   width: 100%;
   height: 100%;
 }
+
+/* System poster */
+.poster-controls {
+  margin-bottom: 10px;
+}
+.poster-controls__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.poster-controls__row + .poster-controls__row {
+  margin-top: 8px;
+}
+.poster-controls__checks {
+  gap: 6px;
+}
+.poster-controls .viz-check {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.system-poster-wrap {
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  min-height: 180px;
+  max-height: 400px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+.system-poster-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#posterPanel:fullscreen {
+  background: var(--panel);
+}
+#posterPanel:fullscreen .system-poster-wrap {
+  max-height: none;
+  height: calc(100vh - 120px);
+  aspect-ratio: auto;
+}
+#posterPanel:fullscreen .panel__header {
+  padding: 10px 16px;
+}

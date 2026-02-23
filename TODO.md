@@ -16,7 +16,6 @@
 
 ## Maybe?
 
-- [ ] Planet & satellite visualiser?
 - [ ] Galaxy viewer. Displays galaxy in overview (not rendering each star), with your local and orbit around the SMBH, and the GHZ.
 
 ## Complete
@@ -35,3 +34,4 @@
 - [x] Overhaul ground composition for rocky planets.
 - [x] Second pass on apparent size page
 - [x] Ambitious idea for the Apparent Size page. A canvas with a view over the shoulder of a person, showing the day or night sky, comparing the apparent size of celestial objects to ones in the Sol system from earth
+- [x] Planet & satellite visualiser

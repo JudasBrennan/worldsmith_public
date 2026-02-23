@@ -2,6 +2,38 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.11.1
+
+### System Poster
+
+**Dynamic solar system lineup visualization**
+(ui/systemPage.js, styles.css)
+
+Added a System Poster panel at the top of the Planetary System page.
+The poster renders a poster-style lineup of all bodies in the current
+system: the star as a glowing half-disk on the left, with rocky planets,
+gas giants, debris disks, and moons arranged left-to-right by orbital
+distance.
+
+- **Body sizing** — Power-law scale so rocky planets remain visible
+  next to gas giants (`(radiusKm / EARTH_R_KM) ^ 0.45`)
+- **Gas giants** — Full banded rendering with rings, spots, and
+  special effects via `drawGasGiantViz`
+- **Rocky planets** — Radial gradient spheres using sky colours from
+  the planet engine, lit from the star direction
+- **Moons** — Stacked vertically below parent bodies with name labels
+- **Habitable zone** — Semi-transparent green arc band curving around
+  the star
+- **Frost line** — Dashed vertical line
+- **Debris disks** — Curved arc bands with irregular asteroid rock
+  particles and fine dust, with name labels
+- **Control panel** — Toggle visibility of labels, moons, habitable
+  zone, frost line, debris disks, orbital guides, and starfield
+- **Scale modes** — Logarithmic (default) and Linear scale toggle
+- **Fullscreen** — Fullscreen API integration for immersive viewing
+- **Export PNG** — Download poster as timestamped PNG
+- **Collapsible** — Click header or arrow button to collapse/expand
+
 ## 1.11.0
 
 ### Apparent Size & Brightness

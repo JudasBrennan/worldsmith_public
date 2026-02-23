@@ -1,6 +1,11 @@
+import { calcGasGiant } from "../engine/gasGiant.js";
+import { calcPlanetExact } from "../engine/planet.js";
+import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
+import { downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
+import { drawGasGiantViz, styleLabel } from "./gasGiantStyles.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   loadWorld,
@@ -16,7 +21,6 @@ import {
   listSystemGasGiants,
   listSystemDebrisDisks,
 } from "./store.js";
-import { styleLabel } from "./gasGiantStyles.js";
 
 const TIP_LABEL = {
   "Star Mass": "Input your star's mass, in solar masses, here. Our sun = 1 Msol.",
@@ -52,7 +56,465 @@ const TIP_LABEL = {
   "Inner debris disk name": "Name used for the optional inner debris disk.",
   "Inner edge": "Inner boundary of the debris disk in astronomical units (AU).",
   "Outer edge": "Outer boundary of the debris disk in astronomical units (AU).",
+  "System poster":
+    "Visual lineup of all bodies in the system, arranged left-to-right by orbital distance. " +
+    "Body sizes use a power-law scale so rocky planets remain visible next to gas giants. " +
+    "The green band marks the habitable zone; the dashed line marks the H\u2082O frost line.",
 };
+
+/* ── System Poster canvas renderer ─────────────────────── */
+
+const EARTH_R_KM = 6371;
+const MOON_R_KM = 1737.4;
+
+function hexToRgba(hex, a) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+function seededRand(seed) {
+  let s = seed | 0 || 1;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+/** Compute canvas-arc start/end angles that cover the full canvas height. */
+function arcAngles(r, cenY, canvasH) {
+  const aTop = r > cenY ? -Math.asin(cenY / r) : -Math.PI / 2;
+  const aBot = r > canvasH - cenY ? Math.asin((canvasH - cenY) / r) : Math.PI / 2;
+  return [aTop, aBot];
+}
+
+function drawSystemPoster(canvas, data, opts = {}) {
+  const { star, system, planets, gasGiants, moons, debrisDisks } = data;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const showLabels = opts.labels !== false;
+  const showMoons = opts.moons !== false;
+  const showHz = opts.hz !== false;
+  const showFrost = opts.frost !== false;
+  const showDebris = opts.debris !== false;
+  const showGuides = opts.guides !== false;
+  const showStarfield = opts.starfield !== false;
+  const scaleMode = opts.scale || "log";
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  if (rect.width < 10 || rect.height < 10) return;
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width;
+  const H = rect.height;
+
+  // ── Background ───────────────────────────────────────
+  const bgGrad = ctx.createLinearGradient(0, 0, W, 0);
+  bgGrad.addColorStop(0, "#06081a");
+  bgGrad.addColorStop(1, "#0a0e24");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Starfield
+  if (showStarfield) {
+    const rng = seededRand(42);
+    for (let i = 0; i < 70; i++) {
+      const sx = rng() * W;
+      const sy = rng() * H;
+      const sa = 0.15 + rng() * 0.45;
+      const sr = 0.3 + rng() * 0.8;
+      ctx.fillStyle = `rgba(200,210,240,${sa})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── Collect all bodies with positions ────────────────
+  const allBodies = [];
+
+  for (const p of planets) {
+    const au = p.au;
+    if (!au || au <= 0) continue;
+    allBodies.push({
+      type: "planet",
+      name: p.name,
+      au,
+      radiusKm: p.radiusKm || EARTH_R_KM,
+      dayHex: p.dayHex || "#9bbbe0",
+      horizonHex: p.horizonHex || "#6a6a6a",
+      id: p.id,
+    });
+  }
+
+  for (const g of gasGiants) {
+    const au = g.au;
+    if (!au || au <= 0) continue;
+    allBodies.push({
+      type: "gasGiant",
+      name: g.name,
+      au,
+      radiusKm: g.radiusKm || 69911,
+      style: g.style || "jupiter",
+      rings: g.rings || false,
+      id: g.id,
+    });
+  }
+
+  allBodies.sort((a, b) => a.au - b.au);
+
+  // Group moons by parent ID
+  const moonsByParent = new Map();
+  for (const m of moons) {
+    if (!m.parentId) continue;
+    if (!moonsByParent.has(m.parentId)) moonsByParent.set(m.parentId, []);
+    moonsByParent.get(m.parentId).push(m);
+  }
+
+  // ── Layout constants ─────────────────────────────────
+  const starGlowW = W * 0.12;
+  const bodyLeft = W * 0.22;
+  const bodyRight = W * 0.95;
+  const bodyRegionW = bodyRight - bodyLeft;
+  const cy = H * 0.4;
+  const maxR = H * 0.3;
+  const labelY = H - 4;
+  const nameY = labelY - 12;
+  const starR = Math.min(H * 0.7, starGlowW * 1.8);
+  const starCx = -starR * 0.3;
+
+  // ── Log-scale x mapping ──────────────────────────────
+  // Gather all AU values (bodies + zone edges)
+  const allAu = allBodies.map((b) => b.au);
+  if (system.habitableZoneAu) {
+    allAu.push(system.habitableZoneAu.inner, system.habitableZoneAu.outer);
+  }
+  if (system.frostLineAu) allAu.push(system.frostLineAu);
+  for (const d of debrisDisks) {
+    if (d.innerAu > 0) allAu.push(d.innerAu);
+    if (d.outerAu > 0) allAu.push(d.outerAu);
+  }
+  const validAu = allAu.filter((v) => v > 0);
+  if (validAu.length === 0) {
+    // Empty system — just draw star and return
+    drawStarHalf(ctx, W, H, star, starGlowW);
+    drawEmptyLabel(ctx, W, H);
+    return;
+  }
+
+  const minAuRaw = Math.min(...validAu);
+  const maxAuRaw = Math.max(...validAu);
+
+  // Log scale
+  const minLog = Math.log10(minAuRaw * 0.7);
+  const maxLog = Math.log10(maxAuRaw * 1.3);
+  const logRange = maxLog - minLog || 1;
+
+  // Linear scale
+  const minLin = minAuRaw * 0.85;
+  const maxLin = maxAuRaw * 1.15;
+  const linRange = maxLin - minLin || 1;
+
+  function auToX(au) {
+    if (au <= 0) return bodyLeft;
+    if (scaleMode === "linear") {
+      const t = (au - minLin) / linRange;
+      return bodyLeft + t * bodyRegionW;
+    }
+    const t = (Math.log10(au) - minLog) / logRange;
+    return bodyLeft + t * bodyRegionW;
+  }
+
+  // ── Body px radius (power-law) ───────────────────────
+  function bodyPxR(radiusKm) {
+    const base = Math.min(8, H * 0.06);
+    const raw = base * Math.pow(radiusKm / EARTH_R_KM, 0.45);
+    return Math.max(3, Math.min(maxR, raw));
+  }
+
+  // ── Draw habitable zone (curved arc band) ───────────
+  if (showHz && system.habitableZoneAu) {
+    const x1 = auToX(system.habitableZoneAu.inner);
+    const x2 = auToX(system.habitableZoneAu.outer);
+    const r1 = x1 - starCx;
+    const r2 = x2 - starCx;
+    const [a1T, a1B] = arcAngles(r1, cy, H);
+    const [a2T, a2B] = arcAngles(r2, cy, H);
+    const aT = Math.min(a1T, a2T);
+    const aB = Math.max(a1B, a2B);
+    ctx.fillStyle = "rgba(50,180,80,0.07)";
+    ctx.beginPath();
+    ctx.arc(starCx, cy, r2, aT, aB);
+    ctx.arc(starCx, cy, r1, aB, aT, true);
+    ctx.closePath();
+    ctx.fill();
+    // HZ label
+    ctx.save();
+    ctx.fillStyle = "rgba(80,200,100,0.35)";
+    ctx.font = "italic 9px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("Habitable Zone", (x1 + x2) / 2, 6);
+    ctx.restore();
+  }
+
+  // ── Draw frost line ──────────────────────────────────
+  if (showFrost && system.frostLineAu) {
+    const fx = auToX(system.frostLineAu);
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = "rgba(120,170,220,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(fx, 0);
+    ctx.lineTo(fx, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(120,170,220,0.35)";
+    ctx.font = "italic 9px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Frost line", fx + 4, 6);
+    ctx.restore();
+  }
+
+  // ── Draw debris disks (curved arcs with asteroid effects) ──
+  for (const d of showDebris ? debrisDisks : []) {
+    if (d.innerAu <= 0 || d.outerAu <= 0) continue;
+    const dInner = Math.min(d.innerAu, d.outerAu);
+    const dOuter = Math.max(d.innerAu, d.outerAu);
+    const x1 = auToX(dInner);
+    const x2 = auToX(dOuter);
+    const dr1 = x1 - starCx;
+    const dr2 = x2 - starCx;
+    const [da1T, da1B] = arcAngles(dr1, cy, H);
+    const [da2T, da2B] = arcAngles(dr2, cy, H);
+    const daT = Math.min(da1T, da2T);
+    const daB = Math.max(da1B, da2B);
+
+    // Background haze band
+    const dGrad = ctx.createRadialGradient(starCx, cy, dr1, starCx, cy, dr2);
+    dGrad.addColorStop(0, "rgba(160,130,90,0.06)");
+    dGrad.addColorStop(0.5, "rgba(160,130,90,0.12)");
+    dGrad.addColorStop(1, "rgba(160,130,90,0.06)");
+    ctx.fillStyle = dGrad;
+    ctx.beginPath();
+    ctx.arc(starCx, cy, dr2, daT, daB);
+    ctx.arc(starCx, cy, dr1, daB, daT, true);
+    ctx.closePath();
+    ctx.fill();
+
+    // Asteroid particles
+    const dRng = seededRand(Math.round(dInner * 1000));
+    const bandW = dr2 - dr1;
+    const astCount = Math.max(25, Math.round(bandW * 1.2));
+    for (let i = 0; i < astCount; i++) {
+      const t = dRng();
+      // Bias toward center of band
+      const t2 = 0.5 + (t - 0.5) * 0.85;
+      const rAst = dr1 + t2 * (dr2 - dr1);
+      const angle = daT + dRng() * (daB - daT);
+      const ax = starCx + Math.cos(angle) * rAst;
+      const ay = cy + Math.sin(angle) * rAst;
+      const alpha = 0.12 + dRng() * 0.28;
+      const size = 0.3 + dRng() * 1.8;
+
+      if (size > 0.9) {
+        // Irregular asteroid rock (small polygon)
+        const verts = 4 + Math.floor(dRng() * 3);
+        const cr = 150 + Math.floor(dRng() * 50);
+        const cg = 120 + Math.floor(dRng() * 40);
+        const cb = 80 + Math.floor(dRng() * 30);
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha})`;
+        ctx.beginPath();
+        for (let v = 0; v < verts; v++) {
+          const va = (v / verts) * Math.PI * 2;
+          const vr = size * (0.5 + dRng() * 0.5);
+          const vx = ax + Math.cos(va) * vr;
+          const vy = ay + Math.sin(va) * vr;
+          if (v === 0) ctx.moveTo(vx, vy);
+          else ctx.lineTo(vx, vy);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // Fine dust particle
+        ctx.fillStyle = `rgba(180,150,110,${alpha * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(ax, ay, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Debris disk label
+    if (showLabels && d.name) {
+      const midX = (x1 + x2) / 2;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 3;
+      ctx.fillStyle = "rgba(180,160,120,0.6)";
+      ctx.font = "italic 9px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(d.name, midX, 6);
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
+  // ── Orbital guide lines ──────────────────────────────
+  if (showGuides) {
+    const starEdgeX = starGlowW * 0.6;
+    for (const body of allBodies) {
+      const bx = auToX(body.au);
+      ctx.strokeStyle = "rgba(200,210,230,0.04)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(starEdgeX, cy);
+      ctx.lineTo(bx, cy);
+      ctx.stroke();
+    }
+  }
+
+  // ── Star half-disk ───────────────────────────────────
+  drawStarHalf(ctx, W, H, star, starGlowW);
+
+  // ── Draw bodies ──────────────────────────────────────
+  for (const body of allBodies) {
+    const bx = auToX(body.au);
+    const pr = bodyPxR(body.radiusKm);
+
+    if (body.type === "gasGiant") {
+      drawGasGiantViz(ctx, bx, cy, pr, body.style, {
+        showRings: body.rings,
+        lightDx: -1,
+        lightDy: 0,
+      });
+    } else {
+      // Rocky planet — radial gradient sphere lit from left
+      const litX = bx - pr * 0.4;
+      const litY = cy - pr * 0.2;
+      const grad = ctx.createRadialGradient(litX, litY, 0, bx, cy, pr);
+      grad.addColorStop(0, hexToRgba(body.dayHex, 0.98));
+      grad.addColorStop(0.55, hexToRgba(body.dayHex, 0.78));
+      grad.addColorStop(0.82, hexToRgba(body.horizonHex, 0.92));
+      grad.addColorStop(1, hexToRgba(body.horizonHex, 0.98));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(bx, cy, pr, 0, Math.PI * 2);
+      ctx.fill();
+      // Subtle outline
+      ctx.strokeStyle = "rgba(0,0,0,0.22)";
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // ── Moons stacked vertically below parent ─────
+    if (showMoons) {
+      const parentMoons = moonsByParent.get(body.id) || [];
+      if (parentMoons.length > 0) {
+        let moonY = cy + pr + 8;
+        for (let mi = 0; mi < parentMoons.length; mi++) {
+          const m = parentMoons[mi];
+          const moonKm = (m.radiusMoon || 0.1) * MOON_R_KM;
+          const ratio = Math.pow(moonKm / body.radiusKm, 0.4);
+          const mr = Math.max(1.2, pr * Math.max(0.08, Math.min(0.5, ratio)));
+          moonY += mr + 2;
+          // Small lit sphere
+          const mGrad = ctx.createRadialGradient(bx - mr * 0.3, moonY - mr * 0.2, 0, bx, moonY, mr);
+          mGrad.addColorStop(0, "rgba(200,200,210,0.9)");
+          mGrad.addColorStop(0.7, "rgba(140,140,150,0.85)");
+          mGrad.addColorStop(1, "rgba(80,80,90,0.8)");
+          ctx.fillStyle = mGrad;
+          ctx.beginPath();
+          ctx.arc(bx, moonY, mr, 0, Math.PI * 2);
+          ctx.fill();
+          // Moon name label
+          if (showLabels && m.name) {
+            ctx.save();
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 2;
+            ctx.fillStyle = "rgba(180,185,210,0.65)";
+            ctx.font = "8px ui-sans-serif, system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(m.name, bx + mr + 3, moonY);
+            ctx.shadowColor = "transparent";
+            ctx.shadowBlur = 0;
+            ctx.restore();
+          }
+          moonY += mr + 2;
+        }
+      }
+    }
+
+    // ── Labels ──────────────────────────────────────
+    if (showLabels) {
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetY = 1;
+      ctx.fillStyle = "rgba(220,225,240,0.85)";
+      ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(body.name, bx, nameY);
+      ctx.fillStyle = "rgba(160,170,200,0.7)";
+      ctx.font = "9px ui-monospace, SFMono-Regular, monospace";
+      ctx.fillText(fmt(body.au, 2) + " AU", bx, labelY);
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+}
+
+function drawStarHalf(ctx, W, H, star, glowW) {
+  const cy = H * 0.4;
+  const starR = Math.min(H * 0.7, glowW * 1.8);
+  const starCx = -starR * 0.3;
+  const col = star.starColourHex || "#fff8e0";
+
+  // Glow halo
+  const glowR = starR * 2.2;
+  const glowGrad = ctx.createRadialGradient(starCx, cy, starR * 0.5, starCx, cy, glowR);
+  glowGrad.addColorStop(0, hexToRgba(col, 0.3));
+  glowGrad.addColorStop(0.5, hexToRgba(col, 0.08));
+  glowGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(starCx, cy, glowR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Star disk
+  const diskGrad = ctx.createRadialGradient(
+    starCx + starR * 0.15,
+    cy - starR * 0.1,
+    0,
+    starCx,
+    cy,
+    starR,
+  );
+  diskGrad.addColorStop(0, "#ffffff");
+  diskGrad.addColorStop(0.3, col);
+  diskGrad.addColorStop(1, hexToRgba(col, 0.85));
+  ctx.fillStyle = diskGrad;
+  ctx.beginPath();
+  ctx.arc(starCx, cy, starR, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawEmptyLabel(ctx, W, H) {
+  ctx.fillStyle = "rgba(160,170,200,0.5)";
+  ctx.font = "italic 12px ui-sans-serif, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Assign planets to orbital slots to populate the poster", W / 2, H / 2);
+}
 
 function orbitSlotToleranceAu(slotAu) {
   return Math.max(0.05, slotAu * 0.02);
@@ -78,6 +540,44 @@ export function initSystemPage(mountEl) {
   const wrap = document.createElement("div");
   wrap.className = "page";
   wrap.innerHTML = `
+    <div class="panel" id="posterPanel">
+      <div class="panel__header" style="cursor:pointer" id="posterToggleHeader">
+        <h2>System Poster ${tipIcon(TIP_LABEL["System poster"])}</h2>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <button class="small" type="button" id="btn-poster-export" title="Export PNG">Export PNG</button>
+          <button class="small" type="button" id="btn-poster-fs" title="Fullscreen">Fullscreen</button>
+          <button class="small" type="button" id="btn-poster-collapse" title="Toggle poster">&#x25B2;</button>
+        </div>
+      </div>
+      <div class="panel__body" id="posterBody">
+        <div class="poster-controls" id="posterControls">
+          <div class="poster-controls__row poster-controls__checks">
+            <label class="viz-check"><input id="pchk-labels" type="checkbox" checked /><span>Labels</span></label>
+            <label class="viz-check"><input id="pchk-moons" type="checkbox" checked /><span>Moons</span></label>
+            <label class="viz-check"><input id="pchk-hz" type="checkbox" checked /><span>Habitable zone</span></label>
+            <label class="viz-check"><input id="pchk-frost" type="checkbox" checked /><span>Frost line</span></label>
+            <label class="viz-check"><input id="pchk-debris" type="checkbox" checked /><span>Debris disks</span></label>
+            <label class="viz-check"><input id="pchk-guides" type="checkbox" checked /><span>Orbital guides</span></label>
+            <label class="viz-check"><input id="pchk-starfield" type="checkbox" checked /><span>Starfield</span></label>
+          </div>
+          <div class="poster-controls__row">
+            <div class="pill-toggle-wrap" style="min-width:260px">
+              <div class="physics-duo-toggle" data-toggle="posterScale">
+                <input type="radio" name="posterScale" id="pscale-log" value="log" checked />
+                <label for="pscale-log">Logarithmic</label>
+                <input type="radio" name="posterScale" id="pscale-lin" value="linear" />
+                <label for="pscale-lin">Linear</label>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="system-poster-wrap" id="posterWrap">
+          <canvas id="systemPoster"></canvas>
+        </div>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--system" aria-hidden="true"></span><span>Planetary System</span></h1>
@@ -149,6 +649,7 @@ export function initSystemPage(mountEl) {
         </div>
       </div>
     </div>
+
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
@@ -163,6 +664,89 @@ export function initSystemPage(mountEl) {
   const unassignedMoonsEl = wrap.querySelector("#unassignedMoons");
   const slotsUiEl = wrap.querySelector("#slotsUi");
   const orbitsEl = wrap.querySelector("#orbits");
+  const posterCanvas = wrap.querySelector("#systemPoster");
+  const posterWrap = wrap.querySelector("#posterWrap");
+  const posterBody = wrap.querySelector("#posterBody");
+  const posterPanel = wrap.querySelector("#posterPanel");
+
+  // Poster display state
+  const posterState = {
+    labels: true,
+    moons: true,
+    hz: true,
+    frost: true,
+    debris: true,
+    guides: true,
+    starfield: true,
+    scale: "log", // "log" or "linear"
+    collapsed: false,
+  };
+
+  // Collapse toggle
+  const collapseBtn = wrap.querySelector("#btn-poster-collapse");
+  wrap.querySelector("#posterToggleHeader").addEventListener("click", (e) => {
+    if (e.target.closest("button") && e.target.closest("button") !== collapseBtn) return;
+    posterState.collapsed = !posterState.collapsed;
+    posterBody.style.display = posterState.collapsed ? "none" : "";
+    collapseBtn.innerHTML = posterState.collapsed ? "&#x25BC;" : "&#x25B2;";
+  });
+
+  // Export PNG
+  wrap.querySelector("#btn-poster-export").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const fn = `worldsmith-system-poster-${makeTimestampToken()}.png`;
+    await downloadCanvasPng(posterCanvas, fn);
+  });
+
+  // Fullscreen
+  const btnPosterFs = wrap.querySelector("#btn-poster-fs");
+  btnPosterFs.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else if (posterPanel.requestFullscreen) {
+      posterPanel.requestFullscreen();
+    } else if (posterPanel.webkitRequestFullscreen) {
+      posterPanel.webkitRequestFullscreen();
+    }
+  });
+  function onPosterFullscreenChange() {
+    const isFs = !!document.fullscreenElement;
+    btnPosterFs.textContent = isFs ? "Exit" : "Fullscreen";
+  }
+  document.addEventListener("fullscreenchange", onPosterFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onPosterFullscreenChange);
+
+  // Checkbox toggles
+  const posterChecks = {
+    labels: wrap.querySelector("#pchk-labels"),
+    moons: wrap.querySelector("#pchk-moons"),
+    hz: wrap.querySelector("#pchk-hz"),
+    frost: wrap.querySelector("#pchk-frost"),
+    debris: wrap.querySelector("#pchk-debris"),
+    guides: wrap.querySelector("#pchk-guides"),
+    starfield: wrap.querySelector("#pchk-starfield"),
+  };
+  for (const [key, el] of Object.entries(posterChecks)) {
+    el.addEventListener("change", () => {
+      posterState[key] = el.checked;
+      drawPoster();
+    });
+  }
+
+  // Scale toggle
+  wrap.querySelector('[data-toggle="posterScale"]').addEventListener("change", (e) => {
+    posterState.scale = e.target.value;
+    drawPoster();
+  });
+
+  // Cached poster data for redraws from controls
+  let cachedPosterData = null;
+  function drawPoster() {
+    if (cachedPosterData) {
+      drawSystemPoster(posterCanvas, cachedPosterData, posterState);
+    }
+  }
 
   // Bind sliders
   bindPair("spacing", spacingEl, 0, 10, 0.01, "auto");
@@ -406,6 +990,88 @@ export function initSystemPage(mountEl) {
       orbitsEl.textContent = model.orbitsAu
         .map((v, i) => `Orbit ${String(i + 1).padStart(2, "0")}: ${fmt(v, 3)} AU`)
         .join("\n");
+
+      // ── System Poster ──────────────────────────────
+      const starModel = calcStar({
+        massMsol: state.starMassMsol,
+        ageGyr: Number(w.star.ageGyr) || 4.6,
+      });
+
+      const posterPlanets = planetsForUi
+        .filter((p) => p.slotIndex != null)
+        .map((p) => {
+          const slotAu = model.orbitsAu[p.slotIndex - 1];
+          let dayHex = "#9bbbe0";
+          let horizonHex = "#6a6a6a";
+          let radiusKm = EARTH_R_KM;
+          try {
+            const pm = calcPlanetExact({
+              starMassMsol: state.starMassMsol,
+              starAgeGyr: Number(w.star.ageGyr) || 4.6,
+              planet: p.inputs,
+            });
+            dayHex = pm.derived.skyColourDayHex || dayHex;
+            horizonHex = pm.derived.skyColourHorizonHex || horizonHex;
+            radiusKm = pm.derived.radiusKm || radiusKm;
+          } catch {
+            /* use defaults */
+          }
+          return { id: p.id, name: p.name, au: slotAu, radiusKm, dayHex, horizonHex };
+        });
+
+      const posterGiants = gasGiants.map((g) => {
+        let radiusKm = (g.radiusRj || 1) * 69911;
+        try {
+          const gm = calcGasGiant({
+            massMjup: g.massMjup,
+            radiusRj: g.radiusRj,
+            orbitAu: g.au,
+            rotationPeriodHours: g.rotationPeriodHours || 10,
+            starMassMsol: state.starMassMsol,
+            starLuminosityLsol: starModel.luminosityLsol,
+          });
+          radiusKm = gm.physical.radiusKm || radiusKm;
+        } catch {
+          /* use default */
+        }
+        return { id: g.id, name: g.name, au: g.au, radiusKm, style: g.style, rings: g.rings };
+      });
+
+      const posterMoons = moonsForUi
+        .filter((m) => m.planetId)
+        .map((m) => ({
+          parentId: m.planetId,
+          name: m.name || m.inputs?.name || "",
+          radiusMoon: Number(m.inputs?.massMoon) > 0 ? null : 0.1,
+          // Approximate radius from density + mass if available
+          ...(() => {
+            const densG = Number(m.inputs?.densityGcm3);
+            const massM = Number(m.inputs?.massMoon);
+            if (densG > 0 && massM > 0) {
+              const earthMoonMassKg = 7.342e22;
+              const massKg = massM * earthMoonMassKg;
+              const rM = Math.cbrt((3 * massKg) / (4 * Math.PI * densG * 1000)) / MOON_R_KM;
+              return { radiusMoon: rM };
+            }
+            return { radiusMoon: 0.1 };
+          })(),
+        }));
+
+      const posterDebris = debrisRows.map((d) => ({
+        innerAu: d.inner,
+        outerAu: d.outer,
+        name: d.name,
+      }));
+
+      cachedPosterData = {
+        star: starModel,
+        system: model,
+        planets: posterPlanets,
+        gasGiants: posterGiants,
+        moons: posterMoons,
+        debrisDisks: posterDebris,
+      };
+      drawPoster();
     } finally {
       isRendering = false;
     }
@@ -740,6 +1406,11 @@ export function initSystemPage(mountEl) {
   // Init
   loadIntoInputs();
   render();
+
+  // Resize poster canvas on container resize
+  if (posterWrap) {
+    new ResizeObserver(() => render()).observe(posterWrap);
+  }
 
   wrap.querySelectorAll('input[type="number"]').forEach((el) => {
     el.addEventListener("keydown", (e) => {
