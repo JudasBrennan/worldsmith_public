@@ -1,0 +1,27 @@
+{
+  "name": "worldsmith-web",
+  "version": "1.9.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:syntax": "node scripts/check-syntax.mjs",
+    "backup:live": "node scripts/backup-live.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:engine": "node --test --test-path-pattern=\"^(?!.*\\.ui\\.test\\.js$).*\\.test\\.js$\" tests/",
+    "test:ui": "node --test \"tests/**/*.ui.test.js\"",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "check": "node scripts/check-syntax.mjs && eslint . && prettier --check . && node --test \"tests/**/*.test.js\"",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.21.0",
+    "globals": "^15.15.0",
+    "jsdom": "^28.1.0",
+    "prettier": "^3.5.2"
+  }
+}

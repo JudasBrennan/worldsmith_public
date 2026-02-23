@@ -1,0 +1,3 @@
+# WorldSmith
+
+Planning notes.

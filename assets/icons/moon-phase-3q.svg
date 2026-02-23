@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <clipPath id="moon-3q-clip">
+      <circle cx="12" cy="12" r="10" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#moon-3q-clip)">
+    <rect x="2" y="2" width="10" height="20" fill="#fff" />
+  </g>
+</svg>

@@ -1,0 +1,162 @@
+import { initStarPage } from "./ui/starPage.js";
+import { initSystemPage } from "./ui/systemPage.js";
+import { initOuterObjectsPage } from "./ui/outerObjectsPage.js";
+import { initPlanetPage } from "./ui/planetPage.js";
+import { initMoonPage } from "./ui/moonPage.js";
+import { initVisualiserPage } from "./ui/visualizerPage.js";
+import { initLocalClusterPage } from "./ui/localClusterPage.js";
+// localClusterVisualizerPage removed — unified into visualizerPage
+import { initImportExportPage } from "./ui/importExportPage.js";
+import { initAboutPage } from "./ui/aboutPage.js";
+import { initApparentPage } from "./ui/apparentPage.js";
+import { initCalendarPage } from "./ui/calendarPage.js";
+import { initSciencePage } from "./ui/sciencePage.js";
+import * as store from "./ui/store.js";
+import { createSolPresetEnvelope } from "./ui/solPreset.js";
+
+const appEl = document.getElementById("app");
+let startupSolPromptHandled = false;
+
+function hasSavedWorldData() {
+  if (typeof store.hasSavedWorldInLocalStorage === "function") {
+    return store.hasSavedWorldInLocalStorage();
+  }
+  try {
+    return !!(
+      localStorage.getItem("worldsmith.world.v1") || localStorage.getItem("worldsmith.world")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function importWorldData(world) {
+  if (typeof store.importWorld === "function") {
+    store.importWorld(world);
+    return true;
+  }
+  return false;
+}
+
+const PAGE_MAP = {
+  star: initStarPage,
+  system: initSystemPage,
+  outer: initOuterObjectsPage,
+  planet: initPlanetPage,
+  moon: initMoonPage,
+  viz: initVisualiserPage,
+  cluster: initLocalClusterPage,
+  galaxy: initLocalClusterPage,
+  "cluster-viz": (el) => initVisualiserPage(el, { startMode: "cluster" }),
+  io: initImportExportPage,
+  apparent: initApparentPage,
+  calendar: initCalendarPage,
+  about: initAboutPage,
+  science: initSciencePage,
+};
+
+function route() {
+  const hash = location.hash || "#/star";
+  const [_, path] = hash.split("#/");
+  const key = (path || "star").split("?")[0];
+
+  // highlight nav (simple)
+  const navKey = key === "cluster-viz" ? "viz" : key;
+  document.querySelectorAll(".top-nav__link, .side-nav__item").forEach((a) => {
+    if (!a.getAttribute("href")) return;
+    a.classList.toggle("is-active", a.getAttribute("href") === `#/${navKey}`);
+  });
+
+  appEl.innerHTML = "";
+
+  const initFn = PAGE_MAP[key];
+  if (initFn) {
+    try {
+      initFn(appEl);
+    } catch (err) {
+      console.error(`[WorldSmith] Failed to load page "${key}":`, err);
+      appEl.innerHTML = `
+        <div class="panel">
+          <div class="panel__header"><h1 class="panel__title">Page Error</h1></div>
+          <div class="panel__body">
+            <p>Something went wrong loading the <b>${key}</b> page.</p>
+            <pre style="white-space:pre-wrap;color:var(--c-danger,#f44)">${String(err)}</pre>
+            <p class="hint">Try refreshing, or choose another page from the navigation menu.</p>
+          </div>
+        </div>`;
+    }
+    return;
+  }
+
+  const safeKey = key.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  appEl.innerHTML = `
+    <div class="panel">
+      <div class="panel__header"><h1>Coming soon</h1></div>
+      <div class="panel__body">
+        <div class="page-title">#/ ${safeKey}</div>
+        <p class="muted">This section is not available in the current release.</p>
+        <p>Please choose a tab from the navigation menu.</p>
+      </div>
+    </div>
+  `;
+}
+
+function showStartupSolPresetPrompt() {
+  const overlay = document.createElement("div");
+  overlay.className = "startup-sol-overlay";
+  overlay.innerHTML = `
+    <div class="startup-sol-dialog panel" role="dialog" aria-modal="true" aria-labelledby="startupSolTitle">
+      <div class="panel__header">
+        <h2 id="startupSolTitle" class="panel__title">
+          <span class="ws-icon icon--import-export" aria-hidden="true"></span>
+          <span>Import Sol Preset?</span>
+        </h2>
+        <div class="badge">Quick start</div>
+      </div>
+      <div class="panel__body">
+        <p>No saved world data was found in this browser.</p>
+        <p class="hint">Would you like to import the built-in Sol preset now?</p>
+        <div class="button-row startup-sol-actions">
+          <button type="button" id="startup-sol-yes" class="primary">Yes</button>
+          <button type="button" id="startup-sol-no">No</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  function close() {
+    overlay.remove();
+    window.removeEventListener("keydown", onKeyDown);
+  }
+
+  function onKeyDown(event) {
+    if (event.key === "Escape") close();
+  }
+
+  const btnYes = overlay.querySelector("#startup-sol-yes");
+  const btnNo = overlay.querySelector("#startup-sol-no");
+  btnNo?.addEventListener("click", close);
+  btnYes?.addEventListener("click", () => {
+    const envelope = createSolPresetEnvelope();
+    importWorldData(envelope.world);
+    close();
+    route();
+  });
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) close();
+  });
+  window.addEventListener("keydown", onKeyDown);
+  document.body.appendChild(overlay);
+}
+
+function maybeShowStartupSolPresetPrompt() {
+  if (startupSolPromptHandled) return;
+  startupSolPromptHandled = true;
+  if (hasSavedWorldData()) return;
+  showStartupSolPresetPrompt();
+}
+
+window.addEventListener("hashchange", route);
+route();
+maybeShowStartupSolPresetPrompt();
