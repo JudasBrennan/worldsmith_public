@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.9.1</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.10.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -60,99 +60,95 @@ export function initAboutPage(mountEl) {
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
 
+        <p><b>Version 1.10.0</b> (from 1.9.1)</p>
+        <ul>
+          <li><b>Rocky Planet Composition</b> &mdash; Seven composition classes (Ice world through Coreless) and six water regimes derived from core mass fraction and water mass fraction. Includes core radius, mass&ndash;radius scaling, and composition-dependent tidal parameters.</li>
+          <li><b>Rocky Planet Atmosphere</b> &mdash; Ten-gas atmosphere with three greenhouse modes (Manual, Core, Full). Sky and vegetation colours vary by star type and pressure. Adds circulation cells, atmospheric tide resistance, and liquid water checks.</li>
+          <li><b>Magnetic Field</b> &mdash; Dynamo model with dipolar and multipolar regimes, driven by core fraction, mass, age, and rotation.</li>
+          <li><b>Tectonic Regimes</b> &mdash; Probability distribution across four regimes (stagnant lid, mobile lid, episodic, plutonic-squishy) based on mass, age, water, composition, and tidal heating.</li>
+          <li><b>Science Divergences</b> &mdash; New section on the Science &amp; Maths page listing 22 places where WorldSmith departs from published formulas, with explanations.</li>
+        </ul>
+
         <p><b>Version 1.9.1</b> (from 1.9.0)</p>
         <ul>
-          <li><b>Cluster Import</b> &mdash; Paste a tab-separated table of star systems into the Local Cluster page to replace the generated neighbourhood with custom coordinates, names, and spectral types.</li>
+          <li><b>Cluster Import</b> &mdash; Paste a tab-separated table of star systems to replace the generated neighbourhood with custom data.</li>
         </ul>
 
         <p><b>Version 1.9.0</b> (from 1.8.1)</p>
         <ul>
-          <li><b>Tidal Heating</b> &mdash; Full tidal dissipation model using the Wisdom (2008) eccentricity function, replacing the simple e&sup2; truncation. Outputs total power, surface heat flux, and Earth-normalised flux.</li>
-          <li><b>Composition Override</b> &mdash; Seven-class interior model with two calibrated overrides: &ldquo;Partially molten&rdquo; (Io, within 1%) and &ldquo;Subsurface ocean&rdquo; (Enceladus, within 10%). Override dropdown on the Moon page.</li>
-          <li><b>Tidal Recession</b> &mdash; Orbital migration rate (cm/yr) and fate (time to Roche limit or Hill sphere escape) from competing planet and moon tidal torques.</li>
+          <li><b>Tidal Heating</b> &mdash; Moon tidal dissipation model with accurate high-eccentricity heating. Outputs total power, surface flux, and Earth-normalised flux.</li>
+          <li><b>Composition Override</b> &mdash; Seven interior classes for moons, with calibrated overrides for partially molten and subsurface ocean bodies.</li>
+          <li><b>Tidal Recession</b> &mdash; Orbital migration rate and fate prediction from competing planet and moon tidal torques.</li>
         </ul>
 
         <p><b>Version 1.8.1</b> (from 1.8.0)</p>
         <ul>
-          <li><b>Atmosphere &amp; Greenhouse</b> &mdash; Overhauled rocky planet atmospheric system with improved greenhouse gas calculations. The greenhouse effect can now be derived from atmospheric composition (Core or Full mode) or set manually via user override.</li>
-          <li><b>Sol Preset</b> &mdash; Cross-referenced and corrected all Sol preset values against the NASA Planetary Fact Sheet (rotation periods, eccentricities, atmospheric compositions, orbital elements, and radii).</li>
-          <li><b>Local Cluster</b> &mdash; Added the ability to manually add or remove specific star types via +/&minus; buttons, and to add or remove companion stars via right-click context menu (single &rarr; binary &rarr; triple &rarr; quadruple). Includes a random seed generator button and a confirmation prompt when discarding manual changes.</li>
+          <li><b>Greenhouse Modes</b> &mdash; Greenhouse effect can now be derived from atmospheric composition (Core or Full mode) or set manually.</li>
+          <li><b>Sol Preset</b> &mdash; All preset values cross-referenced against the NASA Planetary Fact Sheet.</li>
+          <li><b>Local Cluster</b> &mdash; Add or remove star types with +/&minus; buttons and manage companions via right-click context menu.</li>
         </ul>
 
         <p><b>Version 1.8.0</b> (from 1.7.0)</p>
         <ul>
-          <li><b>Sky Colours</b> — Now account for atmospheric column density (gravity + temperature scale height) and CO&sub2; tint, with OKLab colour interpolation.</li>
-          <li><b>Vegetation Colours</b> — Pressure-dependent plant colours from 0.1&ndash;100 atm, with dedicated twilight variants for tidally locked K/M worlds.</li>
-          <li><b>Science &amp; Maths</b> — New reference page documenting all 61 equations, with LaTeX rendering, variable legends, and interactive calculators.</li>
-          <li><b>Temperature Accuracy</b> — Surface divisor now ramps with optical depth (no inflation for airless bodies). Sol preset recalibrated to NASA Planetary Fact Sheet values.</li>
-          <li><b>UI</b> — Expandable KPI cards with hover-to-reveal detail, contrast-aware text on colour swatches, expanded tooltips and JSDoc across all engine files.</li>
+          <li><b>Sky Colours</b> &mdash; Account for atmospheric column density and CO&sub2; tint.</li>
+          <li><b>Vegetation Colours</b> &mdash; Pressure-dependent plant colours with twilight variants for tidally locked worlds.</li>
+          <li><b>Science &amp; Maths</b> &mdash; New reference page documenting all equations with LaTeX rendering and interactive calculators.</li>
+          <li><b>Temperature</b> &mdash; Improved surface temperature accuracy for airless and thin-atmosphere bodies.</li>
+          <li><b>UI</b> &mdash; Expandable KPI cards with hover-to-reveal detail and contrast-aware text on colour swatches.</li>
         </ul>
 
         <p><b>Version 1.7.0</b> (from 1.6.0)</p>
         <ul>
-          <li><b>Unified Visualiser</b> — System and Local Cluster visualisers merged into one page with seamless zoom-based transitions.</li>
-          <li><b>Star</b> — New stellar metallicity [Fe/H] input driving giant planet probability (Fischer &amp; Valenti 2005) and stellar population labels.</li>
-          <li><b>Star</b> — Scientific accuracy overhaul: Eker et al. (2018) six-piece mass&ndash;luminosity and quadratic mass&ndash;radius relations replace the old textbook approximations.</li>
+          <li><b>Unified Visualiser</b> &mdash; System and Local Cluster views merged into one page with seamless zoom transitions.</li>
+          <li><b>Star</b> &mdash; Stellar metallicity [Fe/H] input driving giant planet probability and population labels.</li>
+          <li><b>Star</b> &mdash; Improved mass&ndash;luminosity and mass&ndash;radius relations replacing the old textbook approximations.</li>
         </ul>
 
         <p><b>Version 1.6.0</b> (from 1.5.0)</p>
         <ul>
-          <li><b>Planets / Other Objects</b> — Ground up rework of gas giant and debris disk mechanics.</li>
-          <li><b>System Visualiser</b> — More accurate and detailed styles for gas giants, covering many real and fantastical types.</li>
+          <li><b>Planets / Other Objects</b> &mdash; Reworked gas giant and debris disk mechanics.</li>
+          <li><b>System Visualiser</b> &mdash; Improved gas giant rendering covering many real and fantastical types.</li>
         </ul>
 
         <p><b>Version 1.5.0</b> (from 1.4.0)</p>
         <ul>
-          <li><b>Star</b> — Advanced Physics mode: choose which two of Radius/Luminosity/Temperature to set; the third is derived via Stefan-Boltzmann.</li>
-          <li><b>System Visualiser</b> — Eccentric Orbits toggle: orbits render as tilted, inclined ellipses with Kepler-solved motion and Pe/Ap markers.</li>
-          <li><b>System Visualiser</b> — Moon orbit parity: moons now share the same orbital mechanics as planets (eccentricity, inclination, Kepler solve).</li>
-          <li><b>System Visualiser</b> — Replaced distance and size scale checkboxes with pill-toggle controls.</li>
-          <li><b>Local Cluster</b> — Fixed stellar population fractions to sum to 100% (was 140% in WS8).</li>
-          <li><b>Local Cluster</b> — Class-weighted multiplicity from Duch&ecirc;ne &amp; Kraus (2013) for binary/triple/quadruple generation.</li>
-          <li><b>Local Cluster</b> — Companions filtered so none is heavier than the primary.</li>
-          <li><b>Local Cluster</b> — Added Galactic Habitable Zone probability (Lineweaver 2004 Gaussian model).</li>
-          <li><b>Local Cluster</b> — Disk geometry flattening for large neighbourhood radii.</li>
-          <li><b>Import/Export</b> — New fantasy system preset included.</li>
+          <li><b>Star</b> &mdash; Advanced Physics mode: choose which two of Radius/Luminosity/Temperature to set.</li>
+          <li><b>System Visualiser</b> &mdash; Eccentric orbits rendered as tilted, inclined ellipses with Kepler-solved motion.</li>
+          <li><b>System Visualiser</b> &mdash; Moons now share the same orbital mechanics as planets.</li>
+          <li><b>Local Cluster</b> &mdash; Fixed stellar population fractions, class-weighted multiplicity, companion mass filtering, habitable-zone probability, and disk geometry.</li>
+          <li><b>Import/Export</b> &mdash; Fantasy system preset included.</li>
         </ul>
 
         <p><b>Version 1.4.0</b> (from 1.3.1)</p>
         <ul>
-          <li><b>Apparent Size</b> — New page for star/object/moon apparent magnitude, brightness, and size calculations.</li>
-          <li><b>Calendar</b> — New page for solar, lunar, and lunisolar calendar derivations from orbital and rotation periods.</li>
-          <li><b>Navigation</b> — Added sidebar links for the new Apparent Size and Calendar tools.</li>
+          <li><b>Apparent Size</b> &mdash; New page for apparent magnitude, brightness, and angular size calculations.</li>
+          <li><b>Calendar</b> &mdash; New page for solar, lunar, and lunisolar calendar derivations.</li>
         </ul>
 
         <p><b>Version 1.3.1</b> (from 1.3.0)</p>
         <ul>
-          <li><b>System Visualiser</b> — Fixed depth layering so planets and gas giants correctly render behind or in front of the star.</li>
+          <li><b>System Visualiser</b> &mdash; Fixed depth layering for planets and gas giants around the star.</li>
         </ul>
 
         <p><b>Version 1.3.0</b> (from 1.2.0)</p>
         <ul>
-          <li><b>System Visualiser</b> — Improved scale controls and full 3D camera navigation.</li>
-          <li><b>System Visualiser</b> — Export tools for static PNG snapshots and animated GIF captures.</li>
-          <li><b>Planet</b> — Moon orbit guardrails to keep semi-major-axis values within valid moon-zone bounds.</li>
-          <li><b>Planet</b> — Refined sky-colour presentation, especially the &ldquo;sun near horizon&rdquo; output.</li>
-          <li><b>Local Cluster</b> — Improved interaction and range/bearing grid support.</li>
-          <li><b>Local Cluster</b> — Support for renaming star systems and showing names in the cluster visualiser.</li>
-          <li><b>Import/Export</b> — Built-in Sol preset import.</li>
-          <li><b>UI</b> — Unified wording and visual styling across major pages.</li>
+          <li><b>System Visualiser</b> &mdash; Full 3D camera navigation with PNG and GIF export.</li>
+          <li><b>Planet</b> &mdash; Moon orbit guardrails and improved sky-colour presentation.</li>
+          <li><b>Local Cluster</b> &mdash; Range/bearing grid and renameable star systems.</li>
+          <li><b>Import/Export</b> &mdash; Built-in Sol preset import.</li>
         </ul>
 
         <p><b>Version 1.2.0</b> (from 1.1.0)</p>
         <ul>
-          <li><b>System</b> — Updated habitable-zone maths to use the corrected temperature-dependent model (Chromant&rsquo;s Desmos implementation).</li>
-          <li><b>System Visualiser</b> — Habitable-zone overlay: green HZ band between inner and outer limits, with a show/hide toggle.</li>
+          <li><b>System</b> &mdash; Temperature-dependent habitable-zone model.</li>
+          <li><b>System Visualiser</b> &mdash; Habitable-zone overlay with show/hide toggle.</li>
         </ul>
 
         <p><b>Version 1.1.0</b> (from 1.0.0)</p>
         <ul>
-          <li><b>Import/Export</b> — Direct XLSX spreadsheet import for WorldSmith 8.x workbooks.</li>
-          <li><b>Import/Export</b> — Import detects Star/System/Planet/Moon tabs by structure; tab order changes are supported.</li>
-          <li><b>Import/Export</b> — Multiple Planet or Moon tabs are imported as Planet 1..N and Moon 1..N.</li>
-          <li><b>System Visualiser</b> — Improved focus-follow with gas giant support and zoom while following.</li>
-          <li><b>System Visualiser</b> — Improved star rendering effects.</li>
-          <li><b>Star</b> — Computed expected solar flares and coronal mass ejections based on star type and age.</li>
+          <li><b>Import/Export</b> &mdash; Direct XLSX import for WorldSmith 8.x workbooks, with multi-tab support.</li>
+          <li><b>System Visualiser</b> &mdash; Improved focus-follow and star rendering.</li>
+          <li><b>Star</b> &mdash; Solar flare and coronal mass ejection estimates based on star type and age.</li>
         </ul>
 
         <p class="hint" style="margin-top:14px">

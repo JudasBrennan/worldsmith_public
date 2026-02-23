@@ -14,8 +14,9 @@ This document defines the unified design language, writing conventions, and code
 | `--panel`     | `#171b2e`                           | Panel / card background                 |
 | `--text`      | `#e8e9f3`                           | Primary text                            |
 | `--muted`     | `#a6abcc`                           | Secondary text, hints, units            |
-| `--border`    | `rgba(255,255,255,0.1)`             | Borders, dividers                       |
-| `--focus`     | `rgba(126,178,255,0.45)`            | Focus rings, accent highlights          |
+| `--border`    | `rgba(var(--overlay-color),0.1)`    | Borders, dividers                       |
+| `--focus`     | `rgba(var(--accent-rgb),0.45)`      | Focus rings, accent highlights          |
+| `--accent`    | `#7eb2ff`                           | Accent colour (links, highlights)       |
 | `--good`      | `#7cffb2`                           | Positive status (badges, indicators)    |
 | `--warn`      | `#ffd37c`                           | Warning status                          |
 | `--bad`       | `#ff7c97`                           | Error / danger status                   |
@@ -27,6 +28,30 @@ This document defines the unified design language, writing conventions, and code
 | `--sans`      | `ui-sans-serif, system-ui, ...`     | Body text, labels                       |
 
 Always use tokens instead of hard-coded colours or sizes. If a new semantic colour is needed, add a variable rather than inlining a value.
+
+### Theme system (light / dark)
+
+The app supports two themes controlled by a `data-theme` attribute on `<html>`. Dark is the default (no attribute needed); light is activated by `data-theme="light"`.
+
+**How it works:**
+
+1. All semantic colours are defined in `:root` (dark) and overridden in `[data-theme="light"]`.
+2. Three RGB-channel variables enable transparent overlays that adapt to the theme:
+
+| Variable          | Dark value      | Light value     | Usage                                                       |
+| ----------------- | --------------- | --------------- | ----------------------------------------------------------- |
+| `--overlay-color` | `255, 255, 255` | `0, 0, 0`       | `rgba(var(--overlay-color), 0.06)` for hover tints, borders |
+| `--bg-rgb`        | `15, 18, 32`    | `240, 241, 245` | `rgba(var(--bg-rgb), 0.35)` for input/code backgrounds      |
+| `--panel-rgb`     | `23, 27, 46`    | `255, 255, 255` | `rgba(var(--panel-rgb), 0.7)` for panels, tooltips, menus   |
+| `--accent-rgb`    | `126, 178, 255` | `48, 112, 200`  | `rgba(var(--accent-rgb), 0.15)` for active/focus states     |
+
+**Rules:**
+
+- Never use raw `rgba(255,255,255,X)` or `rgba(0,0,0,X)` for overlays — use `rgba(var(--overlay-color), X)`.
+- Never hardcode panel/bg/accent colours in `rgba()` — use the `-rgb` channel variables.
+- `rgba(0,0,0,X)` is fine for drop-shadows (shadows stay dark in both themes).
+- Theme preference is stored in `localStorage` under `worldsmith.theme`. The toggle button is `#themeToggle` in the header.
+- When adding new colours, define both dark and light values in `:root` and `[data-theme="light"]`.
 
 ### Class naming
 
@@ -232,6 +257,28 @@ resonance constants).
 | **Test notes**     | Always document new/changed tests under `**Tests**` sub-heading                         |
 | **Bug fixes**      | Use `### Bug Fixes` (H3) with bullet list if multiple small fixes in one release        |
 | **Line width**     | Wrap prose at ~80 characters for readability in plain-text editors                      |
+
+### About page changelog (ui/aboutPage.js)
+
+The About page has a user-facing changelog inside the `initAboutPage` HTML template. It follows a simpler style than `CHANGELOG.md`:
+
+```html
+<p><b>Version X.Y.Z</b> (from A.B.C)</p>
+<ul>
+  <li><b>Feature Name</b> &mdash; One or two sentences describing what the user gets.</li>
+</ul>
+```
+
+| Rule              | Convention                                                           |
+| ----------------- | -------------------------------------------------------------------- |
+| **Entry format**  | `<b>Feature</b> &mdash; Description.` — bold name, em-dash, sentence |
+| **Tone**          | User-facing: what it does, not how it works                          |
+| **Length**        | 1–2 sentences per bullet; no paper references or formula names       |
+| **Consolidation** | Group related small changes into one bullet (e.g. "Local Cluster")   |
+| **Internal-only** | Omit test suites, validation harnesses, and theme/CSS plumbing       |
+| **Em-dash**       | Always `&mdash;` (HTML entity), not `—` or `--`                      |
+
+Keep every version's entry list at roughly the same level of detail. When adding a new version, update the header line (`<b>WorldSmith Web X.Y.Z</b>`) at the top of the About page body as well.
 
 ---
 

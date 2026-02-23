@@ -10,8 +10,12 @@ html {
   --panel-2: #1d2240;
   --text: #e8e9f3;
   --muted: #a6abcc;
-  --border: rgba(255, 255, 255, 0.1);
-  --focus: rgba(126, 178, 255, 0.45);
+  --overlay-color: 255, 255, 255;
+  --bg-rgb: 15, 18, 32;
+  --panel-rgb: 23, 27, 46;
+  --accent-rgb: 126, 178, 255;
+  --border: rgba(var(--overlay-color), 0.1);
+  --focus: rgba(var(--accent-rgb), 0.45);
   --good: #7cffb2;
   --warn: #ffd37c;
   --bad: #ff7c97;
@@ -42,6 +46,37 @@ html {
   --sans:
     ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* ── Light theme ─────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f0f1f5;
+  --panel: #ffffff;
+  --panel-2: #f5f6fa;
+  --text: #1a1d2e;
+  --muted: #5a5f7a;
+  --overlay-color: 0, 0, 0;
+  --bg-rgb: 240, 241, 245;
+  --panel-rgb: 255, 255, 255;
+  --accent-rgb: 48, 112, 200;
+  --border: rgba(0, 0, 0, 0.12);
+  --focus: rgba(var(--accent-rgb), 0.35);
+  --good: #1a8a48;
+  --warn: #b07a00;
+  --bad: #c83050;
+  --accent: #3070c8;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  --moon-c0: #2a6ea0;
+  --moon-c1: #b07020;
+  --moon-c2: #7040a8;
+  --moon-c3: #208050;
+  --astro-default: #2a70a8;
+  --astro-vernal: #1a7a3a;
+  --astro-summer: #a08518;
+  --astro-autumn: #a86818;
+  --astro-winter: #2a78a0;
+  --astro-solar-eclipse: #b04a20;
+  --astro-lunar-eclipse: #6838a0;
 }
 
 * {
@@ -75,7 +110,7 @@ a:hover {
   justify-content: space-between;
   gap: var(--gap);
   padding: 14px 18px;
-  background: rgba(15, 18, 32, 0.75);
+  background: rgba(var(--bg-rgb), 0.75);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
@@ -90,7 +125,11 @@ a:hover {
   height: 40px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06));
+  background: linear-gradient(
+    135deg,
+    rgba(var(--overlay-color), 0.14),
+    rgba(var(--overlay-color), 0.06)
+  );
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow);
@@ -115,13 +154,60 @@ a:hover {
   border: 1px solid transparent;
 }
 .top-nav__link:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--overlay-color), 0.06);
   border-color: var(--border);
   text-decoration: none;
 }
 .is-disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+/* ── Theme toggle ──────────────────────────────────────── */
+.theme-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(var(--overlay-color), 0.06);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
+}
+.theme-toggle__sun,
+.theme-toggle__moon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+.theme-toggle:hover {
+  background: rgba(var(--overlay-color), 0.12);
+  border-color: rgba(var(--overlay-color), 0.18);
+}
+/* dark mode (default): hide moon */
+.theme-toggle__moon {
+  display: none;
+}
+/* light mode: swap icons */
+[data-theme="light"] .theme-toggle__sun {
+  display: none;
+}
+[data-theme="light"] .theme-toggle__moon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .app-main {
@@ -141,7 +227,7 @@ a:hover {
   position: sticky;
   top: 0;
   align-self: start;
-  background: rgba(23, 27, 46, 0.65);
+  background: rgba(var(--panel-rgb), 0.65);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px;
@@ -167,17 +253,17 @@ a:hover {
   border: 1px solid transparent;
 }
 .side-nav__item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--overlay-color), 0.06);
   border-color: var(--border);
   text-decoration: none;
 }
 .side-nav__item.is-active {
-  background: rgba(126, 178, 255, 0.1);
-  border-color: rgba(126, 178, 255, 0.3);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
 }
 .top-nav__link.is-active {
-  background: rgba(126, 178, 255, 0.1);
-  border-color: rgba(126, 178, 255, 0.3);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
 }
 
 .content {
@@ -263,7 +349,7 @@ a:hover {
 }
 
 .panel {
-  background: rgba(23, 27, 46, 0.7);
+  background: rgba(var(--panel-rgb), 0.7);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -276,7 +362,7 @@ a:hover {
   align-items: center;
   gap: var(--gap);
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
   border-bottom: 1px solid var(--border);
 }
 .panel__header h1,
@@ -338,13 +424,13 @@ input[type="text"] {
   padding: 10px 10px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(15, 18, 32, 0.35);
+  background: rgba(var(--bg-rgb), 0.35);
   color: var(--text);
   outline: none;
 }
 input[type="number"]:focus,
 input[type="text"]:focus {
-  border-color: rgba(126, 178, 255, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
   box-shadow: 0 0 0 4px var(--focus);
 }
 
@@ -354,13 +440,13 @@ textarea {
   padding: 10px 10px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(15, 18, 32, 0.35);
+  background: rgba(var(--bg-rgb), 0.35);
   color: var(--text);
   outline: none;
 }
 select:focus,
 textarea:focus {
-  border-color: rgba(126, 178, 255, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
   box-shadow: 0 0 0 4px var(--focus);
 }
 input[type="number"]:disabled,
@@ -383,18 +469,18 @@ button {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--overlay-color), 0.06);
   color: var(--text);
 }
 button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--overlay-color), 0.1);
 }
 button.primary {
-  background: rgba(126, 178, 255, 0.18);
-  border-color: rgba(126, 178, 255, 0.35);
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.35);
 }
 button.primary:hover {
-  background: rgba(126, 178, 255, 0.24);
+  background: rgba(var(--accent-rgb), 0.24);
 }
 
 /* Wrapper: grid item that holds the slot while the card lifts out on hover.
@@ -411,7 +497,7 @@ button.primary:hover {
   border-radius: 14px;
   border: 1px solid var(--border);
   /* Opaque so expanded cards fully cover cards underneath */
-  background: var(--kpi-bg, #1e2133);
+  background: var(--kpi-bg, var(--panel-2));
 }
 .kpi__label {
   color: var(--muted);
@@ -487,7 +573,7 @@ button.primary:hover {
   border-radius: 999px;
   font-size: 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--overlay-color), 0.04);
   color: var(--muted);
 }
 .badge.good {
@@ -505,7 +591,7 @@ button.primary:hover {
   font-size: 12px;
   color: var(--muted);
   white-space: pre-wrap;
-  background: rgba(15, 18, 32, 0.35);
+  background: rgba(var(--bg-rgb), 0.35);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px;
@@ -518,7 +604,7 @@ button.primary:hover {
   line-height: 1.5;
   color: var(--text);
   white-space: pre-wrap;
-  background: rgba(15, 18, 32, 0.35);
+  background: rgba(var(--bg-rgb), 0.35);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px;
@@ -618,16 +704,16 @@ body > .app-main {
   height: 18px;
   margin-left: 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(var(--overlay-color), 0.18);
+  background: rgba(var(--overlay-color), 0.06);
+  color: rgba(var(--overlay-color), 0.9);
   font-size: 12px;
   font-family: var(--mono);
   cursor: help;
   user-select: none;
 }
 .tip-icon:focus {
-  outline: 2px solid rgba(126, 178, 255, 0.55);
+  outline: 2px solid rgba(var(--accent-rgb), 0.55);
   outline-offset: 2px;
 }
 
@@ -638,10 +724,10 @@ body > .app-main {
   white-space: pre-wrap;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(20, 24, 45, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(var(--panel-rgb), 0.96);
+  border: 1px solid rgba(var(--overlay-color), 0.12);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(var(--overlay-color), 0.92);
   font-size: 13px;
   line-height: 1.35;
 }
@@ -668,10 +754,10 @@ pre.code {
   margin-left: 10px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(var(--overlay-color), 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.12);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(var(--overlay-color), 0.85);
 }
 
 /* Small utility buttons */
@@ -707,8 +793,8 @@ button.danger:hover {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.06);
   cursor: grab;
 }
 .planet-card:active {
@@ -719,10 +805,10 @@ button.danger:hover {
   opacity: 0.75;
 }
 .dropzone {
-  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border: 1px dashed rgba(var(--overlay-color), 0.18);
   border-radius: 12px;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
 }
 .dropzone.is-over {
   border-color: rgba(135, 206, 255, 0.55);
@@ -762,7 +848,7 @@ button.danger:hover {
   margin-top: 8px;
   margin-left: 18px;
   padding-left: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(var(--overlay-color), 0.1);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -780,8 +866,8 @@ button.danger:hover {
   gap: 8px;
   padding: 6px 8px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(var(--overlay-color), 0.07);
+  background: rgba(var(--overlay-color), 0.035);
 }
 .moon-mini__name {
   font-size: 12px;
@@ -822,7 +908,7 @@ button.danger:hover {
 /* Local cluster pages */
 .cluster-table-wrap {
   margin-top: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   border-radius: 12px;
   overflow: auto;
   max-height: 320px;
@@ -839,7 +925,7 @@ button.danger:hover {
 .cluster-table th,
 .cluster-table td {
   padding: 9px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.08);
   text-align: left;
   font-size: 12px;
   white-space: nowrap;
@@ -848,8 +934,8 @@ button.danger:hover {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: rgba(20, 24, 45, 0.96);
-  color: rgba(220, 230, 255, 0.9);
+  background: rgba(var(--panel-rgb), 0.96);
+  color: var(--text);
 }
 .cluster-table tbody tr:last-child td {
   border-bottom: 0;
@@ -868,21 +954,21 @@ button.danger:hover {
 .cluster-object-tag {
   font-family: var(--mono);
   font-size: 11px;
-  color: rgba(220, 230, 255, 0.92);
+  color: var(--text);
 }
 .cluster-name-input {
   width: 100%;
   min-width: 150px;
   padding: 6px 8px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(8, 12, 26, 0.55);
-  color: rgba(236, 242, 255, 0.95);
+  border: 1px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--bg-rgb), 0.55);
+  color: var(--text);
   font-size: 12px;
 }
 .cluster-name-input:focus {
-  border-color: rgba(126, 178, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(126, 178, 255, 0.22);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
 }
 .cluster-adjust-cell {
   white-space: nowrap;
@@ -896,18 +982,18 @@ button.danger:hover {
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(var(--overlay-color), 0.15);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(220, 230, 255, 0.9);
+  background: rgba(var(--overlay-color), 0.06);
+  color: var(--text);
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
 }
 .cluster-adjust-btn:hover:not(:disabled) {
-  background: rgba(126, 178, 255, 0.18);
-  border-color: rgba(126, 178, 255, 0.4);
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.4);
 }
 .cluster-adjust-btn:disabled {
   opacity: 0.3;
@@ -919,8 +1005,8 @@ button.danger:hover {
   min-width: 190px;
   max-height: 400px;
   overflow-y: auto;
-  background: rgba(20, 24, 45, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(var(--panel-rgb), 0.97);
+  border: 1px solid rgba(var(--overlay-color), 0.15);
   border-radius: 10px;
   padding: 6px 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -928,20 +1014,20 @@ button.danger:hover {
 }
 .cluster-context-menu__title {
   padding: 6px 14px;
-  color: rgba(220, 230, 255, 0.6);
+  color: var(--muted);
   font-size: 11px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.08);
 }
 .cluster-context-menu__item {
   padding: 7px 14px;
   cursor: pointer;
-  color: rgba(220, 230, 255, 0.92);
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .cluster-context-menu__item:hover {
-  background: rgba(126, 178, 255, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
 }
 .cluster-context-menu__item.danger {
   color: rgba(255, 130, 130, 0.92);
@@ -952,7 +1038,7 @@ button.danger:hover {
 .cluster-context-menu__sep {
   height: 1px;
   margin: 4px 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--overlay-color), 0.08);
 }
 
 .planet-card.is-locked {
@@ -1035,7 +1121,7 @@ button.danger:hover {
   align-items: center;
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
   background: rgba(0, 0, 0, 0.1);
 }
 .viz-controls-dropdown .viz-speed input[type="range"] {
@@ -1055,10 +1141,10 @@ button.danger:hover {
 .viz-canvas-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
 }
 .viz-canvas-actions button:disabled:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
 }
 .viz-check {
   display: flex;
@@ -1066,7 +1152,7 @@ button.danger:hover {
   align-items: center;
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
   background: rgba(0, 0, 0, 0.1);
 }
 .viz-check input {
@@ -1080,7 +1166,7 @@ button.danger:hover {
   gap: 10px;
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
   background: rgba(0, 0, 0, 0.1);
 }
 .viz-switch__text {
@@ -1105,8 +1191,8 @@ button.danger:hover {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(var(--overlay-color), 0.16);
+  border: 1px solid rgba(var(--overlay-color), 0.18);
   transition:
     background-color 140ms ease,
     border-color 140ms ease;
@@ -1208,7 +1294,7 @@ input.auto-value {
   padding: 2px;
   border-radius: 50px;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(var(--overlay-color), 0.18);
   background: rgba(0, 0, 0, 0.2);
   width: 100%;
 }
@@ -1236,7 +1322,7 @@ input.auto-value {
   text-align: center;
   position: relative;
   z-index: 2;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(var(--overlay-color), 0.5);
   font-size: 12px;
   line-height: 30px;
   pointer-events: none;
@@ -1275,7 +1361,7 @@ input.auto-value {
   padding: 2px;
   border-radius: 50px;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(var(--overlay-color), 0.18);
   background: rgba(0, 0, 0, 0.2);
   width: 100%;
 }
@@ -1300,7 +1386,7 @@ input.auto-value {
   text-align: center;
   position: relative;
   z-index: 2;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(var(--overlay-color), 0.5);
   font-size: 12px;
   line-height: 30px;
   pointer-events: none;
@@ -1350,7 +1436,7 @@ input.auto-value {
   padding: 2px;
   border-radius: 50px;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(var(--overlay-color), 0.18);
   background: rgba(0, 0, 0, 0.2);
   width: 100%;
 }
@@ -1381,7 +1467,7 @@ input.auto-value {
   text-align: center;
   position: relative;
   z-index: 2;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(var(--overlay-color), 0.5);
   font-size: 12px;
   line-height: 30px;
   pointer-events: none;
@@ -1486,7 +1572,7 @@ input.auto-value {
   gap: 6px;
   padding: 10px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
   background: rgba(0, 0, 0, 0.1);
 }
 .viz-speed__label {
@@ -1559,7 +1645,7 @@ input.auto-value {
   border-radius: 4px;
   margin-right: 8px;
   vertical-align: -2px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(var(--overlay-color), 0.25);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
 }
 
@@ -1571,18 +1657,18 @@ input.auto-value {
   border-radius: 10px;
   color: rgba(10, 14, 20, 0.92); /* dark text for light star colours */
   border: 1px solid rgba(0, 0, 0, 0.18);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+  box-shadow: 0 1px 0 rgba(var(--overlay-color), 0.18) inset;
 }
 
 .swatch--dark {
   border-color: rgba(0, 0, 0, 0.18);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+  box-shadow: 0 0 0 1px rgba(var(--overlay-color), 0.12) inset;
 }
 
 /* Star colour output special styling */
 .kpi.kpi--colour {
   /* Default: solid swatch */
-  background: var(--kpi-colour, rgba(255, 255, 255, 0.92));
+  background: var(--kpi-colour, rgba(var(--overlay-color), 0.92));
   color: rgba(20, 24, 32, 0.92);
   border: 1px solid rgba(0, 0, 0, 0.12);
 }
@@ -1597,10 +1683,10 @@ input.auto-value {
   /* Centre-to-edge "sphere" look */
   background: radial-gradient(
     circle at 40% 35%,
-    var(--kpi-colour-center, rgba(255, 255, 255, 0.95)) 0%,
+    var(--kpi-colour-center, rgba(var(--overlay-color), 0.95)) 0%,
     color-mix(
         in srgb,
-        var(--kpi-colour-center, rgba(255, 255, 255, 0.95)) 70%,
+        var(--kpi-colour-center, rgba(var(--overlay-color), 0.95)) 70%,
         var(--kpi-colour-edge, rgba(0, 0, 0, 0.08)) 30%
       )
       55%,
@@ -1618,8 +1704,8 @@ input.auto-value {
   background:
     radial-gradient(
       circle at 32% 28%,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0.06) 30%,
+      rgba(var(--overlay-color), 0.18) 0%,
+      rgba(var(--overlay-color), 0.06) 30%,
       rgba(0, 0, 0, 0) 55%
     ),
     radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.18) 100%);
@@ -1727,15 +1813,15 @@ input.auto-value {
   background:
     radial-gradient(
       circle at 35% 28%,
-      rgba(255, 255, 255, 0.22) 0%,
-      rgba(255, 255, 255, 0.1) 26%,
-      rgba(255, 255, 255, 0) 56%
+      rgba(var(--overlay-color), 0.22) 0%,
+      rgba(var(--overlay-color), 0.1) 26%,
+      rgba(var(--overlay-color), 0) 56%
     ),
     radial-gradient(
       circle at 50% 50%,
       rgba(0, 0, 0, 0) 60%,
-      rgba(255, 255, 255, 0.1) 80%,
-      rgba(255, 255, 255, 0) 104%
+      rgba(var(--overlay-color), 0.1) 80%,
+      rgba(var(--overlay-color), 0) 104%
     );
   pointer-events: none;
   mix-blend-mode: screen;
@@ -1849,7 +1935,7 @@ input.auto-value {
 .veg-info-gradient {
   height: 36px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
 }
 .veg-info-hex {
   font-size: 12px;
@@ -1938,7 +2024,7 @@ input.auto-value {
   white-space: nowrap;
 }
 .veg-grid-table th {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
   color: var(--muted);
   font-weight: 600;
   font-size: 11px;
@@ -1953,7 +2039,7 @@ input.auto-value {
 .veg-grid-swatch {
   height: 22px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(var(--overlay-color), 0.06);
   min-width: 80px;
 }
 .veg-grid-hex {
@@ -1974,8 +2060,8 @@ input.auto-value {
   flex-direction: column;
   align-items: center;
   height: 68px;
-  background: #0a0c12;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg);
+  border: 1px solid rgba(var(--overlay-color), 0.06);
   overflow: hidden;
 }
 .kpi.kpi--preview > .kpi__label {
@@ -2023,7 +2109,7 @@ input.auto-value {
   height: 34px;
   padding: 0 14px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(var(--overlay-color), 0.18);
   border-radius: 50px;
   color: rgba(235, 242, 255, 0.95);
   cursor: pointer;
@@ -2060,8 +2146,8 @@ input.auto-value {
   gap: 8px;
   padding: 5px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.06);
   font-size: 13px;
 }
 
@@ -2111,15 +2197,15 @@ input.auto-value {
   padding: 10px 6px 8px;
   border-radius: 8px;
   border: 2px solid transparent;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
   cursor: pointer;
   transition:
     background 0.15s,
     border-color 0.15s;
 }
 .gg-picker-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(var(--overlay-color), 0.08);
+  border-color: rgba(var(--overlay-color), 0.18);
 }
 .gg-picker-card.is-selected {
   border-color: var(--accent, #5b8def);
@@ -2157,9 +2243,9 @@ input.auto-value {
   min-height: 320px;
   resize: vertical;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.22);
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(var(--overlay-color), 0.88);
   padding: 12px 12px;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
@@ -2194,7 +2280,7 @@ input.auto-value {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.18);
 }
@@ -2212,7 +2298,7 @@ input.auto-value {
 
 .io-import-preview {
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.18);
 }
@@ -2233,7 +2319,7 @@ input.auto-value {
 .subsection {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(var(--overlay-color), 0.08);
 }
 .subsection__title {
   font-weight: 700;
@@ -2249,7 +2335,7 @@ input.auto-value {
 .gg-row,
 .dd-row {
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.1);
 }
@@ -2276,7 +2362,7 @@ input.auto-value {
 .dd-suggest-preview {
   margin-top: 10px;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.08);
 }
@@ -2298,7 +2384,7 @@ input.auto-value {
     opacity 0.15s;
 }
 .dd-suggest-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--overlay-color), 0.04);
 }
 .dd-suggest-item--alt {
   opacity: 0.55;
@@ -2380,14 +2466,14 @@ input.auto-value {
   min-height: 32px;
   padding: 0 11px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(var(--overlay-color), 0.14);
+  background: rgba(var(--overlay-color), 0.04);
   color: rgba(228, 235, 250, 0.9);
   font-size: 12px;
   font-weight: 600;
 }
 .calendar-collapse-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--overlay-color), 0.08);
 }
 .calendar-collapse-toggle:focus-visible {
   outline: 2px solid rgba(141, 193, 255, 0.85);
@@ -2426,16 +2512,16 @@ input.auto-value {
   min-height: 110px;
   resize: vertical;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(15, 18, 32, 0.35);
-  color: rgba(235, 238, 248, 0.92);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--bg-rgb), 0.35);
+  color: var(--text);
   padding: 10px 10px;
   font-family: var(--sans);
   font-size: 13px;
   line-height: 1.4;
 }
 .calendar-textarea:focus {
-  border-color: rgba(126, 178, 255, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
   box-shadow: 0 0 0 4px var(--focus);
   outline: none;
 }
@@ -2503,12 +2589,12 @@ input.auto-value {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
 }
 .calendar-item-row.is-editing {
-  border-color: rgba(126, 178, 255, 0.42);
-  background: rgba(126, 178, 255, 0.12);
+  border-color: rgba(var(--accent-rgb), 0.42);
+  background: rgba(var(--accent-rgb), 0.12);
 }
 .calendar-item-row__main {
   min-width: 0;
@@ -2541,7 +2627,7 @@ input.auto-value {
   margin-top: 10px;
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
 }
 .calendar-season-band[hidden] {
@@ -2557,8 +2643,8 @@ input.auto-value {
   margin-top: 8px;
   height: 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(var(--overlay-color), 0.14);
+  background: rgba(var(--overlay-color), 0.04);
   overflow: visible;
 }
 .calendar-season-band__segment {
@@ -2584,7 +2670,7 @@ input.auto-value {
   top: -1px;
   width: 1px;
   bottom: -1px;
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(var(--overlay-color), 0.42);
 }
 .calendar-season-band__tick-label {
   position: absolute;
@@ -2602,8 +2688,8 @@ input.auto-value {
   gap: 6px;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--overlay-color), 0.05);
   font-size: 12px;
   color: rgba(235, 238, 248, 0.9);
 }
@@ -2611,7 +2697,7 @@ input.auto-value {
   margin-top: 10px;
   padding: 8px 10px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
   display: flex;
   flex-wrap: wrap;
@@ -2636,8 +2722,8 @@ input.auto-value {
   margin-left: 6px;
   padding: 2px 7px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.2);
+  background: rgba(var(--overlay-color), 0.08);
   color: rgba(235, 238, 248, 0.95);
   font-size: 11px;
   font-weight: 600;
@@ -2647,14 +2733,14 @@ input.auto-value {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
 }
 .calendar-date-tools {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
   display: flex;
   flex-direction: column;
@@ -2728,7 +2814,7 @@ input.auto-value {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
 }
 .calendar-moon-legend__title {
@@ -2753,7 +2839,7 @@ input.auto-value {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(var(--overlay-color), 0.28);
   background: #2a314f;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.22);
   position: relative;
@@ -2841,7 +2927,7 @@ input.auto-value {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(var(--overlay-color), 0.34);
   background: var(--moon-color);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
 }
@@ -2917,7 +3003,7 @@ input.auto-value {
 .calendar-mini-grid-wrap {
   margin-top: 2px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
   overflow: hidden;
 }
@@ -2929,7 +3015,7 @@ input.auto-value {
 .calendar-mini-grid th,
 .calendar-mini-grid td {
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.06);
 }
 .calendar-mini-grid tr:last-child td {
   border-bottom: 0;
@@ -2938,13 +3024,13 @@ input.auto-value {
   padding: 5px 2px;
   font-size: 11px;
   color: rgba(198, 209, 238, 0.84);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
 }
 .calendar-mini-cell {
   padding: 2px;
 }
 .calendar-mini-cell.is-empty {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
 }
 .calendar-mini-day {
   width: 100%;
@@ -2961,7 +3047,7 @@ input.auto-value {
   line-height: 1;
 }
 .calendar-mini-day:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--overlay-color), 0.08);
 }
 .calendar-mini-day:focus-visible {
   outline: 2px solid rgba(141, 193, 255, 0.85);
@@ -2979,7 +3065,7 @@ input.auto-value {
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(var(--overlay-color), 0.14);
   font-size: 10px;
   font-weight: 700;
   color: rgba(255, 231, 188, 0.95);
@@ -2989,8 +3075,8 @@ input.auto-value {
   opacity: 0;
 }
 .calendar-mini-day.is-selected {
-  border-color: rgba(126, 178, 255, 0.65);
-  background: rgba(126, 178, 255, 0.2);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  background: rgba(var(--accent-rgb), 0.2);
 }
 .calendar-mini-day.has-holiday {
   border-color: rgba(255, 215, 150, 0.5);
@@ -3004,7 +3090,7 @@ input.auto-value {
 }
 .calendar-mini-day.is-festival {
   border-color: rgba(183, 205, 255, 0.35);
-  background: rgba(126, 178, 255, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
   color: rgba(220, 232, 255, 0.95);
   min-height: 30px;
 }
@@ -3015,12 +3101,12 @@ input.auto-value {
   text-overflow: ellipsis;
   white-space: nowrap;
   border-color: rgba(173, 200, 255, 0.5);
-  background: rgba(126, 178, 255, 0.24);
+  background: rgba(var(--accent-rgb), 0.24);
   color: rgba(228, 238, 255, 0.95);
 }
 .calendar-mini-day__holiday--astro {
   border-color: rgba(169, 201, 255, 0.55);
-  background: rgba(126, 178, 255, 0.22);
+  background: rgba(var(--accent-rgb), 0.22);
   color: rgba(228, 238, 255, 0.95);
 }
 .calendar-mini-day__holiday--cycle {
@@ -3036,7 +3122,7 @@ input.auto-value {
 .calendar-compact-card {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.14);
 }
 .calendar-compact-card__label {
@@ -3052,7 +3138,7 @@ input.auto-value {
 .calendar-compact-events {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.16);
 }
 .calendar-compact-events__label {
@@ -3104,7 +3190,7 @@ input.auto-value {
   min-height: 420px;
   max-height: 72vh;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
   background: rgba(0, 0, 0, 0.2);
 }
 .calendar-grid-wrap.calendar-grid-wrap--detail {
@@ -3120,12 +3206,12 @@ input.auto-value {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: rgba(20, 24, 45, 0.96);
+  background: rgba(var(--panel-rgb), 0.96);
   color: rgba(225, 233, 255, 0.92);
 }
 .calendar-grid-table th,
 .calendar-grid-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.08);
   padding: 6px;
   text-align: center;
   font-size: 12px;
@@ -3141,14 +3227,14 @@ input.auto-value {
   color: rgba(188, 198, 228, 0.9);
 }
 .calendar-cell--empty {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
 }
 .calendar-day-btn {
   width: 100%;
   min-height: 48px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.05);
   color: rgba(235, 238, 248, 0.9);
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -3158,15 +3244,15 @@ input.auto-value {
   text-align: left;
 }
 .calendar-day-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--overlay-color), 0.08);
 }
 .calendar-day-btn:focus-visible {
   outline: 2px solid rgba(141, 193, 255, 0.85);
   outline-offset: 1px;
 }
 .calendar-day-btn.is-selected {
-  border-color: rgba(126, 178, 255, 0.65);
-  background: rgba(126, 178, 255, 0.2);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  background: rgba(var(--accent-rgb), 0.2);
 }
 .calendar-day-btn.is-full-moon .calendar-day-btn__phase {
   color: rgba(170, 220, 255, 0.95);
@@ -3234,7 +3320,7 @@ input.auto-value {
   grid-template-columns: auto 1fr;
   cursor: default;
   border-color: rgba(173, 200, 255, 0.36);
-  background: rgba(126, 178, 255, 0.16);
+  background: rgba(var(--accent-rgb), 0.16);
 }
 .calendar-day-btn--festival .calendar-day-btn__num {
   display: inline-flex;
@@ -3244,7 +3330,7 @@ input.auto-value {
   height: 22px;
   border-radius: 999px;
   border: 1px solid rgba(173, 200, 255, 0.6);
-  background: rgba(126, 178, 255, 0.24);
+  background: rgba(var(--accent-rgb), 0.24);
   color: rgba(231, 240, 255, 0.95);
   font-size: 11px;
 }
@@ -3254,7 +3340,7 @@ input.auto-value {
   max-width: 100%;
   border-radius: 8px;
   border-color: rgba(173, 200, 255, 0.4);
-  background: rgba(126, 178, 255, 0.2);
+  background: rgba(var(--accent-rgb), 0.2);
   color: rgba(231, 240, 255, 0.92);
   padding: 0 8px;
 }
@@ -3278,8 +3364,8 @@ input.auto-value {
   padding: 0 4px;
   border-radius: 999px;
   font-size: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--overlay-color), 0.08);
 }
 .calendar-day-btn__astro-icons {
   display: inline-flex;
@@ -3301,12 +3387,12 @@ input.auto-value {
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(var(--overlay-color), 0.2);
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
   color: rgba(228, 237, 255, 0.95);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--overlay-color), 0.08);
 }
 .calendar-cycle-marker--active {
   border-color: rgba(124, 236, 167, 0.56);
@@ -3368,13 +3454,13 @@ input.auto-value {
 .calendar-rule-trace__table th {
   text-align: left;
   padding: 2px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.12);
   color: var(--muted);
   font-weight: 600;
 }
 .calendar-rule-trace__table td {
   padding: 2px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.06);
 }
 .calendar-rule-trace__row--matched {
   background: rgba(80, 200, 120, 0.1);
@@ -3446,7 +3532,7 @@ input.auto-value {
   padding: 6px 12px;
   border-radius: var(--radius-sm, 8px);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--overlay-color), 0.04);
   font-size: 13px;
   color: var(--muted);
   cursor: pointer;
@@ -3455,7 +3541,7 @@ input.auto-value {
     color 0.15s;
 }
 .sci-toc__link:hover {
-  background: rgba(126, 178, 255, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
   color: var(--text);
   text-decoration: none;
 }
@@ -3468,7 +3554,7 @@ input.auto-value {
 }
 
 .sci-section {
-  background: rgba(23, 27, 46, 0.7);
+  background: rgba(var(--panel-rgb), 0.7);
   border: 1px solid var(--border);
   border-radius: var(--radius, 14px);
   box-shadow: var(--shadow);
@@ -3479,7 +3565,7 @@ input.auto-value {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(var(--overlay-color), 0.03);
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   list-style: none;
@@ -3515,7 +3601,7 @@ input.auto-value {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 8px);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(var(--overlay-color), 0.02);
   margin-bottom: 12px;
 }
 .sci-formula:last-child {
@@ -3551,7 +3637,7 @@ input.auto-value {
 }
 .sci-vars td {
   padding: 3px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.05);
   vertical-align: top;
 }
 .sci-vars td:first-child {
@@ -3579,7 +3665,7 @@ input.auto-value {
 }
 .sci-data td {
   padding: 4px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(var(--overlay-color), 0.05);
   font-family: var(--mono, monospace);
   font-size: 12px;
 }
@@ -3599,9 +3685,9 @@ input.auto-value {
 .sci-try {
   margin-top: 12px;
   padding: 12px;
-  border: 1px dashed rgba(126, 178, 255, 0.3);
+  border: 1px dashed rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-sm, 8px);
-  background: rgba(126, 178, 255, 0.04);
+  background: rgba(var(--accent-rgb), 0.04);
 }
 .sci-try__title {
   font-weight: 600;

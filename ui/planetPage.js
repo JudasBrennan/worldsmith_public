@@ -426,7 +426,7 @@ export function initPlanetPage(mountEl) {
           <div class="range-meta"><span id="cmf_min">0</span><span id="cmf_max">100</span></div>
         </div>
       </div>
-      ${numWithSlider("wmf", "Water Mass Fraction", "%", "", 0, 50, 0.1, "WMF")}
+      ${numWithSlider("wmf", "WMF", "%", "", 0, 50, 0.1, "WMF")}
       ${numWithSlider("tilt", "Axial Tilt", "\u00b0", "", 0, 180, 0.1, "Axial Tilt")}
       ${numWithSlider("albedo", "Albedo (Bond)", "", "", 0, 0.95, 0.01, "Albedo (Bond)")}
       ${numWithSlider("observer", "Height of Observer", "m", "", 0, 10000, 0.05, "Height of Observer")}

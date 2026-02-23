@@ -17,6 +17,42 @@ import { createSolPresetEnvelope } from "./ui/solPreset.js";
 const appEl = document.getElementById("app");
 let startupSolPromptHandled = false;
 
+/* ── Theme (light / dark) ─────────────────────────────── */
+const THEME_KEY = "worldsmith.theme";
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved) {
+    applyTheme(saved);
+  } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+    applyTheme("light");
+  }
+  // else leave default (dark — no attribute needed)
+
+  const btn = document.getElementById("themeToggle");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme");
+      const next = current === "light" ? "dark" : "light";
+      applyTheme(next);
+      localStorage.setItem(THEME_KEY, next);
+    });
+  }
+
+  // Follow OS changes when user hasn't set a manual preference
+  window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", (e) => {
+    if (!localStorage.getItem(THEME_KEY)) {
+      applyTheme(e.matches ? "light" : "dark");
+    }
+  });
+}
+
+initTheme();
+
 function hasSavedWorldData() {
   if (typeof store.hasSavedWorldInLocalStorage === "function") {
     return store.hasSavedWorldInLocalStorage();

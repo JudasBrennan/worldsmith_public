@@ -2,6 +2,219 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.10.0
+
+### Rocky Planet Composition
+
+**CMF/WMF-driven interior model with seven composition classes**
+(engine/planet.js, ui/planetPage.js, ui/store.js)
+
+Replaced the old density-floor formula with a full interior
+composition model driven by Core Mass Fraction (CMF) and Water Mass
+Fraction (WMF). The mass–radius relation uses Zeng et al. (2016) CMF
+scaling with a mass-dependent compression exponent calibrated to
+Solar System data:
+
+    R(M, CMF) = (1.07 − 0.21 × CMF) × M^α
+    α(M) = min(1/3, 0.257 − 0.0161 × ln M)
+
+Solar System validation: Mercury 0.3% error, Venus 0.8%, Earth 0.2%,
+Mars 0.5%. The old formula was 16–21% off for iron-rich sub-Earths.
+
+Seven composition classes are derived from CMF/WMF thresholds:
+
+| Class        | Condition   | Example      |
+| ------------ | ----------- | ------------ |
+| Ice world    | WMF > 10%   | Europa       |
+| Ocean world  | WMF 0.1–10% | —            |
+| Iron world   | CMF > 60%   | —            |
+| Mercury-like | CMF 45–60%  | Mercury      |
+| Earth-like   | CMF 25–45%  | Earth, Venus |
+| Mars-like    | CMF 10–25%  | Mars         |
+| Coreless     | CMF < 10%   | —            |
+
+Six water regimes (Dry through Ice world) describe surface hydrology.
+CMF can be auto-suggested from stellar metallicity [Fe/H] via molar
+mass balance (Schulze et al. 2021).
+
+Core radius is derived from the Zeng & Jacobsen (2017)
+approximation CRF = √CMF, and water-layer radius inflation uses a
+Zeng & Sasselov (2016) interpolation between dry and 50%-water
+endmembers.
+
+Tidal rigidity and quality factor Q now scale continuously with
+composition: silicate baseline 30 GPa with iron boost above CMF 0.33,
+ice layers at 3.5 GPa, and Q ranging from 12 (low CMF) to ~47
+(Mercury-like).
+
+**References**
+
+- Zeng, L. et al. (2016), "Mass–Radius Relation for Rocky Planets
+  Based on PREM", ApJ 819, 127
+- Zeng, L. & Jacobsen, S. B. (2017), "A Simple Analytical Model for
+  Rocky Planet Interiors", ApJ 837, 164
+- Zeng, L. & Sasselov, D. (2013), "A Detailed Model Grid for Solid
+  Planets from 0.1 to 100 Earth Masses", PASP 125, 227
+- Schulze, J. G. et al. (2021), "An Earth-like Stellar Abundances
+  Proxy for Rocky Planet Composition", PSJ 2, 113
+
+### Rocky Planet Atmosphere
+
+**Ten-gas atmosphere model with three greenhouse modes**
+(engine/planet.js, ui/planetPage.js)
+
+Built a physically-grounded atmosphere system with ten gases across
+three user-selectable modes:
+
+| Mode   | Gases                                        |
+| ------ | -------------------------------------------- |
+| Manual | User sets greenhouse effect directly (0–500) |
+| Core   | N₂, O₂, CO₂, Ar, H₂O, CH₄                    |
+| Full   | Core gases + H₂, He, SO₂, NH₃ (expert gases) |
+
+The greenhouse model computes optical depth τ from partial pressures
+using functional forms grounded in published physics — logarithmic
+for CO₂ and H₂O (band saturation, Myhre 1998), square-root for CH₄
+(IPCC TAR). Coefficients are calibrated to simultaneously match
+NASA Planetary Fact Sheet surface temperatures: Earth 288 K,
+Venus 737 K, Mars 211 K.
+
+Band-overlap suppression prevents double-counting where absorption
+bands coincide: CO₂–H₂O overlap at k = 6, SO₂ at k = 8, NH₃ at
+k = 20. Expert gases include H₂–N₂ collision-induced absorption
+(CIA) for reducing atmospheres.
+
+Mantle outgassing guidance (Ortenzi et al. 2020) suggests primary
+species by oxidation state: highly reduced mantles outgas H₂ + CO,
+Earth-like mantles outgas CO₂ + H₂O, and oxidised mantles add SO₂.
+
+Additional atmosphere-derived outputs:
+
+- **Sky colours** from a PanoptesV-inspired lookup table interpolated
+  in OKLab colour space over star temperature and effective surface
+  pressure, with CO₂ tint correction. Outputs high-sun and horizon
+  colour pairs rendered as radial gradients.
+- **Vegetation colours** from a spectral-class × pressure LUT with
+  pale/deep pigment stops, insolation correction, and twilight
+  variants for tidally locked K/M worlds.
+- **Circulation cells** (1, 3, 5, or 7 Hadley cells) keyed to
+  rotation period.
+- **Atmospheric tide resistance** — when atmospheric thermal torque
+  exceeds gravitational torque (b_atm ≥ 1), tidal synchronisation
+  is prevented (explains Venus's slow retrograde rotation).
+- **Liquid water feasibility** from Clausius–Clapeyron boiling point
+  at the surface pressure and temperature.
+
+**References**
+
+- Myhre, G. et al. (1998), "New estimates of radiative forcing due
+  to well mixed greenhouse gases", Geophys. Res. Lett. 25, 2715
+- Ortenzi, G. et al. (2020), "Mantle redox state drives outgassing
+  chemistry and atmospheric composition", Sci. Rep. 10, 10907
+- Leconte, J. et al. (2015), "Asynchronous rotation of Earth-mass
+  planets in the habitable zone of lower-mass stars", Science 347, 632
+
+### Magnetic Field Model
+
+**Self-normalised dynamo with dipolar/multipolar regimes**
+(engine/planet.js, ui/planetPage.js)
+
+The magnetic field model determines dynamo activity from CMF, planet
+mass, age, and rotation period. Core solidification timescale uses
+τ = 2 + 12 × CMF × √M Gyr, giving a three-phase convective boost:
+ramping during early solidification, peaking at 50–85% solid fraction
+(compositional convection), then exponentially suppressed as the
+liquid shell thins.
+
+A dipolar/multipolar transition at P_dip = 96√M × √(CMF/0.33) hours
+determines whether the field is coherent (dipolar) or fragmented
+(multipolar, 10× weaker). Field strength follows Olson & Christensen
+(2006) scaling with buoyancy flux.
+
+Solar System validation: 96% of rocky-planet fields within 5% of
+observed values, 98% within 15%.
+
+**References**
+
+- Olson, P. & Christensen, U. R. (2006), "Dipole moment scaling for
+  convection-driven planetary dynamos", EPSL 250, 561–571
+
+### Tectonic Regime Probabilities
+
+**Four-regime probability model** (engine/planet.js, ui/planetPage.js)
+
+Assigns probability weights across four tectonic regimes — stagnant
+lid, mobile lid (plate tectonics), episodic resurfacing, and
+plutonic-squishy — using five multiplicative factors: mass, age,
+surface water, CMF, and tidal heating. Each factor applies
+Gaussian preference curves tuned to published GCM and geodynamic
+results. The highest-probability regime is suggested with a
+qualitative advisory.
+
+### Divergences from Published Science
+
+**22 documented deviations on the Science page** (ui/sciencePage.js)
+
+Added a new section to the Science & Maths page cataloguing every
+place where WorldSmith diverges from a single published formula.
+Each entry states what was changed, why, and whether the deviation
+is a simplification, calibration, or novel parameterisation. Covers
+greenhouse coefficients, band-overlap suppression, mass–radius
+exponent, core solidification, magnetic field phases, CRF
+approximation, tectonic probabilities, atmospheric tides,
+composition-dependent rigidity, vegetation extrapolation, spin-orbit
+thresholds, flare rate binning, and more.
+
+The Science page now documents 93 equations across 11 sections.
+
+### NASA Validation Suite
+
+**41 Solar System validation tests** (tests/planet-nasa-validation.test.js)
+
+A dedicated test suite compares engine outputs for Mercury, Venus,
+Earth, and Mars against NASA Planetary Fact Sheet data (compiled in
+the references/ folder from JPL SSD and science.nasa.gov). Tests
+cover density, radius, gravity, surface temperature, core radius,
+composition class, magnetic field activity, habitable-zone
+membership, and tidal evolution. Tolerance-based assertions use
+percentage-error checks to allow for model approximations while
+catching regressions.
+
+### Light / Dark Theme
+
+**Full light-mode theme with toggle** (styles.css, app.js, index.html,
+STYLE_GUIDE.md)
+
+Added a light theme activated via `data-theme="light"` on the root
+element. All ~170 hardcoded `rgba()` colour values were extracted into
+CSS custom properties using an RGB-channel technique:
+
+| Variable          | Dark            | Light           |
+| ----------------- | --------------- | --------------- |
+| `--overlay-color` | `255, 255, 255` | `0, 0, 0`       |
+| `--bg-rgb`        | `15, 18, 32`    | `240, 241, 245` |
+| `--panel-rgb`     | `23, 27, 46`    | `255, 255, 255` |
+| `--accent-rgb`    | `126, 178, 255` | `48, 112, 200`  |
+
+A sun/moon toggle button in the header saves the preference to
+localStorage and falls back to the OS `prefers-color-scheme` media
+query. The moons.svg icon was updated from a hardcoded fill to
+`currentColor` for theme compatibility.
+
+Dark mode appearance is unchanged from 1.9.1.
+
+### Tests
+
+**448 tests total** (tests/)
+
+- 79 planet model tests (composition, atmosphere, sky/vegetation
+  colours, tectonic regimes, magnetic field)
+- 41 NASA validation tests (Mercury, Venus, Earth, Mars)
+- 36 moon tests (tidal heating, recession, composition overrides)
+- Remaining tests cover star, system, calendar, apparent magnitude,
+  local cluster, gas giants, debris disks, import/export, and
+  utilities
+
 ## 1.9.1
 
 ### Cluster Import
