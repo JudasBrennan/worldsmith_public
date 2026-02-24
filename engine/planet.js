@@ -1345,8 +1345,24 @@ export function computeGreenhouseTau({
  * @param {string} [params.planet.greenhouseMode="manual"] "core"|"full"|"manual"
  * @returns {object} { star, inputs, derived, display }
  */
-export function calcPlanetExact({ starMassMsol, starAgeGyr, planet, moons }) {
-  const star = calcStar({ massMsol: starMassMsol, ageGyr: starAgeGyr });
+export function calcPlanetExact({
+  starMassMsol,
+  starAgeGyr,
+  starRadiusRsolOverride,
+  starLuminosityLsolOverride,
+  starTempKOverride,
+  starEvolutionMode,
+  planet,
+  moons,
+}) {
+  const star = calcStar({
+    massMsol: starMassMsol,
+    ageGyr: starAgeGyr,
+    radiusRsolOverride: starRadiusRsolOverride,
+    luminosityLsolOverride: starLuminosityLsolOverride,
+    tempKOverride: starTempKOverride,
+    evolutionMode: starEvolutionMode,
+  });
 
   // Suggested CMF from stellar metallicity (needed before input resolution)
   const suggestedCmf = suggestedCmfFromMetallicity(star.metallicityFeH ?? 0);

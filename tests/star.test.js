@@ -11,6 +11,12 @@ import {
   massToRadius,
   giantPlanetProbability,
   populationLabel,
+  feHtoZ,
+  zamsLuminosity,
+  zamsRadius,
+  msLifetimeGyr,
+  evolvedLuminosity,
+  evolvedRadius,
 } from "../engine/star.js";
 
 function approxEqual(actual, expected, tolerance, label) {
@@ -387,4 +393,138 @@ test("calcStar defaults metallicityFeH to 0 when undefined", () => {
   const s = calcStar({ massMsol: 1, ageGyr: 4.6 });
   assert.strictEqual(s.inputs.metallicityFeH, 0, "defaults to 0");
   pctWithin(s.giantPlanetProbability, 0.1, 1, "default → ~10%");
+});
+
+// ===========================================================================
+// Stellar Evolution (Hurley, Pols & Tout 2000; Tout et al. 1996)
+// ===========================================================================
+
+test("feHtoZ: solar metallicity → Z = 0.02", () => {
+  approxEqual(feHtoZ(0), 0.02, 1e-10, "solar Z");
+});
+
+test("feHtoZ: metal-poor and metal-rich", () => {
+  approxEqual(feHtoZ(-1), 0.002, 1e-10, "[Fe/H]=-1 → Z=0.002");
+  approxEqual(feHtoZ(0.3), 0.02 * Math.pow(10, 0.3), 1e-10, "[Fe/H]=+0.3");
+});
+
+test("ZAMS luminosity: Sun (M=1, Z=0.02) ≈ 0.70 Lsol (young Sun was ~30% dimmer)", () => {
+  pctWithin(zamsLuminosity(1, 0.02), 0.7, 5, "ZAMS L(Sun)");
+});
+
+test("ZAMS radius: Sun (M=1, Z=0.02) ≈ 0.89 Rsol (young Sun was smaller)", () => {
+  pctWithin(zamsRadius(1, 0.02), 0.89, 5, "ZAMS R(Sun)");
+});
+
+test("ZAMS luminosity increases monotonically with mass at solar Z", () => {
+  let prev = 0;
+  for (const m of [0.2, 0.5, 0.8, 1.0, 1.5, 2.0, 5.0, 10.0]) {
+    const L = zamsLuminosity(m, 0.02);
+    assert.ok(L > prev, `ZAMS L(${m}) = ${L} should exceed ${prev}`);
+    prev = L;
+  }
+});
+
+test("ZAMS radius increases monotonically with mass at solar Z", () => {
+  let prev = 0;
+  for (const m of [0.2, 0.5, 0.8, 1.0, 1.5, 2.0, 5.0, 10.0]) {
+    const R = zamsRadius(m, 0.02);
+    assert.ok(R > prev, `ZAMS R(${m}) = ${R} should exceed ${prev}`);
+    prev = R;
+  }
+});
+
+test("MS lifetime: Sun (M=1, Z=0.02) within 20% of 10 Gyr", () => {
+  pctWithin(msLifetimeGyr(1, 0.02), 10, 20, "t_MS(Sun)");
+});
+
+test("MS lifetime: massive stars burn out faster", () => {
+  const t1 = msLifetimeGyr(1, 0.02);
+  const t5 = msLifetimeGyr(5, 0.02);
+  const t10 = msLifetimeGyr(10, 0.02);
+  assert.ok(t5 < t1, `t_MS(5)=${t5} < t_MS(1)=${t1}`);
+  assert.ok(t10 < t5, `t_MS(10)=${t10} < t_MS(5)=${t5}`);
+});
+
+test("MS lifetime: low-mass stars live longer", () => {
+  const t03 = msLifetimeGyr(0.3, 0.02);
+  const t1 = msLifetimeGyr(1, 0.02);
+  assert.ok(t03 > t1 * 5, `t_MS(0.3)=${t03} should be much longer than t_MS(1)=${t1}`);
+});
+
+test("evolved Sun at 4.6 Gyr: L within 10% of 1 Lsol", () => {
+  pctWithin(evolvedLuminosity(1, 0.02, 4.6), 1.0, 10, "evolved L(Sun, 4.6 Gyr)");
+});
+
+test("evolved Sun at 4.6 Gyr: R within 10% of 1 Rsol", () => {
+  pctWithin(evolvedRadius(1, 0.02, 4.6), 1.0, 10, "evolved R(Sun, 4.6 Gyr)");
+});
+
+test("evolved luminosity exceeds ZAMS luminosity at mid-MS age", () => {
+  const lZams = zamsLuminosity(1, 0.02);
+  const tMS = msLifetimeGyr(1, 0.02);
+  const lMid = evolvedLuminosity(1, 0.02, tMS * 0.5);
+  assert.ok(lMid > lZams, `L at 50% MS (${lMid}) > L_ZAMS (${lZams})`);
+});
+
+test("evolved radius exceeds ZAMS radius at mid-MS age", () => {
+  const rZams = zamsRadius(1, 0.02);
+  const tMS = msLifetimeGyr(1, 0.02);
+  const rMid = evolvedRadius(1, 0.02, tMS * 0.5);
+  assert.ok(rMid > rZams, `R at 50% MS (${rMid}) > R_ZAMS (${rZams})`);
+});
+
+test("evolved luminosity at age=0 matches ZAMS", () => {
+  const lZams = zamsLuminosity(1, 0.02);
+  const lEvolved = evolvedLuminosity(1, 0.02, 0);
+  pctWithin(lEvolved, lZams, 0.1, "L(age=0) ≈ L_ZAMS");
+});
+
+test("evolved radius at age=0 matches ZAMS", () => {
+  const rZams = zamsRadius(1, 0.02);
+  const rEvolved = evolvedRadius(1, 0.02, 0);
+  pctWithin(rEvolved, rZams, 0.1, "R(age=0) ≈ R_ZAMS");
+});
+
+test("calcStar with evolutionMode=evolved returns evolved fields", () => {
+  const s = calcStar({ massMsol: 1, ageGyr: 4.6, metallicityFeH: 0, evolutionMode: "evolved" });
+  assert.equal(s.evolutionMode, "evolved");
+  assert.ok(s.radiusRsolZams > 0, "ZAMS radius returned");
+  assert.ok(s.luminosityLsolZams > 0, "ZAMS luminosity returned");
+  assert.ok(s.radiusRsolAuto > s.radiusRsolZams, "evolved R > ZAMS R for Sun at 4.6 Gyr");
+  assert.ok(s.luminosityLsolAuto > s.luminosityLsolZams, "evolved L > ZAMS L for Sun at 4.6 Gyr");
+});
+
+test("calcStar with evolutionMode=zams returns null ZAMS fields", () => {
+  const s = calcStar({ massMsol: 1, ageGyr: 4.6, evolutionMode: "zams" });
+  assert.equal(s.evolutionMode, "zams");
+  assert.equal(s.radiusRsolZams, null, "no ZAMS ref in zams mode");
+  assert.equal(s.luminosityLsolZams, null, "no ZAMS ref in zams mode");
+});
+
+test("calcStar evolved mode: maxAgeGyr uses Hurley t_MS formula", () => {
+  const evolved = calcStar({
+    massMsol: 1,
+    ageGyr: 4.6,
+    metallicityFeH: 0,
+    evolutionMode: "evolved",
+  });
+  const zams = calcStar({ massMsol: 1, ageGyr: 4.6, metallicityFeH: 0, evolutionMode: "zams" });
+  // Hurley MS lifetime ≈ 10 Gyr for Sun; ZAMS mode uses (M/L)×10
+  assert.ok(Math.abs(evolved.maxAgeGyr - zams.maxAgeGyr) < 3, "both give ~10 Gyr for Sun");
+  assert.ok(evolved.maxAgeGyr > 0, "positive max age");
+});
+
+test("metal-poor star has shorter MS lifetime than metal-rich at same mass", () => {
+  // Lower Z → higher L → faster burnout
+  const tPoor = msLifetimeGyr(1, feHtoZ(-1));
+  const tRich = msLifetimeGyr(1, feHtoZ(0.3));
+  assert.ok(tPoor < tRich, `metal-poor t_MS=${tPoor} < metal-rich t_MS=${tRich}`);
+});
+
+test("evolved luminosity is higher for metal-poor stars at same age", () => {
+  // Lower Z → higher ZAMS L → evolves to even higher L
+  const lPoor = evolvedLuminosity(1, feHtoZ(-0.5), 4.6);
+  const lSolar = evolvedLuminosity(1, feHtoZ(0), 4.6);
+  assert.ok(lPoor > lSolar, `metal-poor L=${lPoor} > solar L=${lSolar}`);
 });

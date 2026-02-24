@@ -395,7 +395,7 @@ const UK_HOLIDAY_RULES = [
 ];
 
 const SOL_PRESET_WORLD = {
-  version: 38,
+  version: 44,
   selectedBodyType: "planet",
   star: {
     name: "Sol",
@@ -472,15 +472,21 @@ const SOL_PRESET_WORLD = {
           id: "dd1",
           name: "Kuiper belt",
           innerAu: 39.4,
-          outerAu: 47.7,
+          outerAu: 47.8,
           suggested: false,
+          eccentricity: 0.05,
+          inclination: null,
+          totalMassMearth: null,
         },
         dd2: {
           id: "dd2",
           name: "Asteroid belt",
-          innerAu: 2.1,
-          outerAu: 3.3,
+          innerAu: 2.06,
+          outerAu: 3.27,
           suggested: false,
+          eccentricity: 0.1,
+          inclination: null,
+          totalMassMearth: null,
         },
       },
     },

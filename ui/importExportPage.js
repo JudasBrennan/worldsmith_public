@@ -3,6 +3,7 @@ import { isXlsxFile, importLegacyWorldsmithWorkbook } from "./legacyXlsxImport.j
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { createSolPresetEnvelope } from "./solPreset.js";
 import { createRealmspacePresetEnvelope } from "./realmspacePreset.js";
+import { createArrakisPresetEnvelope } from "./arrakisPreset.js";
 
 const { exportEnvelope, validateEnvelope, importWorld, createBackup, listBackups, restoreBackup } =
   store;
@@ -24,6 +25,8 @@ const TIP_LABEL = {
     "Load and import a built-in Sol preset (Mercury-Mars, Jupiter-Neptune, belts, and key moons).",
   "Import Realmspace preset":
     "Load a Forgotten Realms / Spelljammer preset (Anadia-Chandos, Coliar, Glyth, Selune, and Calendar of Harptos).",
+  "Import Arrakis preset":
+    "Load the Arrakis (Dune) preset: Canopus system with Seban, Menaris, Arrakis, Ven, gas giants Extaris and Revona, moons Krelln and Arvon, and Imperial Standard calendar.",
   "Import file": "Select either a JSON export file or a WorldSmith 8.x XLSX workbook.",
   "Import JSON text": "Paste JSON here for validation and import.",
   "Export JSON text": "Read-only JSON export preview.",
@@ -206,6 +209,7 @@ export function initImportExportPage(root) {
               <button id="btn-import" type="button">Validate import</button>
               <button id="btn-sol-preset" type="button">Import Sol preset</button>
               <button id="btn-realmspace-preset" type="button">Import Realmspace preset</button>
+              <button id="btn-arrakis-preset" type="button">Import Arrakis preset</button>
             </div>
 
             <div style="height:10px"></div>
@@ -248,6 +252,7 @@ export function initImportExportPage(root) {
   const btnImport = root.querySelector("#btn-import");
   const btnSolPreset = root.querySelector("#btn-sol-preset");
   const btnRealmspacePreset = root.querySelector("#btn-realmspace-preset");
+  const btnArrakisPreset = root.querySelector("#btn-arrakis-preset");
   const fileInput = root.querySelector("#file");
 
   const backupListEl = root.querySelector("#backupList");
@@ -264,6 +269,7 @@ export function initImportExportPage(root) {
   btnImport?.setAttribute("data-tip", TIP_LABEL["Validate import"] || "");
   btnSolPreset?.setAttribute("data-tip", TIP_LABEL["Import Sol preset"] || "");
   btnRealmspacePreset?.setAttribute("data-tip", TIP_LABEL["Import Realmspace preset"] || "");
+  btnArrakisPreset?.setAttribute("data-tip", TIP_LABEL["Import Arrakis preset"] || "");
   btnApplyImport?.setAttribute("data-tip", TIP_LABEL["Replace current world"] || "");
   fileInput?.setAttribute("data-tip", TIP_LABEL["Import file"] || "");
 
@@ -514,6 +520,46 @@ export function initImportExportPage(root) {
     renderBackups();
     refreshExportView();
     setStatus(statusImport, "Realmspace preset imported (a backup was created first).", "ok");
+  });
+
+  btnArrakisPreset.addEventListener("click", () => {
+    const envelope = createArrakisPresetEnvelope();
+    txtImport.value = JSON.stringify(envelope, null, 2);
+
+    const v = validateEnvelope(envelope);
+    if (!v.ok) {
+      setStatus(
+        statusImport,
+        `Arrakis preset failed validation:\n- ${v.errors.join("\n- ")}`,
+        "bad",
+      );
+      hideImportPreview();
+      return;
+    }
+
+    showImportPreview(v.world);
+    const shouldApply =
+      typeof window?.confirm !== "function"
+        ? true
+        : window.confirm(
+            "Import Arrakis (Dune) preset and replace the current world?\nA backup will be created automatically first.",
+          );
+
+    if (!shouldApply) {
+      setStatus(
+        statusImport,
+        "Arrakis preset loaded. Review the summary and click Replace current world to apply.",
+        "info",
+      );
+      return;
+    }
+
+    createBackup(5);
+    importWorld(v.world);
+    hideImportPreview();
+    renderBackups();
+    refreshExportView();
+    setStatus(statusImport, "Arrakis preset imported (a backup was created first).", "ok");
   });
 
   fileInput.addEventListener("change", async () => {

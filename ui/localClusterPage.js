@@ -3,6 +3,7 @@ import {
   LOCAL_CLUSTER_DEFAULTS,
   normalizeLocalClusterInputs,
 } from "../engine/localCluster.js";
+import { giantPlanetProbability } from "../engine/star.js";
 import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { getClusterObjectVisual, normalizeClusterObjectKey } from "./clusterObjectVisuals.js";
@@ -48,10 +49,20 @@ const TIP_LABEL = {
     "Home star system is fixed at (0, 0, 0). Neighbour positions are generated with a Park-Miller PRNG seeded from the Random Seed input.\n\nDeviation from WS8: WS8 has no coordinate generator. Distances use cube-root sampling (uniform in volume inside the sphere). Directions use spherical-coordinate sampling.\n\nFor radii > 50 ly, the z-axis is compressed by a disk factor (1 - (r-50)/1000, floored at 0.15) to approximate the Milky Way thin-disk geometry.",
   "System Name":
     "Editable name override for this generated star system. Leave blank to use the default generated name.",
+  "[Fe/H]":
+    "Iron abundance relative to the Sun on a logarithmic scale. [Fe/H] = 0 is solar; +0.3 means twice solar iron; -1.0 means one-tenth.\n\nGenerated from galactic position (radial gradient -0.06 dex/kpc, vertical gradient -0.30 dex/kpc) plus Gaussian scatter (sigma 0.20 dex). The home system uses the value set on the Star page.\n\nReferences: Nordstrom et al. (2004); Luck & Lambert (2011); Schlesinger et al. (2014).",
+  "P(giant)":
+    "Estimated probability of hosting at least one giant planet (> 0.3 Mjup), based on the Fischer & Valenti (2005) metallicity-planet correlation: P = 0.1 * 10^(2*[Fe/H]), clamped to 0-100%.\n\nMetal-rich stars are far more likely to host gas giants; at [Fe/H] = +0.3 the probability is ~40%.",
 };
 
 function formatLy(value, dp = 2) {
   return `${fmt(value, dp)} ly`;
+}
+
+function fmtFeH(feH) {
+  const v = Number(feH);
+  if (!Number.isFinite(v)) return "—";
+  return (v > 0 ? "+" : "") + fmt(v, 2);
 }
 
 function toInteger(n, fallback) {
@@ -376,6 +387,8 @@ export function initLocalClusterPage(mountEl) {
                 <th>Y (ly)</th>
                 <th>Z (ly)</th>
                 <th>Distance (ly)</th>
+                <th>[Fe/H] ${tipIcon(TIP_LABEL["[Fe/H]"])}</th>
+                <th>P(giant) ${tipIcon(TIP_LABEL["P(giant)"])}</th>
               </tr>
             </thead>
             <tbody id="clusterSystemsBody"></tbody>
@@ -495,7 +508,8 @@ export function initLocalClusterPage(mountEl) {
       typeof worldNow?.star?.name === "string" && worldNow.star.name.trim()
         ? worldNow.star.name.trim()
         : "home star system";
-    const model = calcLocalCluster(state);
+    const homeFeH = worldNow?.star?.metallicityFeH ?? 0;
+    const model = calcLocalCluster({ ...state, homeMetallicityFeH: homeFeH });
     const adjustments = getClusterAdjustments();
     const finalSystems = buildFinalSystems(model, adjustments);
     const countDeltas = computeCountDeltas(model, adjustments);
@@ -629,6 +643,8 @@ export function initLocalClusterPage(mountEl) {
           <td>${fmt(system.y, 2)}</td>
           <td>${fmt(system.z, 2)}</td>
           <td>${formatLy(system.distanceLy, 2)}</td>
+          <td>${fmtFeH(system.metallicityFeH)}</td>
+          <td>${fmt(giantPlanetProbability(system.metallicityFeH) * 100, 1)}%</td>
         </tr>
       `;
       })
@@ -780,6 +796,7 @@ export function initLocalClusterPage(mountEl) {
         objectClassKey: classKey,
         multiplicity: "single",
         components: [{ objectClassKey: classKey }],
+        metallicityFeH: 0,
         ...pos,
       });
     } else if (action === "remove") {

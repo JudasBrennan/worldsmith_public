@@ -212,9 +212,29 @@ function formatOrbitalFate(dadt, toRocheGyr, toEscapeGyr) {
  * @returns {object} Structured result with star, planet, inputs, physical,
  *                   orbit, tides, and display tiers
  */
-export function calcMoonExact({ starMassMsol, starAgeGyr, planet, moon, parentOverride }) {
+export function calcMoonExact({
+  starMassMsol,
+  starAgeGyr,
+  starRadiusRsolOverride,
+  starLuminosityLsolOverride,
+  starTempKOverride,
+  starEvolutionMode,
+  planet,
+  moon,
+  parentOverride,
+}) {
   // Parent body values — use parentOverride for gas giants, calcPlanetExact for rocky planets
-  const p = parentOverride || calcPlanetExact({ starMassMsol, starAgeGyr, planet });
+  const p =
+    parentOverride ||
+    calcPlanetExact({
+      starMassMsol,
+      starAgeGyr,
+      starRadiusRsolOverride,
+      starLuminosityLsolOverride,
+      starTempKOverride,
+      starEvolutionMode,
+      planet,
+    });
 
   // Inputs
   const mStarMsol = clamp(starMassMsol, 0.01, 100);

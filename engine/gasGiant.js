@@ -24,6 +24,10 @@ const EARTH_MASS_PER_MJUP = 317.83;
 const RJ_PER_RE = JUPITER_RADIUS_KM / EARTH_RADIUS_KM; // ~10.97
 const AU_KM = 1.496e8;
 const MSOL_PER_MJUP = 1047.35; // M☉/Mj
+const SATURN_MASS_MJUP = 0.2994;
+const F_XUV_SUN_1AU = 4.64; // erg/cm²/s, present-day solar XUV at 1 AU (Ribas 2005)
+const SUN_AGE_GYR = 4.6;
+const HEATING_EFFICIENCY = 0.15; // energy-limited mass-loss efficiency ε
 
 /* ── Mass ↔ Radius (Chen & Kipping 2017) ────────────────────────── */
 
@@ -352,6 +356,164 @@ function calcDynamics(massMjup, radiusKm, rotationHours, tEffK) {
   };
 }
 
+/* ── Oblateness ──────────────────────────────────────────────────── */
+
+function calcOblateness(massMjup, radiusKm, rotationHours, densityGcm3) {
+  const massKg = massMjup * JUPITER_MASS_KG;
+  const rM = radiusKm * 1000;
+  const omega = (2 * Math.PI) / (rotationHours * 3600);
+  const q = (omega ** 2 * rM ** 3) / (G * massKg);
+
+  // Effective moment-of-inertia factor ξ = C/(MR²), calibrated via
+  // Darwin-Radau to reproduce solar-system gas giant flattening.
+  // Gas giants: log-mass interpolation (Saturn 0.239 ↔ Jupiter 0.269)
+  // Ice giants: density-dependent  (Uranus 0.276, Neptune 0.225)
+  let xi;
+  if (massMjup >= 0.15) {
+    const logM = Math.log10(massMjup);
+    const logSat = Math.log10(0.3);
+    const t = clamp((logM - logSat) / -logSat, 0, 1.5);
+    xi = 0.239 + t * 0.03;
+  } else {
+    xi = clamp(0.276 - 0.138 * (densityGcm3 - 1.27), 0.2, 0.3);
+  }
+
+  // Darwin-Radau approximation: f = 2.5q / (1 + 6.25·(1−1.5ξ)²)
+  const x = 1 - 1.5 * xi;
+  const f = clamp((2.5 * q) / (1 + 6.25 * x * x), 0, 0.5);
+
+  const eqRadiusKm = radiusKm * (1 + f / 3);
+  const polRadiusKm = radiusKm * (1 - (2 * f) / 3);
+  const j2 = (2 * f - q) / 3; // first-order hydrostatic (was q/3)
+  return {
+    flattening: round(f, 5),
+    equatorialRadiusKm: round(eqRadiusKm, 0),
+    polarRadiusKm: round(polRadiusKm, 0),
+    j2: round(j2, 6),
+  };
+}
+
+/* ── Mass loss / evaporation ─────────────────────────────────────── */
+
+function calcMassLoss(massMjup, radiusKm, orbitAu, starMassMsol, starLuminosityLsol, starAgeGyr) {
+  const massKg = massMjup * JUPITER_MASS_KG;
+  const rM = radiusKm * 1000;
+  const age = Math.max(0.1, starAgeGyr);
+  // XUV flux: Ribas et al. 2005 power-law decay, scaled by luminosity
+  const fXuv1Au = F_XUV_SUN_1AU * starLuminosityLsol * (age / SUN_AGE_GYR) ** -1.23;
+  const fXuvAtOrbit = fXuv1Au / orbitAu ** 2; // erg/cm²/s
+  const fXuvSI = fXuvAtOrbit * 1e-3; // W/m²
+  // Energy-limited escape: dM/dt = ε π R³ F_XUV / (G M)
+  const massLossKgS = (HEATING_EFFICIENCY * Math.PI * rM ** 3 * fXuvSI) / (G * massKg);
+  const evapTimescaleGyr = massKg / Math.max(massLossKgS, 1e-30) / 3.156e16;
+  // Roche lobe radius (Eggleton 1983 simplified): R_L ≈ 0.462·a·(q/3)^(1/3)
+  const starMassMjup = starMassMsol * MSOL_PER_MJUP;
+  const rocheLobeKm = 0.462 * orbitAu * (massMjup / (3 * starMassMjup)) ** (1 / 3) * AU_KM;
+  const rocheOverflow = radiusKm > rocheLobeKm;
+  return {
+    massLossRateKgS: massLossKgS,
+    evaporationTimescaleGyr: round(Math.min(evapTimescaleGyr, 1e12), 3),
+    xuvFluxErgCm2S: round(fXuvAtOrbit, 4),
+    rocheLobeRadiusKm: round(rocheLobeKm, 0),
+    rocheLobeOverflow: rocheOverflow,
+  };
+}
+
+/* ── Interior / core ─────────────────────────────────────────────── */
+
+function calcInterior(massMjup) {
+  // Thorngren et al. 2016: total heavy element mass
+  const totalHeavy = 49.3 * massMjup ** 0.61;
+  const coreMass = Math.min(totalHeavy * 0.5, 25);
+  const totalMassEarth = massMjup * EARTH_MASS_PER_MJUP;
+  const bulkZ = clamp(totalHeavy / totalMassEarth, 0, 1);
+  return {
+    totalHeavyElementsMearth: round(totalHeavy, 1),
+    estimatedCoreMassMearth: round(coreMass, 1),
+    bulkMetallicityFraction: round(bulkZ, 4),
+  };
+}
+
+/* ── Age-dependent radius correction ─────────────────────────────── */
+
+function calcAgeRadiusCorrection(massMjup, radiusRj, starAgeGyr, teqK) {
+  const age = Math.max(0.1, starAgeGyr);
+  // Fortney et al. 2007 simplified cooling
+  const inflationFactor = 1 + 0.1 * (5 / age) ** 0.35;
+  // Hot Jupiter proximity inflation
+  let proximityBonus = 0;
+  if (teqK > 1000) {
+    proximityBonus = 0.1 + 0.2 * clamp((teqK - 1000) / 1000, 0, 1);
+  }
+  const baseRj = massToRadiusRj(massMjup);
+  const suggestedRj = round(baseRj * inflationFactor + proximityBonus, 3);
+  const deviation = radiusRj - suggestedRj;
+  let note;
+  if (Math.abs(deviation) < 0.05) {
+    note = `Radius consistent with ${fmt(age, 1)} Gyr cooling`;
+  } else if (deviation > 0) {
+    note = `Radius ${fmt(deviation, 2)} Rj larger than expected at ${fmt(age, 1)} Gyr`;
+  } else {
+    note = `Radius ${fmt(Math.abs(deviation), 2)} Rj smaller than expected at ${fmt(age, 1)} Gyr`;
+  }
+  return {
+    suggestedRadiusRj: suggestedRj,
+    radiusInflationFactor: round(inflationFactor, 3),
+    proximityInflationRj: round(proximityBonus, 3),
+    radiusAgeNote: note,
+  };
+}
+
+/* ── Ring properties ─────────────────────────────────────────────── */
+
+function calcRingProperties(massMjup, teqK, rocheLimitRockKm, rocheLimitIceKm) {
+  let ringType, ringComposition;
+  if (teqK < 150) {
+    ringType = "Icy";
+    ringComposition = "Water ice, ammonia ice";
+  } else if (teqK < 300) {
+    ringType = "Mixed";
+    ringComposition = "Ice and silicate dust";
+  } else {
+    ringType = "Rocky";
+    ringComposition = "Silicate dust, rocky debris";
+  }
+  const estimatedMassKg = 3e19 * Math.sqrt(massMjup / SATURN_MASS_MJUP);
+  const areaKm2 = Math.PI * (rocheLimitIceKm ** 2 - rocheLimitRockKm ** 2);
+  const surfaceDensity = areaKm2 > 0 ? estimatedMassKg / (areaKm2 * 1e6) : 0;
+  const opticalDepth = surfaceDensity / 67;
+  let opticalDepthClass;
+  if (opticalDepth > 1) opticalDepthClass = "Dense";
+  else if (opticalDepth > 0.1) opticalDepthClass = "Moderate";
+  else opticalDepthClass = "Tenuous";
+  return {
+    ringType,
+    ringComposition,
+    estimatedMassKg,
+    opticalDepthClass,
+    opticalDepth: round(opticalDepth, 3),
+    innerRadiusKm: round(rocheLimitRockKm, 0),
+    outerRadiusKm: round(rocheLimitIceKm, 0),
+  };
+}
+
+/* ── Tidal effects ───────────────────────────────────────────────── */
+
+function calcTidalEffects(massMjup, radiusKm, orbitAu, starMassMsol, starAgeGyr) {
+  const age = Math.max(0.1, starAgeGyr);
+  const aRatio = orbitAu / 0.05;
+  const rRatio = radiusKm / JUPITER_RADIUS_KM;
+  // Locking timescale: ~1 Gyr for 1 Mjup at 0.05 AU around 1 Msol
+  const lockingGyr = (aRatio ** 6 * massMjup) / (rRatio ** 5 * starMassMsol ** 2);
+  const circGyr = (aRatio ** 6.5 * massMjup) / (rRatio ** 5 * starMassMsol ** 2);
+  return {
+    lockingTimescaleGyr: round(lockingGyr, 3),
+    isTidallyLocked: lockingGyr < age,
+    circularisationTimescaleGyr: round(circGyr, 3),
+    isCircularised: circGyr < age,
+  };
+}
+
 /* ── Main export ─────────────────────────────────────────────────── */
 
 /**
@@ -377,8 +539,8 @@ export function calcGasGiant({
   metallicity: rawMetallicity,
   starMassMsol,
   starLuminosityLsol,
-  starAgeGyr: _starAgeGyr,
-  starRadiusRsol: _starRadiusRsol,
+  starAgeGyr,
+  starRadiusRsol,
 }) {
   /* ── Resolve mass ↔ radius ─────────────────────────────────────── */
 
@@ -386,6 +548,8 @@ export function calcGasGiant({
   const rot = clamp(toFinite(rotationPeriodHours, 10), 1, 100);
   const sMass = clamp(toFinite(starMassMsol, 1), 0.075, 100);
   const sLum = Math.max(0.0001, toFinite(starLuminosityLsol, 1));
+  const sAge = clamp(toFinite(starAgeGyr, 4.6), 0.01, 15);
+  void starRadiusRsol; // reserved for future use
 
   let massMjup, radiusRj;
   let massSource, radiusSource;
@@ -489,6 +653,20 @@ export function calcGasGiant({
 
   const dynamics = calcDynamics(massMjup, radiusKm, rot, tEffK);
 
+  /* ── New physics ────────────────────────────────────────────────── */
+
+  const oblateness = calcOblateness(massMjup, radiusKm, rot, densityGcm3);
+  const interior = calcInterior(massMjup);
+  const massLoss = calcMassLoss(massMjup, radiusKm, orbit, sMass, sLum, sAge);
+  const tidal = calcTidalEffects(massMjup, radiusKm, orbit, sMass, sAge);
+  const ringProps = calcRingProperties(massMjup, teqK, rocheLimitRockKm, rocheLimitIceKm);
+  const ageRadius = calcAgeRadiusCorrection(massMjup, radiusRj, sAge, teqK);
+
+  // Equatorial gravity (GM/R_eq² — matches NASA convention)
+  const eqRadiusM = oblateness.equatorialRadiusKm * 1000;
+  const equatorialGravityMs2 = (G * massKg) / eqRadiusM ** 2;
+  const equatorialGravityG = equatorialGravityMs2 / 9.80665;
+
   /* ── Orbital ───────────────────────────────────────────────────── */
 
   const orbitalPeriodYears = Math.sqrt(orbit ** 3 / sMass);
@@ -525,7 +703,13 @@ export function calcGasGiant({
       densityGcm3: round(densityGcm3, 4),
       gravityMs2: round(gravityMs2, 2),
       gravityG: round(gravityG, 3),
+      equatorialGravityMs2: round(equatorialGravityMs2, 2),
+      equatorialGravityG: round(equatorialGravityG, 3),
       escapeVelocityKms: round(escapeVelocityKms, 2),
+      suggestedRadiusRj: ageRadius.suggestedRadiusRj,
+      radiusInflationFactor: ageRadius.radiusInflationFactor,
+      proximityInflationRj: ageRadius.proximityInflationRj,
+      radiusAgeNote: ageRadius.radiusAgeNote,
     },
 
     thermal: {
@@ -551,6 +735,11 @@ export function calcGasGiant({
     },
 
     dynamics,
+    oblateness,
+    interior,
+    massLoss,
+    tidal,
+    ringProperties: ringProps,
 
     orbital: {
       orbitalPeriodYears: round(orbitalPeriodYears, 4),
@@ -566,7 +755,7 @@ export function calcGasGiant({
       mass: `${fmt(massMjup, 3)} Mj (${fmt(massEarth, 1)} M⊕)`,
       radius: `${fmt(radiusRj, 3)} Rj (${fmt(radiusKm, 0)} km)`,
       density: `${fmt(densityGcm3, 3)} g/cm³`,
-      gravity: `${fmt(gravityG, 2)} g (${fmt(gravityMs2, 1)} m/s²)`,
+      gravity: `${fmt(equatorialGravityG, 2)} g (${fmt(equatorialGravityMs2, 1)} m/s²)`,
       escapeVelocity: `${fmt(escapeVelocityKms, 1)} km/s`,
       equilibriumTemp: `${fmt(teqK, 0)} K`,
       effectiveTemp: `${fmt(tEffK, 0)} K`,
@@ -581,6 +770,19 @@ export function calcGasGiant({
       orbitalVelocity: `${fmt(orbitalVelocityKms, 1)} km/s`,
       chaoticZone: `±${fmt(chaoticZoneHalfAu, 3)} AU`,
       metallicity: `${fmt(atmosphere.metallicitySolar, 1)}× solar`,
+      oblateness: `f = ${fmt(oblateness.flattening, 4)} (J₂ = ${fmt(oblateness.j2, 5)})`,
+      equatorialRadius: `${fmt(oblateness.equatorialRadiusKm, 0)} km eq / ${fmt(oblateness.polarRadiusKm, 0)} km pol`,
+      heavyElements: `${fmt(interior.totalHeavyElementsMearth, 1)} M⊕ total (core ≈ ${fmt(interior.estimatedCoreMassMearth, 1)} M⊕)`,
+      bulkMetallicity: `Z = ${fmt(interior.bulkMetallicityFraction, 3)}`,
+      massLossRate: `${massLoss.massLossRateKgS.toExponential(2)} kg/s`,
+      evaporationTimescale: `${massLoss.evaporationTimescaleGyr >= 1e10 ? "≫ Hubble time" : fmt(massLoss.evaporationTimescaleGyr, 2) + " Gyr"}`,
+      rocheLobeRadius: `${fmt(massLoss.rocheLobeRadiusKm, 0)} km${massLoss.rocheLobeOverflow ? " (OVERFLOW)" : ""}`,
+      suggestedRadius: `${fmt(ageRadius.suggestedRadiusRj, 3)} Rj at ${fmt(sAge, 1)} Gyr`,
+      radiusAgeNote: ageRadius.radiusAgeNote,
+      ringType: `${ringProps.ringType} — ${ringProps.ringComposition}`,
+      ringDetails: `τ ≈ ${fmt(ringProps.opticalDepth, 2)} (${ringProps.opticalDepthClass}), ${ringProps.estimatedMassKg.toExponential(2)} kg`,
+      tidalLocking: `τ_lock = ${tidal.lockingTimescaleGyr >= 1e6 ? "≫ age" : fmt(tidal.lockingTimescaleGyr, 2) + " Gyr"}${tidal.isTidallyLocked ? " — Locked" : ""}`,
+      circularisation: `τ_circ = ${tidal.circularisationTimescaleGyr >= 1e6 ? "≫ age" : fmt(tidal.circularisationTimescaleGyr, 2) + " Gyr"}${tidal.isCircularised ? " — Circularised" : ""}`,
     },
   };
 }

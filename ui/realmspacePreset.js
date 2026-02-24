@@ -341,7 +341,7 @@ const HARPTOS_HOLIDAYS = [
 // Star assumed ≈ 1 Msol (Toril's 365-day year at 1 AU).
 
 const REALMSPACE_PRESET_WORLD = {
-  version: 38,
+  version: 44,
   selectedBodyType: "planet",
   star: {
     name: "The Sun",
@@ -359,28 +359,16 @@ const REALMSPACE_PRESET_WORLD = {
     orbit1Au: 0.25,
     gasGiants: {
       selectedId: "gg_coliar",
-      order: ["gg_coliar", "gg_glyth"],
+      order: ["gg_coliar"],
       byId: {
         gg_coliar: {
           id: "gg_coliar",
           name: "Coliar",
           au: 0.5,
           slotIndex: 2,
-          style: "jupiter",
+          style: "jupiter", // Air Body with floating islands; gas giant is closest fit
           rings: false,
           radiusRj: 0.68,
-          massMjup: null,
-          rotationPeriodHours: null,
-          metallicity: null,
-        },
-        gg_glyth: {
-          id: "gg_glyth",
-          name: "Glyth",
-          au: 5.0,
-          slotIndex: 6,
-          style: "saturn",
-          rings: false,
-          radiusRj: 0.55,
           massMjup: null,
           rotationPeriodHours: null,
           metallicity: null,
@@ -396,13 +384,16 @@ const REALMSPACE_PRESET_WORLD = {
           innerAu: 0.98,
           outerAu: 1.02,
           suggested: false,
+          eccentricity: null,
+          inclination: null,
+          totalMassMearth: null,
         },
       },
     },
   },
   planets: {
     selectedId: "p_toril",
-    order: ["p_anadia", "p_toril", "p_karpri", "p_chandos"],
+    order: ["p_anadia", "p_toril", "p_karpri", "p_chandos", "p_glyth"],
     byId: {
       p_anadia: {
         id: "p_anadia",
@@ -419,14 +410,25 @@ const REALMSPACE_PRESET_WORLD = {
           rotationPeriodHours: 12.0,
           axialTiltDeg: 5.0,
           massEarth: 0.06,
-          cmfPct: 33.0,
+          cmfPct: 18.0, // Mars-like → amber/orange surface palette
+          wmfPct: 0.015, // Polar freshwater seas → Shallow oceans
           albedoBond: 0.15,
           greenhouseEffect: 0.0,
-          observerHeightM: 1.0,
-          pressureAtm: 0.1,
+          observerHeightM: 1.0, // Halfling inhabitants
+          pressureAtm: 0.1, // Thin but breathable
           o2Pct: 10.0,
           co2Pct: 1.0,
+          h2oPct: 0.1,
+          ch4Pct: 0,
+          h2Pct: 0,
+          hePct: 0,
+          so2Pct: 0,
+          nh3Pct: 0,
           arPct: 1.0,
+          tectonicRegime: "stagnant", // Small, geologically dead
+          vegOverride: true, // Polar vegetation (trees, pastoral fields)
+          vegPaleHexOverride: "#5a8a40",
+          vegDeepHexOverride: "#2a5a15",
         },
       },
       p_toril: {
@@ -445,13 +447,22 @@ const REALMSPACE_PRESET_WORLD = {
           axialTiltDeg: 23.5,
           massEarth: 1.0,
           cmfPct: 32.0,
+          wmfPct: 0.5, // ~60% ocean → Extensive oceans
           albedoBond: 0.3,
           greenhouseEffect: 1.65,
           observerHeightM: 1.75,
           pressureAtm: 1.0,
           o2Pct: 21.0,
           co2Pct: 0.04,
+          h2oPct: 0.4,
+          ch4Pct: 0,
+          h2Pct: 0,
+          hePct: 0,
+          so2Pct: 0,
+          nh3Pct: 0,
           arPct: 0.93,
+          tectonicRegime: "mobile",
+          mantleOxidation: "earth",
         },
       },
       p_karpri: {
@@ -466,17 +477,25 @@ const REALMSPACE_PRESET_WORLD = {
           inclinationDeg: 3.0,
           longitudeOfPeriapsisDeg: 200.0,
           subsolarLongitudeDeg: 0.0,
-          rotationPeriodHours: 1.2,
+          rotationPeriodHours: 1.2, // Canon: 1h12m, extreme Coriolis effects
           axialTiltDeg: 10.0,
           massEarth: 1.1,
           cmfPct: 20.0,
-          albedoBond: 0.7,
-          greenhouseEffect: 0.2,
+          wmfPct: 5, // 100% water surface → Global ocean
+          albedoBond: 0.4, // Ocean + polar ice mix
+          greenhouseEffect: 4, // Equatorial liquid water, polar ice caps
           observerHeightM: 1.75,
-          pressureAtm: 0.8,
-          o2Pct: 5.0,
-          co2Pct: 1.5,
-          arPct: 0.5,
+          pressureAtm: 1.0, // "Remarkably clean" breathable atmosphere
+          o2Pct: 21.0, // Fresh/Type A atmosphere
+          co2Pct: 0.3,
+          h2oPct: 3, // Very humid, water world
+          ch4Pct: 0,
+          h2Pct: 0,
+          hePct: 0,
+          so2Pct: 0,
+          nh3Pct: 0,
+          arPct: 0.93,
+          tectonicRegime: "stagnant", // No visible land tectonics
         },
       },
       p_chandos: {
@@ -495,13 +514,57 @@ const REALMSPACE_PRESET_WORLD = {
           axialTiltDeg: 15.0,
           massEarth: 2.5,
           cmfPct: 25.0,
+          wmfPct: 2, // Predominantly water + floating rock islands → Global ocean
           albedoBond: 0.35,
-          greenhouseEffect: 0.1,
+          greenhouseEffect: 9, // Liquid water at 2 AU (~271 K average)
           observerHeightM: 1.75,
-          pressureAtm: 0.5,
-          o2Pct: 2.0,
-          co2Pct: 5.0,
+          pressureAtm: 1.2, // Breathable (Type B), supports greenhouse
+          o2Pct: 18.0, // Breathable but lacks ozone layer
+          co2Pct: 2.0,
+          h2oPct: 4, // Very humid, ocean world
+          ch4Pct: 0,
+          h2Pct: 0,
+          hePct: 0,
+          so2Pct: 0,
+          nh3Pct: 0,
           arPct: 1.0,
+          tectonicRegime: "episodic", // Constant instability, islands rise/sink
+        },
+      },
+      // Glyth: canonically a Size E Earth Body (SJR2), not a gas giant.
+      // 80% land, 20% gelatinous "water". Toxic atmosphere from illithid
+      // forest-burning. Four concentric ring systems (not modelled here).
+      p_glyth: {
+        id: "p_glyth",
+        name: "Glyth",
+        slotIndex: 7,
+        locked: false,
+        inputs: {
+          name: "Glyth",
+          semiMajorAxisAu: 5.0,
+          eccentricity: 0.02,
+          inclinationDeg: 1.0,
+          longitudeOfPeriapsisDeg: 60.0,
+          subsolarLongitudeDeg: 0.0,
+          rotationPeriodHours: 30.5, // Canon: 30h30m
+          axialTiltDeg: 10.0,
+          massEarth: 1.5, // Size E, similar to Toril
+          cmfPct: 33.0,
+          wmfPct: 0.015, // 20% gelatinous "water" → Shallow oceans
+          albedoBond: 0.2, // Dull gray appearance
+          greenhouseEffect: 60, // Thick smoky atmosphere warms surface at 5 AU
+          observerHeightM: 1.75,
+          pressureAtm: 1.5, // Thick, fouled atmosphere
+          o2Pct: 8.0, // Depleted by controlled burns
+          co2Pct: 10.0, // High CO₂ from forest fires
+          h2oPct: 0.5,
+          ch4Pct: 0,
+          h2Pct: 0,
+          hePct: 0,
+          so2Pct: 2, // Acidic rain, pollution from burning
+          nh3Pct: 0,
+          arPct: 1.0,
+          tectonicRegime: "stagnant",
         },
       },
     },
@@ -520,7 +583,7 @@ const REALMSPACE_PRESET_WORLD = {
           semiMajorAxisKm: 295000,
           eccentricity: 0.04,
           inclinationDeg: 5.0,
-          massMoon: 0.37,
+          massMoon: 0.72, // ~93% Luna radius, density 3.0 → 72% Luna mass
           densityGcm3: 3.0,
           albedo: 0.12,
         },

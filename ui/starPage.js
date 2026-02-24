@@ -17,7 +17,7 @@ const TIP_LABEL = {
   Radius:
     "How big your star is in solar radii.\n\nFor M \u2264 1 Msol: Eker et al. (2018, MNRAS 479, 5491) quadratic mass\u2013radius relation from eclipsing binaries.\nFor M > 1 Msol: power-law scaling (Demircan & Kahraman 1991).\n\nOur sun = 1 Rsol = 695,700 km",
   Luminosity:
-    "The amount of light your star emits in solar luminosities.\n\nDerived from mass using the Eker et al. (2018, MNRAS 479, 5491) six-piece empirical relation, calibrated from 509 eclipsing binary stars. Replaces the classical textbook L = M\u2074 approximation, which overestimated K-dwarf luminosities by 30\u201385%.\n\nOur sun = 1 Lsol = 3.846E26 watts",
+    "The amount of light your star emits in solar luminosities.\n\nZAMS mode: Eker et al. (2018, MNRAS 479, 5491) six-piece empirical relation from 509 eclipsing binaries. Replaces the classical L = M\u2074 approximation, which overestimated K-dwarf luminosities by 30\u201385%.\n\nEvolved mode: Hurley, Pols & Tout (2000) analytical stellar evolution. Radius and temperature are accurate to ~1\u20132%, but luminosity carries ~10% mean error inherent to the Tout (1996) polynomial ZAMS baseline and Hurley evolution-rate fits. This is the practical accuracy ceiling of analytical single-star evolution; sub-2% luminosity would require tabulated MESA/MIST isochrone grids.\n\nOur sun = 1 Lsol = 3.846E26 watts",
   "Radius Override":
     "Optionally override the mass-derived stellar radius in solar radii. Leave blank to use the Eker et al. (2018) scaling-law value derived from mass.\n\nUseful for modelling subgiants, evolved stars, or stars with a measured radius.\n\nOur sun = 1 Rsol = 695,700 km",
   "Luminosity Override":
@@ -82,6 +82,7 @@ export function initStarPage(mountEl) {
     advancedDerivationMode: ["rl", "rt", "lt"].includes(world?.star?.advancedDerivationMode)
       ? world.star.advancedDerivationMode
       : "rl",
+    evolutionMode: world?.star?.evolutionMode === "evolved" ? "evolved" : "zams",
   };
 
   const wrap = document.createElement("div");
@@ -134,6 +135,15 @@ export function initStarPage(mountEl) {
             <div class="range-meta"><span id="age_min"></span><span id="age_max"></span></div>
           </div>
           </div>
+
+          <div class="viz-switch" style="margin:10px 0 6px">
+            <div class="viz-switch__text">Stellar Evolution: Off / On</div>
+            <label class="viz-switch__control" for="evolutionToggle">
+              <input type="checkbox" id="evolutionToggle" />
+              <span class="viz-switch__slider" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="hint" id="evolutionHint" style="margin-bottom:8px"></div>
 
           <div class="form-row">
             <div>
@@ -254,6 +264,8 @@ export function initStarPage(mountEl) {
   const tempHintEl = wrap.querySelector("#tempHint");
   const resolutionStatusEl = wrap.querySelector("#resolutionStatus");
   const physicsModeHintEl = wrap.querySelector("#physicsModeHint");
+  const evolutionToggleEl = wrap.querySelector("#evolutionToggle");
+  const evolutionHintEl = wrap.querySelector("#evolutionHint");
 
   // Bind number inputs to sliders
   const massSlider = wrap.querySelector("#mass_slider");
@@ -443,9 +455,21 @@ export function initStarPage(mountEl) {
     classBadge.classList.remove("good", "warn", "bad");
     classBadge.classList.add(model.spectralClass.startsWith("G") ? "good" : "badge");
 
-    radiusHintEl.textContent = `Auto (mass-derived): ${fmt(model.radiusRsolAuto, 3)} Rsol`;
-    luminosityHintEl.textContent = `Auto (mass-derived): ${fmt(model.luminosityLsolAuto, 4)} Lsol`;
+    if (model.evolutionMode === "evolved") {
+      const rz = model.radiusRsolZams;
+      const lz = model.luminosityLsolZams;
+      radiusHintEl.textContent = `Auto (evolved): ${fmt(model.radiusRsolAuto, 3)} Rsol  (ZAMS: ${fmt(rz, 3)})`;
+      luminosityHintEl.textContent = `Auto (evolved): ${fmt(model.luminosityLsolAuto, 4)} Lsol  (ZAMS: ${fmt(lz, 4)})`;
+    } else {
+      radiusHintEl.textContent = `Auto (mass-derived): ${fmt(model.radiusRsolAuto, 3)} Rsol`;
+      luminosityHintEl.textContent = `Auto (mass-derived): ${fmt(model.luminosityLsolAuto, 4)} Lsol`;
+    }
     tempHintEl.textContent = `Auto (from R and L): ${fmt(model.tempK, 0)} K`;
+
+    evolutionHintEl.textContent =
+      state.evolutionMode === "evolved"
+        ? "Luminosity and radius evolve with age and metallicity (Hurley, Pols & Tout 2000)."
+        : "Properties derived from mass only (static scaling laws).  Enable to model stellar ageing.";
 
     updatePhysicsUI(model);
   }
@@ -503,6 +527,7 @@ export function initStarPage(mountEl) {
 
     state.physicsMode = physicsToggleEl.checked ? "advanced" : "simple";
     state.advancedDerivationMode = getDerivMode();
+    state.evolutionMode = evolutionToggleEl.checked ? "evolved" : "zams";
 
     // Read overrides only in Advanced mode; in Simple they stay dormant in state
     // so values are preserved if the user switches back to Advanced.
@@ -538,6 +563,7 @@ export function initStarPage(mountEl) {
         tempKOverride: state.tempKOverride,
         physicsMode: state.physicsMode,
         advancedDerivationMode: state.advancedDerivationMode,
+        evolutionMode: state.evolutionMode,
       },
     });
     render();
@@ -549,6 +575,7 @@ export function initStarPage(mountEl) {
   ageEl.value = state.ageGyr;
   metallicityEl.value = state.metallicityFeH;
   physicsToggleEl.checked = state.physicsMode === "advanced";
+  evolutionToggleEl.checked = state.evolutionMode === "evolved";
   setDerivMode(state.advancedDerivationMode);
   radiusOverrideEl.value = state.radiusRsolOverride != null ? state.radiusRsolOverride : "";
   luminosityOverrideEl.value =
@@ -577,6 +604,11 @@ export function initStarPage(mountEl) {
     render();
   });
 
+  evolutionToggleEl.addEventListener("change", () => {
+    state.evolutionMode = evolutionToggleEl.checked ? "evolved" : "zams";
+    render();
+  });
+
   physicsDerivRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.advancedDerivationMode = getDerivMode();
@@ -596,6 +628,7 @@ export function initStarPage(mountEl) {
     state.tempKOverride = null;
     state.physicsMode = "simple";
     state.advancedDerivationMode = "rl";
+    state.evolutionMode = "zams";
     massEl.value = state.massMsol;
     ageEl.value = state.ageGyr;
     metallicityEl.value = state.metallicityFeH;
@@ -603,6 +636,7 @@ export function initStarPage(mountEl) {
     luminosityOverrideEl.value = "";
     tempOverrideEl.value = "";
     physicsToggleEl.checked = false;
+    evolutionToggleEl.checked = false;
     setDerivMode("rl");
     syncBoundInputs();
     updateWorld({
@@ -616,6 +650,7 @@ export function initStarPage(mountEl) {
         tempKOverride: null,
         physicsMode: "simple",
         advancedDerivationMode: "rl",
+        evolutionMode: "zams",
       },
     });
     render();
@@ -632,6 +667,7 @@ export function initStarPage(mountEl) {
     state.tempKOverride = null;
     state.physicsMode = "simple";
     state.advancedDerivationMode = "rl";
+    state.evolutionMode = "zams";
     massEl.value = state.massMsol;
     ageEl.value = state.ageGyr;
     metallicityEl.value = state.metallicityFeH;
@@ -639,6 +675,7 @@ export function initStarPage(mountEl) {
     luminosityOverrideEl.value = "";
     tempOverrideEl.value = "";
     physicsToggleEl.checked = false;
+    evolutionToggleEl.checked = false;
     setDerivMode("rl");
     syncBoundInputs();
     updateWorld({
@@ -652,6 +689,7 @@ export function initStarPage(mountEl) {
         tempKOverride: null,
         physicsMode: "simple",
         advancedDerivationMode: "rl",
+        evolutionMode: "zams",
       },
     });
     render();

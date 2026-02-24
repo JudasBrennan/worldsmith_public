@@ -425,3 +425,355 @@ test("metallicity display string is formatted", () => {
   });
   assert.match(m.display.metallicity, /solar/);
 });
+
+/* ── Oblateness ─────────────────────────────────────────────────── */
+
+test("Jupiter oblateness: f ≈ 0.065", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  approxEqual(m.oblateness.flattening, 0.065, 0.005, "Jupiter flattening");
+});
+
+test("Saturn oblateness > Jupiter (lower density, fast spin)", () => {
+  const jup = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  const sat = calcGasGiant({
+    massMjup: 0.299,
+    radiusRj: 0.84,
+    orbitAu: 9.58,
+    rotationPeriodHours: 10.656,
+    ...SOLAR,
+  });
+  assert.ok(
+    sat.oblateness.flattening > jup.oblateness.flattening,
+    `Saturn f (${sat.oblateness.flattening}) should exceed Jupiter f (${jup.oblateness.flattening})`,
+  );
+});
+
+test("equatorial radius > polar radius", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.ok(m.oblateness.equatorialRadiusKm > m.oblateness.polarRadiusKm);
+});
+
+test("slow rotation → near-zero oblateness", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 100,
+    ...SOLAR,
+  });
+  assert.ok(m.oblateness.flattening < 0.01, `f = ${m.oblateness.flattening} should be near zero`);
+});
+
+test("equatorial gravity < mean gravity (due to larger radius)", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.ok(
+    m.physical.equatorialGravityMs2 < m.physical.gravityMs2,
+    `eq gravity (${m.physical.equatorialGravityMs2}) should be less than mean (${m.physical.gravityMs2})`,
+  );
+});
+
+/* ── Mass loss ──────────────────────────────────────────────────── */
+
+test("hot Jupiter at 0.03 AU: significant mass loss", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1.3,
+    orbitAu: 0.03,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.ok(m.massLoss.massLossRateKgS > 1e6, "Hot Jupiter should lose >10⁶ kg/s");
+  assert.ok(m.massLoss.evaporationTimescaleGyr > 100, "Should not fully evaporate");
+});
+
+test("Jupiter at 5.2 AU: negligible mass loss", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.ok(m.massLoss.massLossRateKgS < 1e3, "Jupiter should have negligible mass loss");
+});
+
+test("Roche lobe overflow flag is boolean", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.equal(typeof m.massLoss.rocheLobeOverflow, "boolean");
+  assert.equal(m.massLoss.rocheLobeOverflow, false, "Jupiter should not overflow Roche lobe");
+});
+
+test("younger star → more XUV → more mass loss", () => {
+  const young = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1.3,
+    orbitAu: 0.05,
+    rotationPeriodHours: 10,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 0.5,
+    starRadiusRsol: 1,
+  });
+  const old = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1.3,
+    orbitAu: 0.05,
+    rotationPeriodHours: 10,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 8,
+    starRadiusRsol: 1,
+  });
+  assert.ok(
+    young.massLoss.massLossRateKgS > old.massLoss.massLossRateKgS,
+    "Younger star should drive more mass loss",
+  );
+});
+
+/* ── Interior / core ────────────────────────────────────────────── */
+
+test("Jupiter heavy elements: ~30–60 M⊕ (Thorngren 2016)", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.ok(
+    m.interior.totalHeavyElementsMearth >= 30 && m.interior.totalHeavyElementsMearth <= 60,
+    `Heavy elements ${m.interior.totalHeavyElementsMearth} should be 30–60 M⊕`,
+  );
+});
+
+test("core mass capped at 25 M⊕", () => {
+  const m = calcGasGiant({
+    massMjup: 10,
+    radiusRj: 1.1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.ok(m.interior.estimatedCoreMassMearth <= 25, "Core should be capped at 25 M⊕");
+});
+
+test("heavier planet → more heavy elements", () => {
+  const light = calcGasGiant({
+    massMjup: 0.3,
+    radiusRj: 0.9,
+    orbitAu: 5,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  const heavy = calcGasGiant({
+    massMjup: 5,
+    radiusRj: 1.1,
+    orbitAu: 5,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.ok(
+    heavy.interior.totalHeavyElementsMearth > light.interior.totalHeavyElementsMearth,
+    "Heavier planet should have more heavy elements",
+  );
+});
+
+/* ── Age-dependent radius ───────────────────────────────────────── */
+
+test("young system → inflated suggested radius", () => {
+  const young = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 10,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 0.5,
+    starRadiusRsol: 1,
+  });
+  const old = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 10,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 8,
+    starRadiusRsol: 1,
+  });
+  assert.ok(
+    young.physical.suggestedRadiusRj > old.physical.suggestedRadiusRj,
+    "Young system should suggest larger radius",
+  );
+});
+
+test("old system → baseline radius", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 10,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 5,
+    starRadiusRsol: 1,
+  });
+  approxEqual(m.physical.radiusInflationFactor, 1.1, 0.05, "5 Gyr inflation factor");
+});
+
+test("hot Jupiter proximity inflation adds to suggested radius", () => {
+  const cold = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  const hot = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1.3,
+    orbitAu: 0.03,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.ok(hot.physical.proximityInflationRj > 0, "Hot Jupiter should have proximity inflation");
+  assert.equal(
+    cold.physical.proximityInflationRj,
+    0,
+    "Cold giant should have no proximity inflation",
+  );
+});
+
+/* ── Ring properties ────────────────────────────────────────────── */
+
+test("cold giant → icy rings", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.equal(m.ringProperties.ringType, "Icy");
+});
+
+test("hot giant → rocky rings", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1.3,
+    orbitAu: 0.03,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.equal(m.ringProperties.ringType, "Rocky");
+});
+
+test("heavier planet → more ring mass", () => {
+  const light = calcGasGiant({
+    massMjup: 0.3,
+    radiusRj: 0.9,
+    orbitAu: 5,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  const heavy = calcGasGiant({
+    massMjup: 5,
+    radiusRj: 1.1,
+    orbitAu: 5,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.ok(
+    heavy.ringProperties.estimatedMassKg > light.ringProperties.estimatedMassKg,
+    "Heavier planet should have more ring mass",
+  );
+});
+
+/* ── Tidal effects ──────────────────────────────────────────────── */
+
+test("hot Jupiter at 0.03 AU: tidally locked", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1.3,
+    orbitAu: 0.03,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.equal(m.tidal.isTidallyLocked, true, "Hot Jupiter should be tidally locked");
+});
+
+test("Jupiter at 5.2 AU: not tidally locked", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.equal(m.tidal.isTidallyLocked, false, "Jupiter should not be tidally locked");
+});
+
+test("closer orbit → shorter locking timescale", () => {
+  const close = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 0.1,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  const far = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 1,
+    rotationPeriodHours: 10,
+    ...SOLAR,
+  });
+  assert.ok(
+    close.tidal.lockingTimescaleGyr < far.tidal.lockingTimescaleGyr,
+    "Closer orbit should lock faster",
+  );
+});
+
+test("circularisation timescale is positive", () => {
+  const m = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    ...SOLAR,
+  });
+  assert.ok(
+    m.tidal.circularisationTimescaleGyr > 0,
+    "Circularisation timescale should be positive",
+  );
+});

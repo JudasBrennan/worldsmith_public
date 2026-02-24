@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.11.1</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.12.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -59,6 +59,16 @@ export function initAboutPage(mountEl) {
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.12.0</b> (from 1.11.1)</p>
+        <ul>
+          <li><b>3D Splash Screen</b> &mdash; Interactive loading overlay with a 3D planet model you can grab and spin. Biome colouring, clouds, atmosphere, and city lights on the night side. Click &ldquo;Enter WorldSmith&rdquo; to dismiss.</li>
+          <li><b>Rocky Planet Visuals</b> &mdash; Rocky planets now render with physics-driven canvas visuals matching gas giant richness. Surface palettes, oceans, ice caps, clouds, atmosphere rim, terrain types, vegetation, lava cracks, and tidal-lock darkening &mdash; all determined by the planet&rsquo;s properties.</li>
+          <li><b>Gas Giant Physics Overhaul</b> &mdash; Six new subsystems: rotational oblateness, atmospheric mass loss, interior structure &amp; core mass, age-dependent radius cooling, ring properties, and tidal locking/circularisation. All derived from existing inputs.</li>
+          <li><b>Stellar Evolution</b> &mdash; New &ldquo;Evolved&rdquo; toggle on the Star page. When enabled, luminosity, radius, and temperature evolve with age and metallicity instead of using static scaling laws. Propagates through planet insolation, habitable zone, surface temperature, and moon illumination.</li>
+          <li><b>Lagrange Points</b> &mdash; Toggle-able L1&ndash;L5 overlay in the system visualiser. Click a body to see all five equilibrium points.</li>
+          <li><b>Cluster Metallicity</b> &mdash; Each star system in the local cluster now receives a [Fe/H] value based on galactic position, with giant-planet probability.</li>
+        </ul>
 
         <p><b>Version 1.11.1</b> (from 1.11.0)</p>
         <ul>

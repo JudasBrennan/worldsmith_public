@@ -9,6 +9,7 @@ import {
   listMoons,
   listSystemGasGiants,
   getSelectedMoon,
+  getStarOverrides,
   selectMoon,
   createMoonFromInputs,
   deleteMoon,
@@ -105,9 +106,14 @@ const TIP_LABEL = {
 export function initMoonPage(mountEl) {
   const world = loadWorld();
 
+  const sov0 = getStarOverrides(world.star);
   const state = {
     starMassMsol: Number(world.star.massMsol),
     starAgeGyr: Number(world.star.ageGyr),
+    starRadiusRsolOverride: sov0.r,
+    starLuminosityLsolOverride: sov0.l,
+    starTempKOverride: sov0.t,
+    starEvolutionMode: sov0.ev,
     planet: { ...world.planet },
     moon: { ...world.moon },
   };
@@ -266,6 +272,11 @@ export function initMoonPage(mountEl) {
     const w = loadWorld();
     state.starMassMsol = Number(w.star.massMsol);
     state.starAgeGyr = Number(w.star.ageGyr);
+    const sovW = getStarOverrides(w.star);
+    state.starRadiusRsolOverride = sovW.r;
+    state.starLuminosityLsolOverride = sovW.l;
+    state.starTempKOverride = sovW.t;
+    state.starEvolutionMode = sovW.ev;
     const selMoon = getSelectedMoon(w);
     state.moonId = selMoon?.id || w.moons?.selectedId;
     state.moon = { ...(selMoon?.inputs || w.moon) };
@@ -413,6 +424,10 @@ export function initMoonPage(mountEl) {
       model = calcMoon({
         starMassMsol: state.starMassMsol,
         starAgeGyr: state.starAgeGyr,
+        starRadiusRsolOverride: state.starRadiusRsolOverride,
+        starLuminosityLsolOverride: state.starLuminosityLsolOverride,
+        starTempKOverride: state.starTempKOverride,
+        starEvolutionMode: state.starEvolutionMode,
         moon: state.moon,
         parentOverride: po,
       });
@@ -424,6 +439,10 @@ export function initMoonPage(mountEl) {
       model = calcMoon({
         starMassMsol: state.starMassMsol,
         starAgeGyr: state.starAgeGyr,
+        starRadiusRsolOverride: state.starRadiusRsolOverride,
+        starLuminosityLsolOverride: state.starLuminosityLsolOverride,
+        starTempKOverride: state.starTempKOverride,
+        starEvolutionMode: state.starEvolutionMode,
         planet: state.planet,
         moon: state.moon,
       });
@@ -524,6 +543,10 @@ export function initMoonPage(mountEl) {
       guardModel = calcMoon({
         starMassMsol: state.starMassMsol,
         starAgeGyr: state.starAgeGyr,
+        starRadiusRsolOverride: state.starRadiusRsolOverride,
+        starLuminosityLsolOverride: state.starLuminosityLsolOverride,
+        starTempKOverride: state.starTempKOverride,
+        starEvolutionMode: state.starEvolutionMode,
         moon: draftInputs,
         parentOverride: po,
       });
@@ -531,6 +554,10 @@ export function initMoonPage(mountEl) {
       guardModel = calcMoon({
         starMassMsol: state.starMassMsol,
         starAgeGyr: state.starAgeGyr,
+        starRadiusRsolOverride: state.starRadiusRsolOverride,
+        starLuminosityLsolOverride: state.starLuminosityLsolOverride,
+        starTempKOverride: state.starTempKOverride,
+        starEvolutionMode: state.starEvolutionMode,
         planet: resolved.inputs,
         moon: draftInputs,
       });

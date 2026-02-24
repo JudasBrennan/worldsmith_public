@@ -13,6 +13,7 @@ import { initCalendarPage } from "./ui/calendarPage.js";
 import { initSciencePage } from "./ui/sciencePage.js";
 import * as store from "./ui/store.js";
 import { createSolPresetEnvelope } from "./ui/solPreset.js";
+import { showSplashOverlay } from "./ui/splashOverlay.js";
 
 const appEl = document.getElementById("app");
 let startupSolPromptHandled = false;
@@ -194,5 +195,8 @@ function maybeShowStartupSolPresetPrompt() {
 }
 
 window.addEventListener("hashchange", route);
-route();
-maybeShowStartupSolPresetPrompt();
+
+showSplashOverlay().then(() => {
+  route();
+  maybeShowStartupSolPresetPrompt();
+});

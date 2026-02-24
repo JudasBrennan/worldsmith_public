@@ -6,12 +6,14 @@ import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
 import { drawGasGiantViz, styleLabel } from "./gasGiantStyles.js";
+import { computeRockyVisualProfile, drawRockyPlanetViz } from "./rockyPlanetStyles.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   loadWorld,
   updateWorld,
   listPlanets,
   listMoons,
+  getStarOverrides,
   assignPlanetToSlot,
   assignMoonToPlanet,
   selectPlanet,
@@ -394,8 +396,13 @@ function drawSystemPoster(canvas, data, opts = {}) {
         lightDx: -1,
         lightDy: 0,
       });
+    } else if (body.visualProfile) {
+      drawRockyPlanetViz(ctx, bx, cy, pr, body.visualProfile, {
+        lightDx: -1,
+        lightDy: 0,
+      });
     } else {
-      // Rocky planet — radial gradient sphere lit from left
+      // Fallback: simple radial gradient (if profile unavailable)
       const litX = bx - pr * 0.4;
       const litY = cy - pr * 0.2;
       const grad = ctx.createRadialGradient(litX, litY, 0, bx, cy, pr);
@@ -407,7 +414,6 @@ function drawSystemPoster(canvas, data, opts = {}) {
       ctx.beginPath();
       ctx.arc(bx, cy, pr, 0, Math.PI * 2);
       ctx.fill();
-      // Subtle outline
       ctx.strokeStyle = "rgba(0,0,0,0.22)";
       ctx.lineWidth = 0.5;
       ctx.stroke();
@@ -1004,19 +1010,34 @@ export function initSystemPage(mountEl) {
           let dayHex = "#9bbbe0";
           let horizonHex = "#6a6a6a";
           let radiusKm = EARTH_R_KM;
+          let visualProfile = null;
           try {
+            const sov = getStarOverrides(w.star);
             const pm = calcPlanetExact({
               starMassMsol: state.starMassMsol,
               starAgeGyr: Number(w.star.ageGyr) || 4.6,
+              starRadiusRsolOverride: sov.r,
+              starLuminosityLsolOverride: sov.l,
+              starTempKOverride: sov.t,
+              starEvolutionMode: sov.ev,
               planet: p.inputs,
             });
             dayHex = pm.derived.skyColourDayHex || dayHex;
             horizonHex = pm.derived.skyColourHorizonHex || horizonHex;
             radiusKm = pm.derived.radiusKm || radiusKm;
+            visualProfile = computeRockyVisualProfile(pm.derived, p.inputs);
           } catch {
             /* use defaults */
           }
-          return { id: p.id, name: p.name, au: slotAu, radiusKm, dayHex, horizonHex };
+          return {
+            id: p.id,
+            name: p.name,
+            au: slotAu,
+            radiusKm,
+            dayHex,
+            horizonHex,
+            visualProfile,
+          };
         });
 
       const posterGiants = gasGiants.map((g) => {

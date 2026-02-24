@@ -44,6 +44,27 @@ const SPECTRAL_RANK = Object.freeze({
   OTHER: 9,
 });
 
+// ── Metallicity distribution parameters ─────────────────────────────
+// Mean [Fe/H] and scatter for the solar neighbourhood.
+// Radial and vertical gradients shift the mean for non-solar positions.
+const SOLAR_GALACTIC_RADIUS_LY = 25800;
+const FEH_MEAN_SOLAR = -0.05; // Nordström et al. 2004
+const FEH_SIGMA = 0.2; // dex
+const FEH_RADIAL_GRADIENT = -0.06 / 3261.6; // dex/ly  (−0.06 dex/kpc, Luck & Lambert 2011)
+const FEH_VERTICAL_GRADIENT = -0.3 / 3261.6; // dex/ly  (−0.30 dex/kpc, Schlesinger et al. 2014)
+const CLASS_FEH_OFFSET = Object.freeze({
+  O: +0.05,
+  B: +0.04,
+  A: +0.02,
+  F: 0,
+  G: 0,
+  K: 0,
+  M: 0,
+  D: 0,
+  LTY: -0.05,
+  OTHER: 0,
+});
+
 // Per-class multiplicity fractions.
 // Sources: Duchêne & Kraus (2013) for O/B/A/FGK/M; Raghavan et al. (2010) for FGK detail.
 // White dwarf and brown dwarf rates from Tokovinin (2014) and Burgasser et al. (2007).
@@ -145,6 +166,12 @@ export function normalizeLocalClusterInputs(raw = {}) {
 
 function parkMillerNext(state) {
   return (PM_MUL * state) % PM_MOD;
+}
+
+// Box-Muller transform: two uniform samples → one standard normal variate.
+function boxMullerGaussian(u1, u2) {
+  const safe = Math.max(1e-12, Math.min(1 - 1e-12, u1));
+  return Math.sqrt(-2 * Math.log(safe)) * Math.cos(2 * Math.PI * u2);
 }
 
 function objectClassKeyFromSpectralClass(spectralClass) {
@@ -280,6 +307,35 @@ function assignMultiplicity(systems, systemCounts, weights, seed) {
       components.push({ objectClassKey: pickObjectClassKey(companionWeights, state / PM_MOD) });
     }
     return { ...system, multiplicity, components };
+  });
+}
+
+// Assigns [Fe/H] metallicity to each system based on galactic position,
+// spectral class, and Gaussian scatter.  Phase offset 37 avoids overlap
+// with coordinate (0), class (1), and multiplicity (17) PRNG sequences.
+function assignMetallicity(systems, locationLy, seed) {
+  if (!Array.isArray(systems) || !systems.length) return systems;
+
+  const radialOffset =
+    (toFinite(locationLy, SOLAR_GALACTIC_RADIUS_LY) - SOLAR_GALACTIC_RADIUS_LY) *
+    FEH_RADIAL_GRADIENT;
+  const baseMean = FEH_MEAN_SOLAR + radialOffset;
+
+  let state = normalizeSeed(seed);
+  for (let i = 0; i < 37; i++) state = parkMillerNext(state);
+
+  return systems.map((system) => {
+    const verticalShift = Math.abs(system.z || 0) * FEH_VERTICAL_GRADIENT;
+    const classShift = CLASS_FEH_OFFSET[system.objectClassKey] ?? 0;
+    const mean = baseMean + verticalShift + classShift;
+
+    state = parkMillerNext(state);
+    const u1 = state / PM_MOD;
+    state = parkMillerNext(state);
+    const u2 = state / PM_MOD;
+    const scatter = boxMullerGaussian(u1, u2) * FEH_SIGMA;
+
+    return { ...system, metallicityFeH: clamp(mean + scatter, -3.0, 0.5) };
   });
 }
 
@@ -450,22 +506,27 @@ export function calcLocalCluster(rawInputs = {}) {
       : 1.0;
 
   const weights = buildObjectClassWeights(stellarRows);
-  const neighbours = assignMultiplicity(
-    assignObjectClassesToSystems(
-      generateSystemCoordinates(
-        neighbourSystemCount,
-        inputs.neighbourhoodRadiusLy,
+  const neighbours = assignMetallicity(
+    assignMultiplicity(
+      assignObjectClassesToSystems(
+        generateSystemCoordinates(
+          neighbourSystemCount,
+          inputs.neighbourhoodRadiusLy,
+          inputs.randomSeed,
+          diskZScale,
+        ),
+        stellarRows,
         inputs.randomSeed,
-        diskZScale,
       ),
-      stellarRows,
+      systemCounts,
+      weights,
       inputs.randomSeed,
     ),
-    systemCounts,
-    weights,
+    inputs.locationLy,
     inputs.randomSeed,
   );
 
+  const homeFeH = clamp(toFinite(rawInputs.homeMetallicityFeH, 0), -3, 1);
   const homeSystem = {
     id: "home",
     name: "Home Star System",
@@ -478,6 +539,7 @@ export function calcLocalCluster(rawInputs = {}) {
     y: 0,
     z: 0,
     distanceLy: 0,
+    metallicityFeH: homeFeH,
   };
 
   const systems = [homeSystem, ...neighbours];

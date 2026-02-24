@@ -39,6 +39,27 @@ const RES_1_4 = (1 / 4) ** (2 / 3); // ~0.3969
 const RES_1_8 = (1 / 8) ** (2 / 3); // ~0.2500
 
 const SILICATE_DENSITY_KGM3 = 2500; // typical grain density
+const AU_M = 1.496e11;
+const KG_PER_MEARTH = 5.972e24;
+const YEAR_S = 3.1557e7;
+
+/* ── Condensation sequence (Lodders 2003, solar composition) ─────── */
+
+const CONDENSATION_TABLE = [
+  { name: "Corundum", condensK: 1700, massFraction: 0.004, ice: false },
+  { name: "Iron-nickel", condensK: 1450, massFraction: 0.07, ice: false },
+  { name: "Enstatite", condensK: 1350, massFraction: 0.12, ice: false },
+  { name: "Forsterite", condensK: 1300, massFraction: 0.14, ice: false },
+  { name: "Feldspar", condensK: 1200, massFraction: 0.06, ice: false },
+  { name: "Troilite (FeS)", condensK: 700, massFraction: 0.04, ice: false },
+  { name: "Organics", condensK: 300, massFraction: 0.06, ice: false },
+  { name: "Water ice", condensK: 170, massFraction: 0.33, ice: true },
+  { name: "NH\u2083 hydrate", condensK: 130, massFraction: 0.02, ice: true },
+  { name: "CO\u2082 ice", condensK: 70, massFraction: 0.05, ice: true },
+  { name: "CH\u2084 ice", condensK: 31, massFraction: 0.04, ice: true },
+  { name: "CO ice", condensK: 25, massFraction: 0.03, ice: true },
+  { name: "N\u2082 ice", condensK: 22, massFraction: 0.02, ice: true },
+];
 
 /* ── Resonance-based suggestions ─────────────────────────────────── */
 
@@ -193,27 +214,55 @@ export function calcDebrisDiskSuggestions({ gasGiants, starLuminosityLsol, count
 
 /* ── Composition classification ──────────────────────────────────── */
 
-function classifyComposition(tempMidK) {
-  const t = toFinite(tempMidK, 100);
-  if (t > 300)
-    return {
-      className: "Silicate-dominated",
-      dominantMaterials: ["Silicates", "Metals", "Carbon grains"],
-    };
-  if (t > 150)
-    return {
-      className: "Mixed silicate-ice",
-      dominantMaterials: ["Silicates", "Water ice", "Organics"],
-    };
-  if (t > 40)
-    return {
-      className: "Ice-dominated",
-      dominantMaterials: ["Water ice", "Organics", "Tholins"],
-    };
-  return {
-    className: "Volatile-rich",
-    dominantMaterials: ["Water ice", "CO ice", "N₂ ice", "CH₄ ice"],
-  };
+function classifyComposition(tempInnerK, tempMidK, tempOuterK) {
+  const tIn = toFinite(tempInnerK, 300);
+  const tMid = toFinite(tempMidK, 100);
+  const tOut = toFinite(tempOuterK, 50);
+
+  // Per-species presence at inner/mid/outer edges
+  const species = CONDENSATION_TABLE.map((s) => ({
+    name: s.name,
+    condensationK: s.condensK,
+    massFraction: s.massFraction,
+    ice: s.ice,
+    presentAtInner: tIn <= s.condensK,
+    presentAtMid: tMid <= s.condensK,
+    presentAtOuter: tOut <= s.condensK,
+  }));
+
+  // Ice-to-rock ratio at midpoint
+  let iceSum = 0;
+  let rockSum = 0;
+  for (const s of species) {
+    if (s.presentAtMid) {
+      if (s.ice) iceSum += s.massFraction;
+      else rockSum += s.massFraction;
+    }
+  }
+  const iceToRockRatio = rockSum > 0 ? iceSum / rockSum : iceSum > 0 ? Infinity : 0;
+
+  // Dominant species at midpoint by mass fraction
+  const dominantByMass = species
+    .filter((s) => s.presentAtMid)
+    .sort((a, b) => b.massFraction - a.massFraction);
+
+  // Backward-compatible 4-class labels
+  let className, dominantMaterials;
+  if (tMid > 300) {
+    className = "Silicate-dominated";
+    dominantMaterials = dominantByMass.slice(0, 3).map((s) => s.name);
+  } else if (tMid > 150) {
+    className = "Mixed silicate-ice";
+    dominantMaterials = dominantByMass.slice(0, 3).map((s) => s.name);
+  } else if (tMid > 40) {
+    className = "Ice-dominated";
+    dominantMaterials = dominantByMass.slice(0, 3).map((s) => s.name);
+  } else {
+    className = "Volatile-rich";
+    dominantMaterials = dominantByMass.slice(0, 4).map((s) => s.name);
+  }
+
+  return { className, dominantMaterials, species, iceToRockRatio, dominantByMass };
 }
 
 /* ── Debris disk classification label ────────────────────────────── */
@@ -244,14 +293,38 @@ function classifyDisk(tempMidK, midAu, frostLineAu) {
  * @param {number} params.starMassMsol  Host star mass (M☉)
  * @param {number} params.starLuminosityLsol  Host star luminosity (L☉)
  * @param {number} params.starAgeGyr    System age (Gyr)
+ * @param {number} [params.eccentricity]      Disk eccentricity (0–0.5)
+ * @param {number} [params.inclination]       Disk inclination (°)
+ * @param {number} [params.totalMassMearth]   Total mass override (M⊕)
+ * @param {Array}  [params.gasGiants]         Gas giants [{name, au, massMjup}]
+ * @param {number} [params.starTeffK]         Star effective temperature (K)
  * @returns {object} Comprehensive debris disk model
  */
-export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityLsol, starAgeGyr }) {
+export function calcDebrisDisk({
+  innerAu,
+  outerAu,
+  starMassMsol,
+  starLuminosityLsol,
+  starAgeGyr,
+  eccentricity,
+  inclination,
+  totalMassMearth,
+  gasGiants,
+  starTeffK,
+}) {
   const rIn = clamp(toFinite(innerAu, 2), 0.01, 1e6);
   const rOut = Math.max(rIn + 0.01, clamp(toFinite(outerAu, 5), 0.01, 1e6));
   const sMass = clamp(toFinite(starMassMsol, 1), 0.075, 100);
   const sLum = Math.max(0.0001, toFinite(starLuminosityLsol, 1));
   const sAge = clamp(toFinite(starAgeGyr, 4.6), 0.001, 20);
+  const ecc = clamp(toFinite(eccentricity, 0.05), 0, 0.5);
+  const inc = clamp(toFinite(inclination, 0), 0, 90);
+  const userMass =
+    totalMassMearth != null && Number.isFinite(Number(totalMassMearth)) && totalMassMearth > 0
+      ? Number(totalMassMearth)
+      : null;
+  const teff = toFinite(starTeffK, 0);
+  const giants = Array.isArray(gasGiants) ? gasGiants : [];
 
   const midAu = (rIn + rOut) / 2;
   const widthAu = rOut - rIn;
@@ -263,9 +336,16 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
   const tempOuterK = (279 * Math.sqrt(sLum)) / Math.sqrt(rOut);
   const tempMidK = (279 * Math.sqrt(sLum)) / Math.sqrt(midAu);
 
-  /* ── Composition ───────────────────────────────────────────────── */
+  /* ── Pericenter / Apocenter ────────────────────────────────────── */
 
-  const composition = classifyComposition(tempMidK);
+  const periAu = midAu * (1 - ecc);
+  const apoAu = midAu * (1 + ecc);
+  const tempPeriK = (279 * Math.sqrt(sLum)) / Math.sqrt(periAu);
+  const tempApoK = (279 * Math.sqrt(sLum)) / Math.sqrt(apoAu);
+
+  /* ── Composition (condensation sequence) ───────────────────────── */
+
+  const composition = classifyComposition(tempInnerK, tempMidK, tempOuterK);
 
   /* ── Frost line comparison ─────────────────────────────────────── */
 
@@ -280,11 +360,11 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
   // f_max = 2.4e-8 × (r_mid/AU)^(7/3) × (dr/r) × (t_age/Gyr)^(-1)
   // Simplified form assuming D_max = 60 km, Q*_D = 300 J/kg, e = 0.1
   const fMax = 2.4e-8 * midAu ** (7 / 3) * drOverR * (1 / sAge);
-  const fractionalLuminosity = Math.min(fMax, 0.01); // physical cap
+  let fractionalLuminosity = Math.min(fMax, 0.01); // physical cap
 
   /* ── Optical depth ─────────────────────────────────────────────── */
 
-  const tau = (2 * fractionalLuminosity) / drOverR;
+  let tau = (2 * fractionalLuminosity) / drOverR;
 
   /* ── Blowout grain size (radiation pressure limit) ─────────────── */
 
@@ -301,35 +381,131 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
   /* ── Collisional lifetime ──────────────────────────────────────── */
 
   const orbitalPeriodYears = Math.sqrt(midAu ** 3 / sMass);
-  const collisionalYears = tau > 0 ? orbitalPeriodYears / (4 * Math.PI * tau) : Infinity;
+  let collisionalYears = tau > 0 ? orbitalPeriodYears / (4 * Math.PI * tau) : Infinity;
   const dominantProcess =
     collisionalYears < prDragYears ? "Collision-dominated" : "PR-drag-dominated";
 
-  /* ── Estimated mass ────────────────────────────────────────────── */
+  /* ── Estimated mass (Dohnanyi cascade or user override) ────────── */
 
-  // From optical depth and Dohnanyi (1969) collisional cascade (q = 3.5):
-  //   Cross-section: σ ≈ 2πC × s_min^{-0.5}
-  //   Mass:          M ≈ (8π/3) ρC × s_max^{0.5}
-  // Eliminating C:  M = (4/3) × ρ × σ × √(s_max × s_min)
-  //
-  // s_max = 100 km (largest planetesimal in cascade)
-  // s_min = blowout grain size (radiation pressure limit)
-  // This gives the Wyatt (2007) steady-state maximum mass for a disk
-  // of this age and location.
   const sMaxM = 1e5; // 100 km in metres
   const sMinM = Math.max(blowoutSizeUm * 1e-6, 1e-7);
-  const crossSection = tau * 2 * Math.PI * midAu * 1.496e11 * widthAu * 1.496e11; // m²
-  const massKg = crossSection * (4 / 3) * SILICATE_DENSITY_KGM3 * Math.sqrt(sMaxM * sMinM);
-  const massEarth = massKg / 5.972e24;
+  let massKg, massEarth, massSource;
+  if (userMass !== null) {
+    // User override: reverse-derive optical depth from mass
+    massEarth = userMass;
+    massKg = userMass * KG_PER_MEARTH;
+    const crossSection = massKg / ((4 / 3) * SILICATE_DENSITY_KGM3 * Math.sqrt(sMaxM * sMinM));
+    const diskArea = 2 * Math.PI * midAu * AU_M * widthAu * AU_M;
+    tau = Math.min(crossSection / diskArea, 1);
+    fractionalLuminosity = (tau * drOverR) / 2;
+    collisionalYears = tau > 0 ? orbitalPeriodYears / (4 * Math.PI * tau) : Infinity;
+    massSource = "User override";
+  } else {
+    const crossSection = tau * 2 * Math.PI * midAu * AU_M * widthAu * AU_M;
+    massKg = crossSection * (4 / 3) * SILICATE_DENSITY_KGM3 * Math.sqrt(sMaxM * sMinM);
+    massEarth = massKg / KG_PER_MEARTH;
+    massSource = "Wyatt steady-state";
+  }
+
+  /* ── Collision velocity ────────────────────────────────────────── */
+
+  const vKeplerKms = (29.78 * Math.sqrt(sMass)) / Math.sqrt(midAu);
+  const collisionVelocityKms = ecc * vKeplerKms * Math.SQRT2;
+  const collisionVelocityMs = collisionVelocityKms * 1000;
+  let collisionRegime;
+  if (collisionVelocityMs < 10) collisionRegime = "Gentle (accretionary)";
+  else if (collisionVelocityMs < 100) collisionRegime = "Erosive";
+  else collisionRegime = "Catastrophic";
+
+  /* ── Dust production rate ──────────────────────────────────────── */
+
+  const dustProductionKgPerYr =
+    Number.isFinite(collisionalYears) && collisionalYears > 0 ? massKg / collisionalYears : 0;
+  const dustProductionKgPerS = dustProductionKgPerYr / YEAR_S;
+
+  /* ── Surface density ───────────────────────────────────────────── */
+
+  const diskAreaM2 = Math.PI * (rOut ** 2 - rIn ** 2) * AU_M ** 2;
+  const surfaceDensityGcm2 = diskAreaM2 > 0 ? (massKg * 1000) / (diskAreaM2 * 1e4) : 0;
+  // MMSN comparison: Σ_MMSN ≈ 7 × (r/AU)^(-1.5)  at midpoint
+  const mmsnGcm2 = 7 * midAu ** -1.5;
+  const surfaceDensityRatioMMSN = mmsnGcm2 > 0 ? surfaceDensityGcm2 / mmsnGcm2 : 0;
+
+  /* ── IR excess (detectability at 24 μm) ────────────────────────── */
+
+  let irExcess, irExcessLabel;
+  if (teff > 0) {
+    // Planck function ratio at 24 μm
+    const lambda = 24e-6; // metres
+    const hckT_disk = 0.014388 / (lambda * tempMidK); // hc/(λkT)
+    const hckT_star = 0.014388 / (lambda * teff);
+    const bDisk = 1 / (Math.exp(hckT_disk) - 1);
+    const bStar = 1 / (Math.exp(hckT_star) - 1);
+    irExcess = fractionalLuminosity * (bDisk / bStar);
+    if (irExcess > 0.1) irExcessLabel = "Easily detected";
+    else if (irExcess > 0.01) irExcessLabel = "Marginal";
+    else irExcessLabel = "Below threshold";
+  } else {
+    irExcess = null;
+    irExcessLabel = "Star Teff unavailable";
+  }
+
+  /* ── Zodiacal dust delivery (PR drag inflow) ───────────────────── */
+
+  const smallGrainFraction = Math.sqrt(sMinM / sMaxM);
+  const prInflowKgPerYr = (massKg * smallGrainFraction) / prDragYears;
+  let zodiacalLabel;
+  if (prInflowKgPerYr > 1e8) zodiacalLabel = "Heavy";
+  else if (prInflowKgPerYr > 1e5) zodiacalLabel = "Moderate";
+  else if (prInflowKgPerYr > 100) zodiacalLabel = "Faint";
+  else zodiacalLabel = "Negligible";
+
+  /* ── Dynamical stability (chaotic zone check) ──────────────────── */
+
+  const overlappingGiants = [];
+  for (const g of giants) {
+    const gAu = toFinite(g.au, 0);
+    const gMassMjup = toFinite(g.massMjup, 1);
+    if (gAu <= 0) continue;
+    const massRatio = (gMassMjup * 9.547e-4) / sMass; // Mjup → Msol
+    const halfWidth = 1.3 * gAu * massRatio ** (2 / 7);
+    const zoneInner = gAu - halfWidth;
+    const zoneOuter = gAu + halfWidth;
+    if (zoneInner < rOut && zoneOuter > rIn) {
+      overlappingGiants.push({
+        name: g.name || "Giant",
+        au: gAu,
+        zoneInnerAu: round(zoneInner, 2),
+        zoneOuterAu: round(zoneOuter, 2),
+      });
+    }
+  }
+  const isStable = overlappingGiants.length === 0;
 
   /* ── Classification ────────────────────────────────────────────── */
 
   const classification = classifyDisk(tempMidK, midAu, frostLineAu);
 
+  /* ── Display helpers ───────────────────────────────────────────── */
+
+  function fmtTime(years) {
+    if (!Number.isFinite(years)) return "\u221E";
+    if (years > 1e9) return `${fmt(years / 1e9, 1)} Gyr`;
+    if (years > 1e6) return `${fmt(years / 1e6, 1)} Myr`;
+    if (years > 1000) return `${fmt(years / 1000, 1)} kyr`;
+    return `${fmt(years, 0)} yr`;
+  }
+
   /* ── Assemble output ───────────────────────────────────────────── */
 
   return {
-    inputs: { innerAu: rIn, outerAu: rOut },
+    inputs: {
+      innerAu: rIn,
+      outerAu: rOut,
+      eccentricity: ecc,
+      inclination: inc,
+      totalMassMearth: userMass,
+    },
 
     placement: {
       relativeToFrostLine,
@@ -340,18 +516,21 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
       innerK: round(tempInnerK, 1),
       outerK: round(tempOuterK, 1),
       midK: round(tempMidK, 1),
+      periK: round(tempPeriK, 1),
+      apoK: round(tempApoK, 1),
     },
 
     composition,
 
     luminosity: {
-      fractionalLuminosity: fractionalLuminosity,
+      fractionalLuminosity,
       opticalDepth: tau,
     },
 
     mass: {
       estimatedMassEarth: massEarth,
       estimatedMassKg: massKg,
+      source: massSource,
     },
 
     grains: {
@@ -363,6 +542,36 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
       prDragYears: round(prDragYears, 0),
       collisionalYears: Number.isFinite(collisionalYears) ? round(collisionalYears, 0) : Infinity,
       dominantProcess,
+      dustProductionKgPerYr,
+      dustProductionKgPerS,
+    },
+
+    collision: {
+      velocityKms: round(collisionVelocityKms, 3),
+      velocityMs: round(collisionVelocityMs, 1),
+      regime: collisionRegime,
+      keplerVelocityKms: round(vKeplerKms, 2),
+    },
+
+    surfaceDensity: {
+      gcm2: surfaceDensityGcm2,
+      ratioMMSN: surfaceDensityRatioMMSN,
+    },
+
+    irExcess: {
+      value: irExcess,
+      label: irExcessLabel,
+    },
+
+    zodiacal: {
+      prInflowKgPerYr,
+      smallGrainFraction,
+      label: zodiacalLabel,
+    },
+
+    stability: {
+      isStable,
+      overlappingGiants,
     },
 
     classification,
@@ -370,12 +579,14 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
     orbital: {
       midpointAu: round(midAu, 2),
       widthAu: round(widthAu, 2),
+      periAu: round(periAu, 2),
+      apoAu: round(apoAu, 2),
       orbitalPeriodYears: round(orbitalPeriodYears, 2),
     },
 
     display: {
-      range: `${fmt(rIn, 2)}–${fmt(rOut, 2)} AU`,
-      temperature: `${fmt(tempInnerK, 0)}–${fmt(tempOuterK, 0)} K`,
+      range: `${fmt(rIn, 2)}\u2013${fmt(rOut, 2)} AU`,
+      temperature: `${fmt(tempInnerK, 0)}\u2013${fmt(tempOuterK, 0)} K`,
       composition: composition.className,
       frostLine: relativeToFrostLine,
       luminosity:
@@ -384,16 +595,38 @@ export function calcDebrisDisk({ innerAu, outerAu, starMassMsol, starLuminosityL
           : fmt(fractionalLuminosity, 6),
       opticalDepth: tau < 1e-4 ? tau.toExponential(2) : fmt(tau, 6),
       mass: massEarth < 0.001 ? massEarth.toExponential(2) : fmt(massEarth, 4),
-      blowout: `${fmt(blowoutSizeUm, 2)} μm`,
-      prDrag: prDragYears > 1e6 ? `${fmt(prDragYears / 1e6, 1)} Myr` : `${fmt(prDragYears, 0)} yr`,
-      collisional: Number.isFinite(collisionalYears)
-        ? collisionalYears > 1e6
-          ? `${fmt(collisionalYears / 1e6, 1)} Myr`
-          : `${fmt(collisionalYears, 0)} yr`
-        : "∞",
+      massSource,
+      blowout: `${fmt(blowoutSizeUm, 2)} \u03BCm`,
+      prDrag: fmtTime(prDragYears),
+      collisional: fmtTime(collisionalYears),
       dominantProcess,
       classification: classification.label,
       orbitalPeriod: `${fmt(orbitalPeriodYears, 1)} yr`,
+      collisionVelocity: `${fmt(collisionVelocityKms, 2)} km/s`,
+      collisionRegime,
+      surfaceDensity:
+        surfaceDensityGcm2 < 1e-4
+          ? surfaceDensityGcm2.toExponential(2)
+          : fmt(surfaceDensityGcm2, 4),
+      surfaceDensityVsMMSN: `${fmt(surfaceDensityRatioMMSN * 100, 1)}% of MMSN`,
+      irExcess:
+        irExcess != null ? (irExcess < 1e-4 ? irExcess.toExponential(2) : fmt(irExcess, 4)) : "N/A",
+      irExcessLabel,
+      dustProduction:
+        fmtTime(collisionalYears) !== "\u221E"
+          ? `${dustProductionKgPerYr.toExponential(2)} kg/yr`
+          : "N/A",
+      zodiacalLabel,
+      zodiacalInflow: `${prInflowKgPerYr.toExponential(2)} kg/yr`,
+      stability: isStable
+        ? "Stable"
+        : `Unstable (${overlappingGiants.map((g) => g.name).join(", ")})`,
+      periApo: ecc > 0 ? `${fmt(periAu, 2)}\u2013${fmt(apoAu, 2)} AU` : "Circular",
+      iceToRock: Number.isFinite(composition.iceToRockRatio)
+        ? fmt(composition.iceToRockRatio, 2)
+        : composition.iceToRockRatio === Infinity
+          ? "Ice only"
+          : "Rock only",
     },
   };
 }

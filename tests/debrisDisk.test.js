@@ -297,3 +297,167 @@ test("frost line placement: asteroid belt inside, Kuiper belt outside", () => {
   assert.equal(ab.placement.relativeToFrostLine, "Inside");
   assert.equal(kb.placement.relativeToFrostLine, "Outside");
 });
+
+/* ── Backward compatibility ──────────────────────────────────────── */
+
+test("backward compat: default ecc/inc/mass when omitted", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR });
+  assert.equal(d.inputs.eccentricity, 0.05, "default ecc");
+  assert.equal(d.inputs.inclination, 0, "default inc");
+  assert.equal(d.inputs.totalMassMearth, null, "no mass override");
+  assert.equal(d.mass.source, "Wyatt steady-state");
+});
+
+/* ── Condensation sequence ───────────────────────────────────────── */
+
+test("condensation: asteroid belt has silicates, no water ice at inner edge", () => {
+  const d = calcDebrisDisk({ innerAu: 2.06, outerAu: 3.28, ...SOLAR });
+  const forsterite = d.composition.species.find((s) => s.name === "Forsterite");
+  const waterIce = d.composition.species.find((s) => s.name === "Water ice");
+  assert.ok(forsterite.presentAtInner, "Forsterite should condense at inner edge");
+  assert.ok(!waterIce.presentAtInner, "Water ice should NOT condense at inner edge (~165 K)");
+});
+
+test("condensation: Kuiper belt has water and CO₂ ice", () => {
+  const d = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
+  const waterIce = d.composition.species.find((s) => s.name === "Water ice");
+  const co2 = d.composition.species.find((s) => s.name === "CO\u2082 ice");
+  assert.ok(waterIce.presentAtMid, "Water ice should be present");
+  assert.ok(co2.presentAtMid, "CO\u2082 ice should be present");
+});
+
+test("condensation: very cold disk has CO and N₂ ice", () => {
+  const d = calcDebrisDisk({ innerAu: 500, outerAu: 800, ...SOLAR });
+  const coIce = d.composition.species.find((s) => s.name === "CO ice");
+  const n2Ice = d.composition.species.find((s) => s.name === "N\u2082 ice");
+  assert.ok(coIce.presentAtMid, "CO ice should be present at ~10 K");
+  assert.ok(n2Ice.presentAtMid, "N\u2082 ice should be present at ~10 K");
+});
+
+test("condensation: ice-to-rock ratio > 0.5 beyond frost line, zero inside frost line", () => {
+  const kb = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
+  assert.ok(kb.composition.iceToRockRatio > 0.5, `ice/rock = ${kb.composition.iceToRockRatio}`);
+  const hot = calcDebrisDisk({ innerAu: 0.5, outerAu: 1.0, ...SOLAR });
+  assert.equal(hot.composition.iceToRockRatio, 0, "no ice inside frost line");
+});
+
+/* ── Eccentricity ────────────────────────────────────────────────── */
+
+test("eccentricity: peri < mid < apo", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, eccentricity: 0.3, ...SOLAR });
+  assert.ok(d.orbital.periAu < d.orbital.midpointAu);
+  assert.ok(d.orbital.apoAu > d.orbital.midpointAu);
+  assert.ok(d.temperature.periK > d.temperature.midK);
+  assert.ok(d.temperature.apoK < d.temperature.midK);
+});
+
+test("eccentricity: higher e → faster collision velocity", () => {
+  const low = calcDebrisDisk({ innerAu: 30, outerAu: 50, eccentricity: 0.01, ...SOLAR });
+  const high = calcDebrisDisk({ innerAu: 30, outerAu: 50, eccentricity: 0.4, ...SOLAR });
+  assert.ok(high.collision.velocityKms > low.collision.velocityKms * 10);
+});
+
+test("eccentricity: e=0 → peri=apo=mid, circular label", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, eccentricity: 0, ...SOLAR });
+  assert.equal(d.orbital.periAu, d.orbital.midpointAu);
+  assert.equal(d.orbital.apoAu, d.orbital.midpointAu);
+  assert.equal(d.display.periApo, "Circular");
+});
+
+/* ── Mass override ───────────────────────────────────────────────── */
+
+test("mass override: user mass used exactly", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, totalMassMearth: 0.1, ...SOLAR });
+  assert.equal(d.mass.estimatedMassEarth, 0.1);
+  assert.equal(d.mass.source, "User override");
+});
+
+test("mass override: higher mass → higher optical depth", () => {
+  const low = calcDebrisDisk({ innerAu: 30, outerAu: 50, totalMassMearth: 0.001, ...SOLAR });
+  const high = calcDebrisDisk({ innerAu: 30, outerAu: 50, totalMassMearth: 10, ...SOLAR });
+  assert.ok(high.luminosity.opticalDepth > low.luminosity.opticalDepth);
+});
+
+/* ── Collision velocity ──────────────────────────────────────────── */
+
+test("collision velocity: Kuiper belt with e=0.05 → reasonable range", () => {
+  const d = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, eccentricity: 0.05, ...SOLAR });
+  assert.ok(d.collision.velocityKms > 0.01 && d.collision.velocityKms < 5);
+});
+
+test("collision velocity: very low e → gentle regime", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, eccentricity: 0.001, ...SOLAR });
+  assert.equal(d.collision.regime, "Gentle (accretionary)");
+});
+
+/* ── Surface density ─────────────────────────────────────────────── */
+
+test("surface density: asteroid belt in reasonable range", () => {
+  const d = calcDebrisDisk({ innerAu: 2.06, outerAu: 3.28, ...SOLAR });
+  assert.ok(d.surfaceDensity.gcm2 > 0, "surface density should be positive");
+  assert.ok(d.surfaceDensity.ratioMMSN < 1, "Wyatt steady-state should be well below MMSN");
+});
+
+/* ── IR excess ───────────────────────────────────────────────────── */
+
+test("IR excess: young disk brighter than old", () => {
+  const young = calcDebrisDisk({
+    innerAu: 30,
+    outerAu: 50,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 0.1,
+    starTeffK: 5776,
+  });
+  const old = calcDebrisDisk({
+    innerAu: 30,
+    outerAu: 50,
+    starMassMsol: 1,
+    starLuminosityLsol: 1,
+    starAgeGyr: 10,
+    starTeffK: 5776,
+  });
+  assert.ok(young.irExcess.value > old.irExcess.value, "young disk brighter IR excess");
+});
+
+test("IR excess: label is valid detectability category", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR, starTeffK: 5776 });
+  const valid = ["Easily detected", "Marginal", "Below threshold"];
+  assert.ok(valid.includes(d.irExcess.label), `label = ${d.irExcess.label}`);
+});
+
+test("IR excess: no star Teff → null value", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR });
+  assert.equal(d.irExcess.value, null);
+  assert.equal(d.irExcess.label, "Star Teff unavailable");
+});
+
+/* ── Dynamical stability ─────────────────────────────────────────── */
+
+test("stability: disk overlapping Jupiter → unstable", () => {
+  const d = calcDebrisDisk({
+    innerAu: 2,
+    outerAu: 8,
+    ...SOLAR,
+    gasGiants: [{ name: "Jupiter", au: 5.2, massMjup: 1 }],
+  });
+  assert.equal(d.stability.isStable, false);
+  assert.ok(d.stability.overlappingGiants.length > 0);
+  assert.equal(d.stability.overlappingGiants[0].name, "Jupiter");
+});
+
+test("stability: far disk → stable", () => {
+  const d = calcDebrisDisk({
+    innerAu: 100,
+    outerAu: 150,
+    ...SOLAR,
+    gasGiants: [{ name: "Jupiter", au: 5.2, massMjup: 1 }],
+  });
+  assert.equal(d.stability.isStable, true);
+  assert.equal(d.stability.overlappingGiants.length, 0);
+});
+
+test("stability: no giants → stable", () => {
+  const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR });
+  assert.equal(d.stability.isStable, true);
+});

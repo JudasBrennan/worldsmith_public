@@ -15,6 +15,7 @@ import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   getSelectedMoon,
   getSelectedPlanet,
+  getStarOverrides,
   listMoons,
   listPlanets,
   loadWorld,
@@ -748,9 +749,14 @@ function uniqIds(arr) {
 
 function derivePlanetPeriodDays(world, planet) {
   if (!planet?.inputs) return 365.2422;
+  const sov = getStarOverrides(world?.star);
   const m = calcPlanetExact({
     starMassMsol: N(world?.star?.massMsol, 1),
     starAgeGyr: N(world?.star?.ageGyr, 4.5),
+    starRadiusRsolOverride: sov.r,
+    starLuminosityLsolOverride: sov.l,
+    starTempKOverride: sov.t,
+    starEvolutionMode: sov.ev,
     planet: planet.inputs,
   });
   return Math.max(0.1, N(m?.derived?.orbitalPeriodEarthDays, 365.2422));
@@ -758,9 +764,14 @@ function derivePlanetPeriodDays(world, planet) {
 
 function deriveMoonSynodicDays(world, planet, moon) {
   if (!planet?.inputs || !moon?.inputs) return 29.5306;
+  const sovM = getStarOverrides(world?.star);
   const m = calcMoon({
     starMassMsol: N(world?.star?.massMsol, 1),
     starAgeGyr: N(world?.star?.ageGyr, 4.5),
+    starRadiusRsolOverride: sovM.r,
+    starLuminosityLsolOverride: sovM.l,
+    starTempKOverride: sovM.t,
+    starEvolutionMode: sovM.ev,
     planet: planet.inputs,
     moon: moon.inputs,
   });

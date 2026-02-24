@@ -101,6 +101,7 @@ export function calcSystem({ starMassMsol, spacingFactor, orbit1Au }) {
       radiusRsol,
       densityDsol,
       densityGcm3,
+      tempK: (luminosityLsol / radiusRsol ** 2) ** 0.25 * 5776,
     },
 
     habitableZoneAu: { inner: hzInnerAu, outer: hzOuterAu },

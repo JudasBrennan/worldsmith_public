@@ -261,3 +261,92 @@ test("disk z-scale is 1.0 for small radii", () => {
     );
   }
 });
+
+// ── Metallicity tests ─────────────────────────────────────────────────
+
+test("all generated systems have a finite metallicityFeH", () => {
+  const model = calcLocalCluster(INPUTS);
+  for (const system of model.systems) {
+    assert.equal(
+      Number.isFinite(system.metallicityFeH),
+      true,
+      `${system.id} has non-finite metallicityFeH: ${system.metallicityFeH}`,
+    );
+  }
+});
+
+test("metallicityFeH is deterministic for fixed seed", () => {
+  const a = calcLocalCluster(INPUTS);
+  const b = calcLocalCluster(INPUTS);
+  for (let i = 0; i < a.systems.length; i++) {
+    assert.equal(
+      a.systems[i].metallicityFeH,
+      b.systems[i].metallicityFeH,
+      `system ${i} metallicity differs between runs`,
+    );
+  }
+});
+
+test("different seeds produce different metallicity distributions", () => {
+  const a = calcLocalCluster({ ...INPUTS, randomSeed: 1 });
+  const b = calcLocalCluster({ ...INPUTS, randomSeed: 999 });
+  const aFeH = a.systems
+    .slice(1)
+    .map((s) => s.metallicityFeH)
+    .join(",");
+  const bFeH = b.systems
+    .slice(1)
+    .map((s) => s.metallicityFeH)
+    .join(",");
+  assert.notEqual(aFeH, bFeH, "different seeds should produce different metallicities");
+});
+
+test("metallicityFeH values are within physical range [-3, 0.5]", () => {
+  const model = calcLocalCluster(INPUTS);
+  for (const system of model.systems) {
+    assert.ok(
+      system.metallicityFeH >= -3.0 && system.metallicityFeH <= 0.5,
+      `${system.id} metallicityFeH ${system.metallicityFeH} out of range`,
+    );
+  }
+});
+
+test("home system uses provided homeMetallicityFeH", () => {
+  const model = calcLocalCluster({ ...INPUTS, homeMetallicityFeH: -0.15 });
+  const home = model.systems[0];
+  assert.equal(home.metallicityFeH, -0.15, "home system should use provided metallicity");
+});
+
+test("home system defaults to [Fe/H] = 0 when not provided", () => {
+  const model = calcLocalCluster(INPUTS);
+  const home = model.systems[0];
+  assert.equal(home.metallicityFeH, 0, "home system defaults to solar metallicity");
+});
+
+test("solar neighbourhood mean metallicity is near -0.05 dex", () => {
+  const model = calcLocalCluster({
+    ...INPUTS,
+    locationLy: 25800,
+    stellarDensityPerLy3: 0.08,
+    neighbourhoodRadiusLy: 12,
+  });
+  const neighbours = model.systems.filter((s) => !s.isHome);
+  const mean = neighbours.reduce((s, sys) => s + sys.metallicityFeH, 0) / neighbours.length;
+  assert.ok(
+    mean > -0.4 && mean < 0.3,
+    `mean metallicity ${mean} should be near -0.05 dex for solar neighbourhood`,
+  );
+});
+
+test("inner disk location produces higher mean metallicity than outer disk", () => {
+  const inner = calcLocalCluster({ ...INPUTS, locationLy: 15000 });
+  const outer = calcLocalCluster({ ...INPUTS, locationLy: 40000 });
+  const avg = (systems) => {
+    const nb = systems.filter((s) => !s.isHome);
+    return nb.reduce((s, sys) => s + sys.metallicityFeH, 0) / nb.length;
+  };
+  assert.ok(
+    avg(inner.systems) > avg(outer.systems),
+    "inner disk mean should exceed outer disk mean",
+  );
+});

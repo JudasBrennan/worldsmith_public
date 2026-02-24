@@ -436,7 +436,10 @@ export function drawClusterScene(ctx, W, H, camState, snapshot, opts) {
       const { system, screen } = entry;
       const classLabel = formatClusterSystemLabel(system);
       const line1 = system.name;
-      const line2 = `${classLabel} | ${fmt(system.distanceLy, 2)} ly`;
+      const feH = Number.isFinite(system.metallicityFeH)
+        ? ` | ${system.metallicityFeH >= 0 ? "+" : ""}${fmt(system.metallicityFeH, 2)}`
+        : "";
+      const line2 = `${classLabel} | ${fmt(system.distanceLy, 2)} ly${feH}`;
       let labelX;
       if (system.isHome) {
         labelX = screen.x + Math.max(14, entry.pointRadius * 2.4 + 8);
@@ -482,7 +485,10 @@ export function drawClusterScene(ctx, W, H, camState, snapshot, opts) {
       const { system, screen } = hoverEntry;
       const classLabel = formatClusterSystemLabel(system);
       const hLine1 = system.name;
-      const hLine2 = `${classLabel} | ${fmt(system.distanceLy, 2)} ly`;
+      const hFeH = Number.isFinite(system.metallicityFeH)
+        ? ` | ${system.metallicityFeH >= 0 ? "+" : ""}${fmt(system.metallicityFeH, 2)}`
+        : "";
+      const hLine2 = `${classLabel} | ${fmt(system.distanceLy, 2)} ly${hFeH}`;
       const companionCount = Array.isArray(system.components) ? system.components.length - 1 : 0;
       let hLabelX;
       if (system.isHome) {

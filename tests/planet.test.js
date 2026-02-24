@@ -847,3 +847,100 @@ test("calcPlanetExact: manual override preserves chosen regime", () => {
   });
   assert.equal(p.derived.tectonicRegime, "stagnant");
 });
+
+test("calcPlanetExact: star luminosity override propagates to planet", () => {
+  const base = calcPlanetExact(EARTH_LIKE);
+  // Override luminosity to 4× solar — planet should receive 4× the insolation
+  const bright = calcPlanetExact({
+    ...EARTH_LIKE,
+    starLuminosityLsolOverride: 4,
+  });
+  assert.ok(
+    bright.derived.surfaceTempK > base.derived.surfaceTempK,
+    `brighter star (${bright.derived.surfaceTempK} K) should heat planet more than default (${base.derived.surfaceTempK} K)`,
+  );
+  // Insolation scales linearly with L
+  approxEqual(
+    bright.derived.insolationEarth / base.derived.insolationEarth,
+    4,
+    0.01,
+    "insolation ratio for 4× luminosity",
+  );
+});
+
+test("calcPlanetExact: star R+L override → star model uses overridden values", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    starRadiusRsolOverride: 1.5,
+    starLuminosityLsolOverride: 3.6,
+  });
+  // The star model embedded in the result should reflect overrides
+  approxEqual(p.star.radiusRsol, 1.5, 0.001, "star radius override");
+  approxEqual(p.star.luminosityLsol, 3.6, 0.001, "star luminosity override");
+  assert.equal(p.star.resolutionMode, "R+L→T");
+  // Temperature derived from Stefan-Boltzmann: T = (L/R²)^0.25 × 5776
+  const expectedT = Math.pow(3.6 / 1.5 ** 2, 0.25) * 5776;
+  approxEqual(p.star.tempK, expectedT, 1, "derived temperature from R+L");
+});
+
+test("calcPlanetExact: star R+T override → luminosity derived via SB", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    starRadiusRsolOverride: 1.5,
+    starTempKOverride: 6000,
+  });
+  approxEqual(p.star.radiusRsol, 1.5, 0.001, "star radius override");
+  // L = R² × (T/5776)⁴
+  const expectedL = 1.5 ** 2 * (6000 / 5776) ** 4;
+  approxEqual(p.star.luminosityLsol, expectedL, 0.01, "derived luminosity from R+T");
+  assert.equal(p.star.resolutionMode, "R+T→L");
+  // Planet insolation should use this derived L, not the mass-derived L
+  const base = calcPlanetExact(EARTH_LIKE);
+  const ratio = p.derived.insolationEarth / base.derived.insolationEarth;
+  approxEqual(ratio, expectedL, 0.01, "insolation uses SB-derived luminosity");
+});
+
+test("calcPlanetExact: star L+T override → radius derived via SB", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    starLuminosityLsolOverride: 2,
+    starTempKOverride: 5000,
+  });
+  approxEqual(p.star.luminosityLsol, 2, 0.001, "star luminosity override");
+  // R = sqrt(L) × (5776/T)²
+  const expectedR = Math.sqrt(2) * (5776 / 5000) ** 2;
+  approxEqual(p.star.radiusRsol, expectedR, 0.01, "derived radius from L+T");
+  assert.equal(p.star.resolutionMode, "L+T→R");
+});
+
+test("calcPlanetExact: no overrides → mass-derived star", () => {
+  const p = calcPlanetExact(EARTH_LIKE);
+  assert.equal(p.star.resolutionMode, "mass-derived");
+});
+
+test("calcPlanetExact: null/undefined overrides are ignored", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    starRadiusRsolOverride: null,
+    starLuminosityLsolOverride: undefined,
+    starTempKOverride: null,
+  });
+  assert.equal(p.star.resolutionMode, "mass-derived");
+});
+
+test("calcPlanetExact: HZ shifts with luminosity override", () => {
+  const base = calcPlanetExact(EARTH_LIKE);
+  const bright = calcPlanetExact({
+    ...EARTH_LIKE,
+    starLuminosityLsolOverride: 4,
+  });
+  // HZ distance scales as sqrt(L/Seff), so 4× L → ~2× HZ distance
+  assert.ok(
+    bright.star.habitableZoneAu.inner > base.star.habitableZoneAu.inner,
+    "HZ inner edge moves outward with higher luminosity",
+  );
+  assert.ok(
+    bright.star.habitableZoneAu.outer > base.star.habitableZoneAu.outer,
+    "HZ outer edge moves outward with higher luminosity",
+  );
+});

@@ -3,16 +3,23 @@
 ## Next
 
 - [ ] Icy planets (Ganymede, for example)
-- [ ] Lagrange Points in the visualiser.
 
 ## Definitely
 
 - [ ] Limit local cluster to 25 ly radius OR improve star generation logic so there isn't a soft cap on number of objects
 - [ ] Implement calculated planet colour logic
-- [ ] Improve planet colour logic in system visualiser
+- [ ] Improve planet and moon colour logic in system visualiser
 - [ ] Add support for binary, ternary, and quaternary home systems.
-- [ ] Utilise metallicity [Fe/H] in local cluster star generation
-- [ ] Overhaul and increase complexity and usefulness of outer system
+- [ ] Debris disk composition influenced by stellar metallicity
+- [ ] Link gas giant atmospheric metallicity default to stellar [Fe/H]
+- [ ] Overhaul and increase complexity and usefulness of Debris Disks.
+- [ ] Implement Oord Clouds.
+- [ ] Implement Dwarf Planets.
+- [ ] Implement Commets.
+- [ ] Implement Tectonics tab, updating and improving systems from the WS8 spreadsheet.
+- [ ] Implement Climate tab, updating and improving systems from the WS8 spreadsheet.
+- [ ] Implement Population tab, updating and improving systems from the WS8 spreadsheet.
+- [ ] Add Radioactive Mass Fraction as an advanced override. Displayed as Radioisotope Abundance (relative to Earth).
 
 ## Maybe?
 
@@ -34,4 +41,7 @@
 - [x] Overhaul ground composition for rocky planets.
 - [x] Second pass on apparent size page
 - [x] Ambitious idea for the Apparent Size page. A canvas with a view over the shoulder of a person, showing the day or night sky, comparing the apparent size of celestial objects to ones in the Sol system from earth
+- [x] Lagrange Points in the visualiser.
 - [x] Planet & satellite visualiser
+- [x] Utilise metallicity [Fe/H] in local cluster star generation
+- [x] Overhaul and increase depth and complexity of Gas Giants.

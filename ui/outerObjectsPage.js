@@ -42,6 +42,32 @@ const TIP_LABEL = {
   "Disk Derived":
     "Fractional luminosity (L_disk/L\u2605) measures dust brightness. Optical depth (\u03c4) is the fraction of starlight intercepted. Grain blowout size is the minimum grain surviving radiation pressure. PR drag and collisional timescales determine whether the disk is collision- or drag-dominated.",
 
+  // ── New disk inputs ──
+  "Disk Eccentricity":
+    "Mean orbital eccentricity of disk particles (0\u20130.5). Higher eccentricity increases collision speeds and widens the pericenter\u2013apocenter range. Default 0.05 is typical for a dynamically cool belt.",
+  "Disk Inclination":
+    "Mean inclination of disk particle orbits (0\u201390\u00b0). Affects the vertical thickness of the disk. 0\u00b0 = face-on; higher values reduce projected area for observers.",
+  "Disk Mass Override":
+    "Total disk mass in Earth masses. When set, this overrides the Wyatt steady-state mass estimate and reverse-derives optical depth from the given mass. Leave empty to use the default age-based estimate.",
+
+  // ── New disk outputs ──
+  "Collision Velocity":
+    "Mean collision speed between disk particles: v_coll = e \u00d7 v_Kepler \u00d7 \u221A2. Gentle (<10 m/s) allows accretion, erosive (10\u2013100 m/s) grinds grains, catastrophic (>100 m/s) shatters bodies.",
+  "Surface Density":
+    "Mass per unit area (\u03A3) of the disk annulus, compared to the Minimum Mass Solar Nebula (MMSN). Values near 100% of MMSN suggest a primordial-mass disk.",
+  "IR Excess":
+    "Ratio of disk thermal emission to stellar flux at 24 \u03BCm. >10% is easily detectable, 1\u201310% is marginal, <1% is below current instrument thresholds (Spitzer/JWST).",
+  "Disk Stability":
+    "Checks whether any gas giant\u2019s chaotic zone (Wisdom 1980: \u0394a = 1.3 a (M_p/M\u2605)^{2/7}) overlaps the disk. Overlap means the disk would be cleared on ~Myr timescales.",
+  "Dust Production":
+    "Rate at which collisional grinding converts planetesimal mass into small dust grains. Equal to M_disk / t_collisional.",
+  "Zodiacal Delivery":
+    "Poynting\u2013Robertson drag slowly spirals small grains inward. This estimates the mass inflow rate toward the inner system, analogous to our zodiacal dust cloud.",
+  "Ice-to-Rock Ratio":
+    "Mass ratio of condensed ices to refractory minerals at the disk midpoint. Beyond the frost line this exceeds ~1; inside, the disk is rock-dominated.",
+  "Condensation Species":
+    "Species present at each disk location based on the Lodders (2003) condensation sequence. A species condenses (is solid) when the local temperature is below its condensation temperature.",
+
   // ── Summary KPIs ──
   "Debris disks count": "Total number of debris disk zones in this system.",
 };
@@ -174,10 +200,10 @@ export function initOuterObjectsPage(mountEl) {
               </div>
 
               <div class="physics-duo-toggle dd-mode-toggle" style="margin-top:8px" data-toggle="dd-mode">
-                <input type="radio" name="ddMode_${d.id}" id="ddModeEdges_${d.id}" value="edges" ${mode === "edges" ? "checked" : ""} />
-                <label for="ddModeEdges_${d.id}">Inner / Outer</label>
-                <input type="radio" name="ddMode_${d.id}" id="ddModeCenter_${d.id}" value="center" ${mode === "center" ? "checked" : ""} />
-                <label for="ddModeCenter_${d.id}">Center / Width</label>
+                <input type="radio" name="ddMode_${escapeHtml(d.id)}" id="ddModeEdges_${escapeHtml(d.id)}" value="edges" ${mode === "edges" ? "checked" : ""} />
+                <label for="ddModeEdges_${escapeHtml(d.id)}">Inner / Outer</label>
+                <input type="radio" name="ddMode_${escapeHtml(d.id)}" id="ddModeCenter_${escapeHtml(d.id)}" value="center" ${mode === "center" ? "checked" : ""} />
+                <label for="ddModeCenter_${escapeHtml(d.id)}">Center / Width</label>
                 <span></span>
               </div>
 
@@ -228,6 +254,38 @@ export function initOuterObjectsPage(mountEl) {
                   </div>
                 </div>
               </div>
+
+              <div class="form-row" style="margin-top:8px">
+                <div>
+                  <div class="label">Eccentricity ${tipIcon(TIP_LABEL["Disk Eccentricity"])}</div>
+                </div>
+                <div class="input-pair">
+                  <input class="dd-ecc" type="number" step="0.01" min="0" max="0.5" value="${d.eccentricity != null ? d.eccentricity : ""}" placeholder="0.05" />
+                  <input class="dd-ecc-slider" type="range" />
+                  <div class="range-meta"><span>0</span><span>0.5</span></div>
+                </div>
+              </div>
+
+              <div class="form-row" style="margin-top:8px">
+                <div>
+                  <div class="label">Inclination <span class="unit">\u00b0</span> ${tipIcon(TIP_LABEL["Disk Inclination"])}</div>
+                </div>
+                <div class="input-pair">
+                  <input class="dd-inc" type="number" step="1" min="0" max="90" value="${d.inclination != null ? d.inclination : ""}" placeholder="0" />
+                  <input class="dd-inc-slider" type="range" />
+                  <div class="range-meta"><span>0</span><span>90</span></div>
+                </div>
+              </div>
+
+              <div class="form-row" style="margin-top:8px">
+                <div>
+                  <div class="label">Total mass <span class="unit">M\u2295</span> ${tipIcon(TIP_LABEL["Disk Mass Override"])}</div>
+                </div>
+                <div class="input-pair">
+                  <input class="dd-mass" type="number" step="0.001" min="0" value="${d.totalMassMearth != null ? d.totalMassMearth : ""}" placeholder="Auto" />
+                  <button class="small dd-mass-clear" type="button" style="margin-left:4px">Auto</button>
+                </div>
+              </div>
             </div>
           `;
             })
@@ -264,7 +322,19 @@ export function initOuterObjectsPage(mountEl) {
           innerAu = Number.isFinite(inner) && inner > 0 ? inner : 0.01;
           outerAu = Number.isFinite(outer) && outer > 0 ? outer : 0.01;
         }
-        result.push({ id, name, innerAu, outerAu, suggested: false });
+        const eccVal = row.querySelector(".dd-ecc").value;
+        const incVal = row.querySelector(".dd-inc").value;
+        const massVal = row.querySelector(".dd-mass").value;
+        result.push({
+          id,
+          name,
+          innerAu,
+          outerAu,
+          suggested: false,
+          eccentricity: eccVal !== "" ? Number(eccVal) : null,
+          inclination: incVal !== "" ? Number(incVal) : null,
+          totalMassMearth: massVal !== "" ? Number(massVal) : null,
+        });
       }
       saveSystemDebrisDisks(result);
       scheduleRender();
@@ -324,6 +394,37 @@ export function initOuterObjectsPage(mountEl) {
         step: 0.01,
         mode: "auto",
         onChange,
+      });
+
+      const eccEl = row.querySelector(".dd-ecc");
+      const eccSl = row.querySelector(".dd-ecc-slider");
+      const incEl = row.querySelector(".dd-inc");
+      const incSl = row.querySelector(".dd-inc-slider");
+      const massEl = row.querySelector(".dd-mass");
+      const massClear = row.querySelector(".dd-mass-clear");
+
+      bindNumberAndSlider({
+        numberEl: eccEl,
+        sliderEl: eccSl,
+        min: 0,
+        max: 0.5,
+        step: 0.01,
+        mode: "linear",
+        onChange,
+      });
+      bindNumberAndSlider({
+        numberEl: incEl,
+        sliderEl: incSl,
+        min: 0,
+        max: 90,
+        step: 1,
+        mode: "linear",
+        onChange,
+      });
+      massEl.addEventListener("change", onChange);
+      massClear.addEventListener("click", () => {
+        massEl.value = "";
+        onChange();
       });
 
       modeToggle.addEventListener("change", () => {
@@ -411,18 +512,30 @@ export function initOuterObjectsPage(mountEl) {
 
   function renderSummary(world, model) {
     const disks = getDebrisDisks(world);
+    const gasGiants = getGasGiants(world);
+    const starTeffK = model.star.tempK || 0;
     const starData = {
       starMassMsol: Number(world.star.massMsol) || 1,
       starLuminosityLsol: model.star.luminosityLsol,
       starAgeGyr: Number(world.star.ageGyr) || 4.6,
       starRadiusRsol: model.star.radiusRsol,
     };
+    const giantsForEngine = gasGiants.map((g) => ({
+      name: g.name,
+      au: g.au,
+      massMjup: g.massMjup,
+    }));
 
     // Compute debris disk derived properties
     const ddModels = disks.map((d) =>
       calcDebrisDisk({
         innerAu: d.innerAu,
         outerAu: d.outerAu,
+        eccentricity: d.eccentricity,
+        inclination: d.inclination,
+        totalMassMearth: d.totalMassMearth,
+        gasGiants: giantsForEngine,
+        starTeffK,
         ...starData,
       }),
     );
@@ -433,13 +546,20 @@ export function initOuterObjectsPage(mountEl) {
       const d = disks[i];
       const dm = ddModels[i];
 
+      const speciesRows = dm.composition.species
+        .map(
+          (s) =>
+            `<tr><td>${s.name}</td><td>${s.condensationK} K</td><td>${s.presentAtInner ? "\u2713" : "\u2717"}</td><td>${s.presentAtMid ? "\u2713" : "\u2717"}</td><td>${s.presentAtOuter ? "\u2713" : "\u2717"}</td></tr>`,
+        )
+        .join("");
+
       ddSections += `
         <div class="label" style="margin-top:18px">${escapeHtml(d.name)}</div>
         <div class="kpi-grid">
           <div class="kpi-wrap"><div class="kpi">
             <div class="kpi__label">Range ${tipIcon(TIP_LABEL["Disk Range"])}</div>
             <div class="kpi__value">${dm.display.range}</div>
-            <div class="kpi__meta"></div>
+            <div class="kpi__meta">${dm.inputs.eccentricity > 0 ? dm.display.periApo : ""}</div>
           </div></div>
           <div class="kpi-wrap"><div class="kpi">
             <div class="kpi__label">Temperature ${tipIcon(TIP_LABEL["Disk Temperature"])}</div>
@@ -459,12 +579,32 @@ export function initOuterObjectsPage(mountEl) {
           <div class="kpi-wrap"><div class="kpi">
             <div class="kpi__label">Estimated Mass ${tipIcon(TIP_LABEL["Estimated Mass"])}</div>
             <div class="kpi__value">${dm.display.mass} M\u2295</div>
-            <div class="kpi__meta"></div>
+            <div class="kpi__meta">${dm.display.massSource}</div>
           </div></div>
           <div class="kpi-wrap"><div class="kpi">
             <div class="kpi__label">Orbital Period ${tipIcon(TIP_LABEL["Disk Orbital Period"])}</div>
             <div class="kpi__value">${dm.display.orbitalPeriod}</div>
             <div class="kpi__meta">At midpoint</div>
+          </div></div>
+          <div class="kpi-wrap"><div class="kpi">
+            <div class="kpi__label">Collision Velocity ${tipIcon(TIP_LABEL["Collision Velocity"])}</div>
+            <div class="kpi__value">${dm.display.collisionVelocity}</div>
+            <div class="kpi__meta">${dm.display.collisionRegime}</div>
+          </div></div>
+          <div class="kpi-wrap"><div class="kpi">
+            <div class="kpi__label">Surface Density ${tipIcon(TIP_LABEL["Surface Density"])}</div>
+            <div class="kpi__value">${dm.display.surfaceDensity} g/cm\u00b2</div>
+            <div class="kpi__meta">${dm.display.surfaceDensityVsMMSN}</div>
+          </div></div>
+          <div class="kpi-wrap"><div class="kpi">
+            <div class="kpi__label">IR Excess ${tipIcon(TIP_LABEL["IR Excess"])}</div>
+            <div class="kpi__value">${dm.display.irExcess}</div>
+            <div class="kpi__meta">${dm.display.irExcessLabel}</div>
+          </div></div>
+          <div class="kpi-wrap"><div class="kpi">
+            <div class="kpi__label">Stability ${tipIcon(TIP_LABEL["Disk Stability"])}</div>
+            <div class="kpi__value">${dm.display.stability}</div>
+            <div class="kpi__meta"></div>
           </div></div>
         </div>
         <div style="margin-top:14px">
@@ -475,7 +615,19 @@ Optical depth: ${dm.display.opticalDepth}
 Grain blowout size: ${dm.display.blowout}
 PR drag timescale: ${dm.display.prDrag}
 Collisional lifetime: ${dm.display.collisional}
-Dominant process: ${dm.display.dominantProcess}</div>
+Dominant process: ${dm.display.dominantProcess}
+
+Dust production: ${dm.display.dustProduction}
+Zodiacal delivery: ${dm.display.zodiacalInflow} (${dm.display.zodiacalLabel})
+Ice-to-rock ratio: ${dm.display.iceToRock}</div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="label">Condensation species ${tipIcon(TIP_LABEL["Condensation Species"])}</div>
+          <div class="derived-readout"><table class="mini-table">
+<thead><tr><th>Species</th><th>T<sub>cond</sub></th><th>Inner</th><th>Mid</th><th>Outer</th></tr></thead>
+<tbody>${speciesRows}</tbody>
+</table>
+<div style="margin-top:4px">Ice-to-rock ratio ${tipIcon(TIP_LABEL["Ice-to-Rock Ratio"])}: ${dm.display.iceToRock}</div></div>
         </div>
       `;
     }

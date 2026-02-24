@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net ws: wss:; worker-src 'self' blob:"
     />
     <title>WorldSmith Web</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?release=1.11.1" />
+    <link rel="stylesheet" href="./styles.css?release=1.12.0" />
   </head>
   <body>
     <header class="app-header">
@@ -18,7 +18,7 @@
         <div class="brand__text">
           <div class="brand__title">WorldSmith Web</div>
           <div class="brand__subtitle">
-            Worldbuilding calculators <span id="versionTag" class="version-tag">1.11.1</span>
+            Worldbuilding calculators <span id="versionTag" class="version-tag">1.12.0</span>
           </div>
         </div>
       </div>
@@ -111,15 +111,9 @@
       </aside>
 
       <section class="content" id="app" aria-live="polite"></section>
+      <footer class="app-footer">Judas Brennan &middot; 2026</footer>
     </main>
 
-    <footer class="app-footer">
-      <div>WorldSmith Web | vanilla HTML/CSS/JS</div>
-      <div class="muted">
-        WorldSmith helps you generate Sol-like systems and Earth-like worlds for tabletop RPGs.
-      </div>
-    </footer>
-
-    <script type="module" src="./app.js?release=1.11.1"></script>
+    <script type="module" src="./app.js?release=1.12.0"></script>
   </body>
 </html>

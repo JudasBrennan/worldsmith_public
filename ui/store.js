@@ -15,7 +15,7 @@ const LEGACY_KEY = "worldsmith.world";
 let volatileWorldRaw = null;
 
 // Schema version for migrations
-const SCHEMA_VERSION = 43;
+const SCHEMA_VERSION = 45;
 // Practical giant-planet radius bounds in Jupiter radii (Rj):
 // lower bound ~= Neptune-size (~0.35 Rj), upper bound ~= inflated HAT-P-67 b (2.14 Rj).
 export const GAS_GIANT_RADIUS_MIN_RJ = 0.35;
@@ -86,11 +86,12 @@ export function randomGasGiantRadiusRj() {
 
 function makeCollection(list, idPrefix) {
   const order = [];
-  const byId = {};
+  const byId = Object.create(null);
   let idx = 1;
   for (const item of list || []) {
     if (!item || typeof item !== "object") continue;
     const id = String(item.id || `${idPrefix}${idx++}`);
+    if (id === "__proto__" || id === "constructor" || id === "prototype") continue;
     byId[id] = { ...item, id };
     order.push(id);
   }
@@ -159,12 +160,34 @@ function normalizeDebrisDisk(raw, idx = 1) {
   const outer = Number(raw?.outerAu ?? raw?.outer ?? 0);
   const innerAu = Number.isFinite(inner) ? Math.max(0, inner) : 0;
   const outerAu = Number.isFinite(outer) ? Math.max(0, outer) : 0;
+  // Eccentricity (0–0.5) — optional
+  const rawEcc = raw?.eccentricity ?? null;
+  const parsedEcc = Number(rawEcc);
+  const eccentricity =
+    rawEcc != null && Number.isFinite(parsedEcc) && parsedEcc >= 0 && parsedEcc <= 0.5
+      ? parsedEcc
+      : null;
+  // Inclination (0–90°) — optional
+  const rawInc = raw?.inclination ?? raw?.inclinationDeg ?? null;
+  const parsedInc = Number(rawInc);
+  const inclination =
+    rawInc != null && Number.isFinite(parsedInc) && parsedInc >= 0 && parsedInc <= 90
+      ? parsedInc
+      : null;
+  // Total mass override (Earth masses, >0) — optional
+  const rawMass = raw?.totalMassMearth ?? raw?.massMearth ?? null;
+  const parsedMass = Number(rawMass);
+  const totalMassMearth =
+    rawMass != null && Number.isFinite(parsedMass) && parsedMass > 0 ? parsedMass : null;
   return {
     id: String(raw?.id || `dd${idx}`),
     name: String(raw?.name || (idx === 1 ? "Debris disk" : `Debris disk ${idx}`)),
     innerAu,
     outerAu,
     suggested: Boolean(raw?.suggested),
+    eccentricity,
+    inclination,
+    totalMassMearth,
   };
 }
 
@@ -299,6 +322,7 @@ function defaultWorld() {
       metallicityFeH: 0.0,
       physicsMode: "simple",
       advancedDerivationMode: "rl",
+      evolutionMode: "zams",
     },
     selectedBodyType: "planet",
     system: {
@@ -393,6 +417,8 @@ function migrateWorld(world) {
   const starName = String(world.star.name ?? "").trim();
   world.star.name = starName || "Star";
   if (world.star.metallicityFeH == null) world.star.metallicityFeH = 0.0;
+  // v45: add evolutionMode to star (default "zams" for backwards compat)
+  if (!world.star.evolutionMode) world.star.evolutionMode = "zams";
 
   // Local cluster defaults/sanity
   world.cluster = normalizeLocalClusterInputs(world.cluster || LOCAL_CLUSTER_DEFAULTS);
@@ -591,6 +617,21 @@ function migrateWorld(world) {
   if (world.version !== SCHEMA_VERSION) world.version = SCHEMA_VERSION;
 
   return world;
+}
+
+/** Resolve effective R/L/T overrides and evolution mode from the star state. */
+export function getStarOverrides(star) {
+  const ev = star?.evolutionMode || "zams";
+  if (star?.physicsMode === "advanced") {
+    const m = star.advancedDerivationMode;
+    const r = star.radiusRsolOverride;
+    const l = star.luminosityLsolOverride;
+    const t = star.tempKOverride;
+    if (m === "rt") return { r, l: null, t, ev };
+    if (m === "lt") return { r: null, l, t, ev };
+    return { r, l, t: null, ev }; // "rl" (default)
+  }
+  return { r: null, l: null, t: null, ev };
 }
 
 // Planet helpers (small surface area on purpose)

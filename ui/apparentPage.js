@@ -13,6 +13,7 @@ import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   getSelectedPlanet,
+  getStarOverrides,
   listMoons,
   listPlanets,
   listSystemGasGiants,
@@ -524,12 +525,17 @@ function drawSkyCanvas(canvas, model, starColourHex, skyMode, moonPhaseDeg, skyC
 function buildApparentSamples(world, homePlanetId, state) {
   const starMassMsol = Number(world?.star?.massMsol) || 1;
   const starAgeGyr = Number(world?.star?.ageGyr) || 4.6;
+  const sov = getStarOverrides(world?.star);
 
   const planets = listPlanets(world)
     .map((planet) => {
       const model = calcPlanetExact({
         starMassMsol,
         starAgeGyr,
+        starRadiusRsolOverride: sov.r,
+        starLuminosityLsolOverride: sov.l,
+        starTempKOverride: sov.t,
+        starEvolutionMode: sov.ev,
         planet: planet.inputs || {},
       });
 

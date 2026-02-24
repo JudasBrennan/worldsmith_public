@@ -6,6 +6,7 @@
   listMoons,
   listSystemGasGiants,
   listSystemDebrisDisks,
+  getStarOverrides,
 } from "./store.js";
 import { calcSystem } from "../engine/system.js";
 import { calcStar, starColourHexFromTempK } from "../engine/star.js";
@@ -19,9 +20,11 @@ import {
   flareClassFromEnergy,
   createSeededRng,
 } from "../engine/stellarActivity.js";
+import { calcLagrangePoints } from "../engine/lagrange.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { captureCanvasGif, downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
 import { gasStylePalette, drawGasGiantViz } from "./gasGiantStyles.js";
+import { computeRockyVisualProfile, drawRockyPlanetViz } from "./rockyPlanetStyles.js";
 import { drawTransitionBar } from "./vizTransition.js";
 import { buildClusterSnapshot, drawClusterScene } from "./vizClusterRenderer.js";
 
@@ -143,6 +146,8 @@ const TIP_LABEL = {
     "Show periapsis (closest approach) and apoapsis (farthest point) markers on eccentric orbits.",
   "Hill spheres":
     "Show the Hill sphere \u2014 the gravitational sphere of influence \u2014 around each planet and gas giant. Defines the maximum region where stable satellite orbits can exist.",
+  "Lagrange points":
+    "Show L1\u2013L5 equilibrium positions for each star\u2013body pair. L4 and L5 (leading and trailing Trojans, \u00b160\u00b0) are stable and shown for all bodies. Click a body to reveal all five points including L1/L2 (near the body) and L3 (opposite side of star).",
   "Frost line":
     "Show the H\u2082O frost line \u2014 the distance beyond which water ice can condense.",
   Distances: "Show orbital distance (AU) alongside body name labels.",
@@ -236,6 +241,7 @@ export function initVisualiserPage(root, options = {}) {
               <label class="viz-check"><input id="chk-eccentric" type="checkbox" /><span>Eccentric orbits ${tipIcon(TIP_LABEL["Eccentric orbits"] || "")}</span></label>
               <label class="viz-check"><input id="chk-pe-ap" type="checkbox" /><span>Pe / Ap markers ${tipIcon(TIP_LABEL["Pe / Ap markers"] || "")}</span></label>
               <label class="viz-check"><input id="chk-hill" type="checkbox" /><span>Hill spheres ${tipIcon(TIP_LABEL["Hill spheres"] || "")}</span></label>
+              <label class="viz-check"><input id="chk-lagrange" type="checkbox" /><span>Lagrange points ${tipIcon(TIP_LABEL["Lagrange points"] || "")}</span></label>
               <label class="viz-check"><input id="chk-frost" type="checkbox" checked /><span>Frost line ${tipIcon(TIP_LABEL["Frost line"] || "")}</span></label>
               <label class="viz-check"><input id="chk-distances" type="checkbox" checked /><span>Distances ${tipIcon(TIP_LABEL["Distances"] || "")}</span></label>
               <label class="viz-check"><input id="chk-grid" type="checkbox" /><span>AU grid ${tipIcon(TIP_LABEL["AU grid"] || "")}</span></label>
@@ -311,6 +317,7 @@ export function initVisualiserPage(root, options = {}) {
   const chkEccentric = root.querySelector("#chk-eccentric");
   const chkPeAp = root.querySelector("#chk-pe-ap");
   const chkHill = root.querySelector("#chk-hill");
+  const chkLagrange = root.querySelector("#chk-lagrange");
   const chkFrost = root.querySelector("#chk-frost");
   const chkDistances = root.querySelector("#chk-distances");
   const chkGrid = root.querySelector("#chk-grid");
@@ -671,6 +678,7 @@ export function initVisualiserPage(root, options = {}) {
     const starName = String(w.star?.name || "").trim() || "Star";
     const starMassMsol = Number(w.star?.massMsol ?? w.system?.starMassMsol);
     const starAgeGyr = Number(w.star?.ageGyr ?? 4.6);
+    const sov = getStarOverrides(w.star);
     const starSeedRaw = w.star?.activitySeed ?? w.star?.seed ?? null;
 
     // Mirror starPage.js getEffectiveOverrides() so the visualizer uses the same
@@ -757,9 +765,18 @@ export function initVisualiserPage(root, options = {}) {
         let radiusEarth = null;
         let skyHighHex = null;
         let skyHorizonHex = null;
+        let visualProfile = null;
         const planetInputs = { ...p.inputs, semiMajorAxisAu: au };
         try {
-          const planetCalc = calcPlanetExact({ starMassMsol, starAgeGyr, planet: planetInputs });
+          const planetCalc = calcPlanetExact({
+            starMassMsol,
+            starAgeGyr,
+            starRadiusRsolOverride: sov.r,
+            starLuminosityLsolOverride: sov.l,
+            starTempKOverride: sov.t,
+            starEvolutionMode: sov.ev,
+            planet: planetInputs,
+          });
           periodDays = Number(planetCalc?.derived?.orbitalPeriodEarthDays);
           if (!Number.isFinite(periodDays) || periodDays <= 0) periodDays = null;
           radiusEarth = Number(planetCalc?.derived?.radiusEarth);
@@ -771,11 +788,16 @@ export function initVisualiserPage(root, options = {}) {
           if (!/^#?[0-9a-fA-F]{6}$/.test(skyHorizonHex)) skyHorizonHex = null;
           if (skyHighHex && !skyHighHex.startsWith("#")) skyHighHex = "#" + skyHighHex;
           if (skyHorizonHex && !skyHorizonHex.startsWith("#")) skyHorizonHex = "#" + skyHorizonHex;
+
+          if (planetCalc?.derived) {
+            visualProfile = computeRockyVisualProfile(planetCalc.derived, p.inputs);
+          }
         } catch {
           periodDays = null;
           radiusEarth = null;
           skyHighHex = null;
           skyHorizonHex = null;
+          visualProfile = null;
         }
 
         return {
@@ -788,6 +810,7 @@ export function initVisualiserPage(root, options = {}) {
           massEarth: Number(p.inputs?.massEarth) || null,
           skyHighHex,
           skyHorizonHex,
+          visualProfile,
           eccentricity: clamp(Number(p.inputs?.eccentricity ?? 0), 0, 0.99),
           longitudeOfPeriapsisDeg: Number(p.inputs?.longitudeOfPeriapsisDeg ?? 0),
           inclinationDeg: clamp(Number(p.inputs?.inclinationDeg ?? 0), 0, 180),
@@ -802,6 +825,10 @@ export function initVisualiserPage(root, options = {}) {
                 const moonCalc = calcMoonExact({
                   starMassMsol,
                   starAgeGyr,
+                  starRadiusRsolOverride: sov.r,
+                  starLuminosityLsolOverride: sov.l,
+                  starTempKOverride: sov.t,
+                  starEvolutionMode: sov.ev,
                   planet: planetInputs,
                   moon: { ...m.inputs },
                 });
@@ -893,6 +920,10 @@ export function initVisualiserPage(root, options = {}) {
                 const moonCalc = calcMoonExact({
                   starMassMsol,
                   starAgeGyr,
+                  starRadiusRsolOverride: sov.r,
+                  starLuminosityLsolOverride: sov.l,
+                  starTempKOverride: sov.t,
+                  starEvolutionMode: sov.ev,
                   moon: { ...m.inputs },
                   parentOverride,
                 });
@@ -1420,6 +1451,44 @@ export function initVisualiserPage(root, options = {}) {
         ctx.font = "9px system-ui, sans-serif";
         ctx.fillStyle = col + "0.65)";
         ctx.fillText(hillAu.toFixed(3) + " AU", bx, topY - 15);
+      }
+    }
+  }
+
+  // Draw a Lagrange point marker.
+  // mode: "trojan" (small diamond, L4/L5 overview) or "full" (cross + label)
+  function drawLagrangeMarker(screenX, screenY, label, mode) {
+    const col = "rgba(80,200,200,";
+    if (mode === "trojan") {
+      const s = 4;
+      ctx.fillStyle = col + "0.65)";
+      ctx.beginPath();
+      ctx.moveTo(screenX, screenY - s);
+      ctx.lineTo(screenX + s, screenY);
+      ctx.lineTo(screenX, screenY + s);
+      ctx.lineTo(screenX - s, screenY);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      const s = 6;
+      ctx.strokeStyle = col + "0.70)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(screenX - s, screenY);
+      ctx.lineTo(screenX + s, screenY);
+      ctx.moveTo(screenX, screenY - s);
+      ctx.lineTo(screenX, screenY + s);
+      ctx.stroke();
+      ctx.fillStyle = col + "0.85)";
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, 2, 0, Math.PI * 2);
+      ctx.fill();
+      if (chkLabels.checked) {
+        ctx.font = "bold 10px system-ui, sans-serif";
+        ctx.fillStyle = col + "0.90)";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(label, screenX + 8, screenY - 4);
       }
     }
   }
@@ -2080,6 +2149,43 @@ export function initVisualiserPage(root, options = {}) {
       }
     }
 
+    // Lagrange point markers for gas giants
+    if (chkLagrange?.checked) {
+      for (const { gasGiant, placement } of gasRenderNodes) {
+        const mj = Number(gasGiant.massMjup);
+        if (!Number.isFinite(mj) || mj <= 0 || !Number.isFinite(gasGiant.au) || gasGiant.au <= 0)
+          continue;
+        const isFocused =
+          state.focusTargetKind === "gasGiant" && state.focusTargetId === gasGiant.id;
+        const lp = calcLagrangePoints({
+          bodyAu: gasGiant.au,
+          bodyMass: mj,
+          starMass: starMassMsol * MJUP_PER_MSOL,
+          bodyAngleRad: placement.angle,
+        });
+        if (!lp) continue;
+        const pts = lp.points;
+        for (const key of ["L4", "L5"]) {
+          const pt = pts[key];
+          const pr = mapAuToPx(pt.au, minAu, maxAu, maxR);
+          const ox = Math.cos(pt.angleRad) * pr;
+          const oy = Math.sin(pt.angleRad) * pr;
+          const sp = orbitOffsetToScreen(ox, oy, cx, cy);
+          drawLagrangeMarker(sp.x, sp.y, pt.label, isFocused ? "full" : "trojan");
+        }
+        if (isFocused) {
+          for (const key of ["L1", "L2", "L3"]) {
+            const pt = pts[key];
+            const pr = mapAuToPx(pt.au, minAu, maxAu, maxR);
+            const ox = Math.cos(pt.angleRad) * pr;
+            const oy = Math.sin(pt.angleRad) * pr;
+            const sp = orbitOffsetToScreen(ox, oy, cx, cy);
+            drawLagrangeMarker(sp.x, sp.y, pt.label, "full");
+          }
+        }
+      }
+    }
+
     // Frost line (dashed blue) — independent toggle
     if (chkFrost.checked && Number.isFinite(sys.frostLineAu) && sys.frostLineAu > 0) {
       const fr = mapAuToPx(sys.frostLineAu, minAu, maxAu, maxR);
@@ -2171,6 +2277,40 @@ export function initVisualiserPage(root, options = {}) {
           chkDistances.checked,
           hillAu,
         );
+      }
+    }
+
+    // Lagrange point markers for rocky planets
+    if (chkLagrange?.checked) {
+      for (const { p, placement } of planetRenderNodes) {
+        if (!p.massEarth || !Number.isFinite(p.au) || p.au <= 0) continue;
+        const isFocused = state.focusTargetKind === "planet" && state.focusTargetId === p.id;
+        const lp = calcLagrangePoints({
+          bodyAu: p.au,
+          bodyMass: p.massEarth,
+          starMass: starMassMsol * EARTH_PER_MSOL,
+          bodyAngleRad: placement.angle,
+        });
+        if (!lp) continue;
+        const pts = lp.points;
+        for (const key of ["L4", "L5"]) {
+          const pt = pts[key];
+          const pr = mapAuToPx(pt.au, minAu, maxAu, maxR);
+          const ox = Math.cos(pt.angleRad) * pr;
+          const oy = Math.sin(pt.angleRad) * pr;
+          const sp = orbitOffsetToScreen(ox, oy, cx, cy);
+          drawLagrangeMarker(sp.x, sp.y, pt.label, isFocused ? "full" : "trojan");
+        }
+        if (isFocused) {
+          for (const key of ["L1", "L2", "L3"]) {
+            const pt = pts[key];
+            const pr = mapAuToPx(pt.au, minAu, maxAu, maxR);
+            const ox = Math.cos(pt.angleRad) * pr;
+            const oy = Math.sin(pt.angleRad) * pr;
+            const sp = orbitOffsetToScreen(ox, oy, cx, cy);
+            drawLagrangeMarker(sp.x, sp.y, pt.label, "full");
+          }
+        }
       }
     }
 
@@ -2357,9 +2497,15 @@ export function initVisualiserPage(root, options = {}) {
 
       if (isPhysical && pr < PHYS_VIS_THRESHOLD_PX) {
         drawPositionIndicator(ctx, px, py, high);
+      } else if (p.visualProfile) {
+        const visPr = Math.max(pr, 0.5);
+        drawRockyPlanetViz(ctx, px, py, visPr, p.visualProfile, {
+          lightDx: ux,
+          lightDy: uy,
+        });
       } else {
         const visPr = Math.max(pr, 0.5);
-        // Place the bright focus slightly toward the sun; fade to horizon colour on the far side.
+        // Fallback: simple gradient for planets without visual profile
         const fx = px + ux * visPr * 0.55;
         const fy = py + uy * visPr * 0.55;
         const gradP = ctx.createRadialGradient(fx, fy, visPr * 0.15, px, py, visPr * 1.05);

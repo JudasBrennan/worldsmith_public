@@ -6,6 +6,12 @@ import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { GAS_GIANT_STYLES, styleLabel, drawGasGiantPreview } from "./gasGiantStyles.js";
 import {
+  computeRockyVisualProfile,
+  drawRockyPlanetPreview,
+  ROCKY_RECIPES,
+  drawRecipePreview,
+} from "./rockyPlanetStyles.js";
+import {
   GAS_GIANT_RADIUS_MAX_RJ,
   GAS_GIANT_RADIUS_MIN_RJ,
   GAS_GIANT_RADIUS_STEP_RJ,
@@ -35,6 +41,7 @@ import {
   randomGasGiantRadiusRj,
   saveSystemGasGiants,
   saveWorld,
+  getStarOverrides,
 } from "./store.js";
 
 /* ── Tooltip dictionary (rocky planet + gas giant) ──────────────── */
@@ -103,6 +110,8 @@ const TIP_LABEL = {
   Moons: "Major moons currently assigned to this body.",
 
   // ── Rocky planet outputs ──
+  Appearance:
+    "Physics-driven visual of the planet from space. Surface colour, oceans, ice caps, clouds, and terrain are derived from composition, water regime, temperature, pressure, and tectonics.\n\nClick Recipes to browse preset input combinations for different planet types.",
   Composition:
     "Interior composition class derived from Core Mass Fraction (CMF) and Water Mass Fraction (WMF).\n\nIron world: CMF > 60% (Mercury-like interior)\nMercury-like: CMF 45\u201360%\nEarth-like: CMF 25\u201345%\nMars-like: CMF 10\u201325%\nCoreless: CMF < 10%\nOcean world: WMF 0.1\u201310%\nIce world: WMF > 10%",
   "Core Radius":
@@ -187,6 +196,18 @@ const TIP_LABEL = {
     "Temperature-based appearance classification (Sudarsky et al. 2000). Class I: ammonia clouds (<150 K). Class II: water clouds (150\u2013250 K). Class III: cloudless (250\u2013900 K). Class IV: alkali metals (900\u20131400 K). Class V: silicate/iron clouds (>1400 K).",
   "GG Derived":
     "Detailed atmospheric, thermal, magnetic, and gravitational properties computed from the input parameters and host-star luminosity.",
+  "GG Oblateness":
+    "Rotational flattening f = (R_eq \u2212 R_pol)/R_eq. Faster spin \u2192 more oblate. Gas giants use f/q \u2248 0.75; ice giants \u2248 0.9. Jupiter f = 0.065, Saturn f = 0.098. J\u2082 is the quadrupole gravity moment.",
+  "GG Mass Loss":
+    "Energy-limited atmospheric escape driven by stellar XUV radiation (Ribas et al. 2005). Hot Jupiters at <0.1 AU can lose >10\u2076 kg/s. Evaporation timescale \u226b Hubble time for most giants. Roche lobe overflow flags planets exceeding the Eggleton (1983) tidal radius.",
+  "GG Interior":
+    "Heavy-element budget from Thorngren et al. (2016): M_Z = 49.3 \u00d7 (M/Mj)^0.61 M\u2295. Core mass capped at 25 M\u2295 per Juno constraints. Bulk metallicity Z = M_Z / M_total.",
+  "GG Suggested Radius":
+    "Age-dependent radius from Fortney et al. (2007) cooling models. Young systems have inflated radii; old systems contract toward baseline. Hot Jupiters (T_eq > 1000 K) receive an extra proximity inflation of 0.1\u20130.3 Rj.",
+  "GG Ring Properties":
+    "Ring composition depends on equilibrium temperature: icy (<150 K), mixed (150\u2013300 K), or rocky (>300 K). Mass scaled from Saturn\u2019s rings. Optical depth classified as Dense (\u03c4 > 1), Moderate (0.1\u20131), or Tenuous (< 0.1).",
+  "GG Tidal":
+    "Tidal locking timescale \u221d a\u2076: hot Jupiters at <0.05 AU lock within ~1 Gyr. Circularisation timescale \u221d a^6.5. Both compared to the host star\u2019s age to determine current state.",
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
@@ -771,9 +792,14 @@ export function initPlanetPage(mountEl) {
       if (on) {
         // Default override colours to current auto-calculated values
         const selPlanet = getSelectedPlanet(w);
+        const sov = getStarOverrides(w.star);
         const m = calcPlanetExact({
           starMassMsol: Number(w.star.massMsol),
           starAgeGyr: Number(w.star.ageGyr),
+          starRadiusRsolOverride: sov.r,
+          starLuminosityLsolOverride: sov.l,
+          starTempKOverride: sov.t,
+          starEvolutionMode: sov.ev,
           planet: { ...selPlanet.inputs, vegOverride: false },
           moons: listMoons(w)
             .filter((mm) => mm.planetId === selPlanet.id)
@@ -889,14 +915,20 @@ export function initPlanetPage(mountEl) {
     const assignedMoons = listMoons(world)
       .filter((m) => m.planetId === planet.id)
       .map((m) => m.inputs);
+    const sov = getStarOverrides(world.star);
     const model = calcPlanetExact({
       starMassMsol: Number(world.star.massMsol),
       starAgeGyr: Number(world.star.ageGyr),
+      starRadiusRsolOverride: sov.r,
+      starLuminosityLsolOverride: sov.l,
+      starTempKOverride: sov.t,
+      starEvolutionMode: sov.ev,
       planet: planet.inputs,
       moons: assignedMoons,
     });
     const d = model.derived;
     const p = planet.inputs || {};
+    const visualProfile = computeRockyVisualProfile(d, p);
 
     // Update CMF input when in auto mode
     if (d.cmfIsAuto && cmfEl) {
@@ -908,6 +940,12 @@ export function initPlanetPage(mountEl) {
     }
 
     const items = [
+      {
+        label: "Appearance",
+        value: d.compositionClass,
+        meta: d.waterRegime,
+        isRockyPreview: true,
+      },
       {
         label: "Composition",
         value: model.display.compositionClass,
@@ -1024,16 +1062,26 @@ export function initPlanetPage(mountEl) {
 
     const kpiHtml = items
       .filter(Boolean)
-      .map(
-        (x) => `
+      .map((x) => {
+        if (x.isRockyPreview) {
+          return `
+      <div class="kpi-wrap"><div class="kpi kpi--preview">
+        <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.label] || "")}
+          <button type="button" class="small rp-recipe-btn">Recipes</button>
+        </div>
+        <canvas class="rocky-preview-canvas" width="180" height="180"></canvas>
+        <div class="kpi__meta">${x.value} \u2014 ${x.meta || ""}</div>
+      </div></div>`;
+        }
+        return `
       <div class="kpi-wrap">
         <div class="kpi ${x.kpiClass || ""}" ${x.kpiAttrs || ""} style="${x.kpiStyle || ""}">
           <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.tipLabel] || TIP_LABEL[x.label] || "")}</div>
           <div class="kpi__value">${x.value}</div>
           <div class="kpi__meta">${x.meta || ""}</div>
         </div>
-      </div>`,
-      )
+      </div>`;
+      })
       .join("");
 
     const n2Pct = fmt(d.n2Pct, 2);
@@ -1092,6 +1140,23 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
         <div class="derived-readout">${`Cell count: ${d.circulationCellCount}\n${d.circulationCellRanges.length ? d.circulationCellRanges.map((c) => `${c.name}: ${c.rangeDegNS}\u00b0 N/S`).join("\n") : "-"}`}</div>
       </div>
     `;
+
+    // Render rocky planet preview canvas
+    const rockyCvs = bodyOutputsEl.querySelector(".rocky-preview-canvas");
+    if (rockyCvs && visualProfile) {
+      drawRockyPlanetPreview(rockyCvs, visualProfile);
+    }
+
+    // Wire recipe picker button
+    bodyOutputsEl.querySelector(".rp-recipe-btn")?.addEventListener("click", () => {
+      openRecipePicker((recipe) => {
+        const w = loadWorld();
+        const pid = w.planets.selectedId;
+        updatePlanet(pid, { inputs: recipe.apply });
+        updateWorld({ planet: recipe.apply });
+        render();
+      });
+    });
 
     // Update tectonic pills: mark recommended + auto-select if in auto mode
     if (tecPillsEl && d.tectonicSuggested) {
@@ -1806,7 +1871,26 @@ Chaotic zone: ${m.display.chaoticZone}
 Ring zone: ${fmt(m.gravity.ringZoneInnerKm, 0)}\u2013${fmt(m.gravity.ringZoneOuterKm, 0)} km
 
 Dynamics: ${m.display.bands}
-Wind speed: ${m.display.windSpeed}</div>
+Wind speed: ${m.display.windSpeed}
+
+Oblateness: ${m.display.oblateness} ${tipIcon(TIP_LABEL["GG Oblateness"])}
+Equatorial/Polar: ${m.display.equatorialRadius}
+
+Interior: ${m.display.heavyElements} ${tipIcon(TIP_LABEL["GG Interior"])}
+Bulk metallicity: ${m.display.bulkMetallicity}
+
+Mass loss: ${m.display.massLossRate} ${tipIcon(TIP_LABEL["GG Mass Loss"])}
+Evaporation: ${m.display.evaporationTimescale}
+Roche lobe: ${m.display.rocheLobeRadius}
+
+Suggested radius: ${m.display.suggestedRadius} ${tipIcon(TIP_LABEL["GG Suggested Radius"])}
+${m.display.radiusAgeNote}
+
+Rings: ${m.display.ringType} ${tipIcon(TIP_LABEL["GG Ring Properties"])}
+Ring details: ${m.display.ringDetails}
+
+Tidal locking: ${m.display.tidalLocking} ${tipIcon(TIP_LABEL["GG Tidal"])}
+Circularisation: ${m.display.circularisation}</div>
       </div>
     `;
 
@@ -1886,6 +1970,71 @@ Wind speed: ${m.display.windSpeed}</div>
       if (e.target === overlay) close();
     });
     overlay.querySelector(".gg-picker-close").addEventListener("click", close);
+
+    function onKey(e) {
+      if (e.key === "Escape") close();
+    }
+    document.addEventListener("keydown", onKey);
+  }
+
+  /* ── Rocky recipe picker modal ─────────────────────────────────── */
+
+  function openRecipePicker(onSelect) {
+    const categories = ["Terrestrial", "Barren", "Extreme", "Ocean"];
+    const overlay = document.createElement("div");
+    overlay.className = "rp-picker-overlay";
+    overlay.innerHTML = `
+      <div class="rp-picker-dialog panel">
+        <div class="panel__header">
+          <h2>Rocky Planet Recipes</h2>
+          <button type="button" class="small rp-picker-close">Close</button>
+        </div>
+        <div class="panel__body">
+          ${categories
+            .map(
+              (cat) => `
+            <div class="rp-picker-category">${cat}</div>
+            <div class="rp-picker-grid">
+              ${ROCKY_RECIPES.filter((r) => r.category === cat)
+                .map(
+                  (r) => `
+                <div class="rp-picker-card" data-recipe="${r.id}">
+                  <canvas width="90" height="90"></canvas>
+                  <div class="rp-picker-card__label">${r.label}</div>
+                </div>`,
+                )
+                .join("")}
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Render all recipe previews
+    for (const card of overlay.querySelectorAll(".rp-picker-card")) {
+      const recipe = ROCKY_RECIPES.find((r) => r.id === card.dataset.recipe);
+      if (recipe) drawRecipePreview(card.querySelector("canvas"), recipe);
+    }
+
+    function close() {
+      overlay.remove();
+      document.removeEventListener("keydown", onKey);
+    }
+
+    for (const card of overlay.querySelectorAll(".rp-picker-card")) {
+      card.addEventListener("click", () => {
+        const recipe = ROCKY_RECIPES.find((r) => r.id === card.dataset.recipe);
+        if (recipe) onSelect(recipe);
+        close();
+      });
+    }
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector(".rp-picker-close").addEventListener("click", close);
 
     function onKey(e) {
       if (e.key === "Escape") close();

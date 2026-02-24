@@ -295,17 +295,17 @@ test("Realmspace preset validates and imports expected bodies", () => {
   assert.equal(imported.star.name, "The Sun");
 
   const planets = listPlanets(imported);
-  assert.equal(planets.length, 4);
+  assert.equal(planets.length, 5);
   assert.deepEqual(
     planets.map((p) => p.name),
-    ["Anadia", "Toril", "Karpri", "Chandos"],
+    ["Anadia", "Toril", "Karpri", "Chandos", "Glyth"],
   );
 
   const gas = listSystemGasGiants(imported);
-  assert.equal(gas.length, 2);
+  assert.equal(gas.length, 1);
   assert.deepEqual(
     gas.map((g) => g.name),
-    ["Coliar", "Glyth"],
+    ["Coliar"],
   );
   for (const giant of gas) assertRadiusInRange(giant.radiusRj);
 

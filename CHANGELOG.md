@@ -2,6 +2,306 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.12.0
+
+### 3D Planet Splash Screen
+
+**Interactive loading overlay with Three.js planet**
+(ui/splashOverlay.js, app.js, styles.css, index.html)
+
+Added a full-screen splash overlay shown on every page load. A 3D
+model of the planet (`assets/planet.glb`, created in Blender) is
+rendered via Three.js loaded lazily from the jsdelivr CDN. The planet
+auto-rotates and can be grabbed and spun on its axis via OrbitControls
+(rotation only — no zoom or pan). Biome colouring is applied at
+runtime from vertex positions: ocean (blue), latitude-driven biomes
+(tropical, savanna, desert, temperate, boreal, tundra, polar), and
+elevation-based mountain/snow colouring. Clouds render as translucent
+white, the atmosphere as a faint blue rim, and city lights as warm
+amber dots on the night side. Day/night lighting uses a directional
+sun with a dim cool-blue fill on the dark side.
+
+The user dismisses the overlay by clicking "Enter WorldSmith", which
+triggers a 0.5 s fade-out transition. All Three.js resources
+(renderer, geometries, materials, controls) are disposed on dismiss.
+If Three.js or the GLB fails to load, the enter button still appears
+so the user is never blocked. Respects `prefers-reduced-motion` by
+disabling auto-rotation.
+
+- CSP updated: `wasm-unsafe-eval` added to `script-src`;
+  `https://cdn.jsdelivr.net` added to `connect-src` for Draco decoder
+- Three.js + GLTFLoader + DRACOLoader + OrbitControls loaded via
+  dynamic `import()` from CDN with cached promise (retry on failure)
+- Draco decoder forced to JS-only mode to avoid WASM CSP issues
+
+### Rocky Planet Visual Rendering
+
+**Physics-driven canvas visuals for rocky planets**
+(ui/rockyPlanetStyles.js, ui/planetPage.js, ui/systemPage.js,
+ui/visualizerPage.js, styles.css)
+
+Rocky planets now render with the same visual richness as gas giants.
+A new physics-driven rendering system translates engine-derived
+properties (composition class, water regime, surface temperature,
+tectonic regime, atmospheric pressure, vegetation, axial tilt) into
+a layered canvas visual — no user-selectable style presets, everything
+is determined by the planet's physics.
+
+- **Surface palettes** — Seven composition classes (Earth-like,
+  Mars-like, Mercury-like, Iron world, Coreless, Ice world, Ocean
+  world) each with a three-tone colour palette
+- **Oceans** — Coverage from water regime (Dry → 0, Shallow → 0.3,
+  Extensive → 0.65, Global → 0.95, Deep → 1.0); frozen when T < 273 K
+- **Ice caps** — Piecewise-linear extent from surface temperature with
+  axial-tilt asymmetry between poles
+- **Clouds** — Coverage from pressure × water vapour; Venus-like
+  worlds get near-total yellowish cloud cover
+- **Atmosphere rim** — Logarithmic thickness from surface pressure,
+  coloured by sky colour
+- **Terrain** — Cratered (stagnant + airless), worn (stagnant +
+  atmosphere), continental (mobile), volcanic (episodic), or smooth
+  (plutonic-squishy)
+- **Vegetation** — Semi-transparent tinted patches near the equator
+  for habitable worlds with vegetation hex values
+- **Special effects** — Lava cracks (T > 1200 K), frozen crystalline
+  highlight (T < 100 K + airless)
+- **Tidal lock** — Terminator darkening on the far side
+- **Deterministic** — Seeded RNG from planet name for reproducible
+  rendering across reloads
+
+Integrated into three rendering contexts: 180 px preview card on the
+Planet page (matching the gas giant preview), the System Poster on the
+Planetary System page, and the system Visualiser — all with
+star-directed lighting and scale-aware detail simplification.
+
+**Tests** (tests/rockyPlanetStyles.test.js)
+
+- 44 new tests across 9 groups: palette (8), ocean (8), ice caps (5),
+  clouds (3), atmosphere (4), terrain (5), special effects (3),
+  vegetation (3), determinism and edge cases (5)
+
+### Gas Giant Engine — Six New Physics Features
+
+**Oblateness, mass loss, interior, age-radius cooling, ring properties,
+and tidal effects** (engine/gasGiant.js, ui/planetPage.js)
+
+Added six new physics subsystems to the gas giant engine, bringing it
+closer to parity with the rocky planet engine. All six features are
+computed from the existing user inputs (mass, radius, orbit, rotation,
+star parameters) and appear in the derived-readout panel.
+
+1. **Oblateness** — Rotational flattening via Darwin-Radau approximation
+   with calibrated effective C/(MR²). Returns flattening, equatorial and
+   polar radii, and J₂. Gas giants use log-mass interpolation between
+   Saturn and Jupiter calibration points; ice giants use a
+   density-dependent MOI. Equatorial gravity (GM/R_eq²) matches the NASA
+   convention for surface gravity reporting.
+
+2. **Atmospheric mass loss** — XUV-driven energy-limited escape (Ribas
+   et al. 2005 power-law decay). Returns mass-loss rate (kg/s),
+   evaporation timescale (Gyr), XUV flux at orbit, Roche lobe radius
+   (Eggleton 1983), and overflow flag. Uses `starAgeGyr` (previously
+   accepted but unused).
+
+3. **Interior structure** — Heavy-element mass from Thorngren et al.
+   (2016): M_Z = 49.3 × (M/Mj)^0.61 M⊕. Core mass capped at 25 M⊕
+   (Juno constraint). Returns total heavy elements, estimated core mass,
+   and bulk metallicity fraction.
+
+4. **Age-dependent radius** — Fortney et al. (2007) cooling
+   approximation: R(t)/R(5 Gyr) ≈ 1 + 0.1 × (5/t)^0.35. Hot Jupiters
+   (T_eq > 1000 K) receive proximity inflation (+0.1 to +0.3 Rj).
+   Returns suggested radius, inflation factor, and diagnostic note.
+
+5. **Ring properties** — Temperature-dependent composition (Icy < 150 K,
+   Mixed 150–300 K, Rocky > 300 K). Mass scaled from Saturn:
+   3×10¹⁹ × (M/M_Saturn)^0.5 kg. Returns ring type, composition,
+   estimated mass, optical depth class, and radial extent.
+
+6. **Tidal effects** — Locking timescale ∝ a⁶ and circularisation
+   timescale ∝ a^6.5, both compared to star age for locked/circularised
+   flags. Hot Jupiters at 0.03 AU are tidally locked; Jupiter at 5.2 AU
+   is not.
+
+**Tests** (tests/gasGiant.test.js)
+
+- 22 new tests: oblateness (5), mass loss (4), interior (3),
+  age-radius (3), rings (3), tidal (4)
+
+### Gas Giant NASA Validation
+
+**Engine vs NASA/JPL factsheet comparison** (engine/gasGiant.js,
+tests/gasGiant-nasa-validation.test.js)
+
+Created a NASA validation test suite comparing engine outputs for
+Jupiter, Saturn, Uranus, and Neptune against observed values from
+NASA/JPL Planetary Fact Sheets (references/\*-factsheet.md). Ten
+properties are compared per planet with error percentages displayed
+in a summary table.
+
+The Darwin-Radau oblateness model reduced flattening errors from
+3.6–35.1% to under 0.3% for all four giants. Equatorial gravity
+(GM/R_eq²) matches NASA's convention, reducing gravity error from
+4.6–7.2% to under 0.5%. J₂ uses the first-order hydrostatic relation
+(2f − q)/3 instead of the previous q/3 approximation.
+
+| Property                | Before          | After |
+| ----------------------- | --------------- | ----- |
+| Flattening (worst)      | 35.1% (Neptune) | 0.3%  |
+| Gravity (worst)         | 7.2% (Uranus)   | 0.5%  |
+| Fair comparisons ≤ 1.5% | 24/28           | 32/32 |
+
+Effective temperature and bond albedo remain footnoted as model
+limitations (Sudarsky classification vs real atmospheric properties).
+
+**Tests** (tests/gasGiant-nasa-validation.test.js)
+
+- 33 new tests: summary table (1), per-planet assertions for density,
+  escape velocity, orbital period, orbital velocity, equatorial radius,
+  polar radius, flattening, and equatorial gravity (8 × 4 planets)
+
+**References**
+
+- Ribas, I. et al. (2005), "Evolution of the Solar Activity over Time
+  and Effects on Planetary Atmospheres", ApJ 622, 680
+- Thorngren, D. P. et al. (2016), "The Mass–Metallicity Relation for
+  Giant Planets", ApJ 831, 64
+- Fortney, J. J. et al. (2007), "Planetary Radii across Cool Jupiters
+  to Hot Neptunes", ApJ 659, 1661
+- Eggleton, P. P. (1983), "Approximations to the Radii of Roche
+  Lobes", ApJ 268, 368
+- NASA/JPL Planetary Fact Sheets (science.nasa.gov)
+
+### Lagrange Points in the System Visualiser
+
+**L1–L5 equilibrium point overlay** (engine/lagrange.js, ui/visualizerPage.js)
+
+Added a toggle-able Lagrange point overlay to the system visualiser.
+When enabled, L4/L5 Trojan points appear as small teal diamonds on every
+body's orbit. Clicking a body promotes the display to all five L-points
+(L1–L5) rendered as labelled cross markers. L1/L2 use the Hill sphere
+approximation; L3 uses the restricted three-body mass-ratio correction;
+L4/L5 are the exact equilateral points at +/-60 degrees.
+
+- Teal/cyan colour (`rgba(80,200,200,X)`) distinct from purple Hill
+  spheres, green HZ, and blue frost line
+- Works with log/linear scale, eccentric orbits, and 3D rotation
+- Separate render blocks for gas giants (Jupiter-mass units) and rocky
+  planets (Earth-mass units)
+
+**Tests** (tests/lagrange.test.js)
+
+- 9 new tests: Earth-Sun and Jupiter-Sun Hill radii, L4/L5 symmetry,
+  L3 mass correction, monotonicity, and invalid-input guards
+
+### Metallicity in Local Cluster Star Generation
+
+**Per-system [Fe/H] assignment** (engine/localCluster.js,
+ui/localClusterPage.js, ui/vizClusterRenderer.js)
+
+Each generated star system now receives a metallicity value based on
+galactic position and spectral class. The mean [Fe/H] is shifted by a
+radial gradient (-0.06 dex/kpc, Luck & Lambert 2011) and a vertical
+gradient (-0.30 dex/kpc, Schlesinger et al. 2014), with per-class
+offsets (O/B slightly metal-rich, brown dwarfs slightly metal-poor) and
+Gaussian scatter (sigma 0.20 dex, Nordstrom et al. 2004). The home
+system uses the value set on the Star page.
+
+- [Fe/H] and P(giant) columns added to the system coordinates table
+- Giant planet probability per system via Fischer & Valenti (2005):
+  P = 0.1 x 10^(2 x [Fe/H])
+- Cluster visualiser labels now show [Fe/H] on hover and when labels
+  are enabled
+- Deterministic generation via Box-Muller transform on the existing
+  Park-Miller PRNG (phase offset 37)
+
+**Tests** (tests/localCluster.test.js)
+
+- 8 new tests: determinism, physical range, home system override,
+  solar neighbourhood mean, radial gradient direction, seed variation
+
+**References**
+
+- Nordstrom, B. et al. (2004), "The Geneva-Copenhagen survey", A&A 418
+- Luck, R. E. & Lambert, D. L. (2011), "The Distribution of the
+  Elements in the Galactic Disk", AJ 142, 136
+- Schlesinger, K. J. et al. (2014), "The Vertical Metallicity Gradient
+  of the Milky Way Disk", ApJ 791, 112
+- Fischer, D. A. & Valenti, J. (2005), "The Planet-Metallicity
+  Correlation", ApJ 622, 1102
+
+### Stellar Evolution Engine
+
+**Main-sequence luminosity, radius, and temperature evolution**
+(engine/star.js, ui/starPage.js, ui/store.js)
+
+Added a stellar evolution mode based on Hurley, Pols & Tout (2000)
+analytical single-star evolution (SSE) formulae. When the "Evolved"
+toggle is enabled on the Star page, the engine computes age-dependent
+luminosity, radius, and temperature instead of the static Eker (2018)
+mass–luminosity/mass–radius relations. Metallicity ([Fe/H]) feeds
+into Tout et al. (1996) ZAMS baselines and Hurley evolution rates.
+
+- **ZAMS baseline** — Tout et al. (1996) rational-function fits for
+  zero-age main-sequence luminosity and radius as functions of mass
+  and metallicity Z
+- **MS lifetime** — Hurley (2000) eq. 4 for time to base of giant
+  branch (t_BGB), with t_MS ≈ 0.95 × t_BGB
+- **Luminosity evolution** — Parametric interpolation
+  log(L/L_ZAMS) = α·τ + β·τ^η + γ·τ² with piecewise α_L, β_L from
+  Hurley eqs. 19–20, constrained so L(τ=1) = L_TMS
+- **Radius evolution** — log(R/R_ZAMS) = α·τ + γ·τ³ with α_R from
+  Hurley, constrained so R(τ=1) = R_TMS
+- **Temperature** — Stefan-Boltzmann: T = (L/R²)^0.25 × 5772 K
+- **Override propagation** — Star R/L/T overrides from the evolved
+  model flow through to planet insolation, surface temperature,
+  habitable zone, and moon illumination via all UI call sites
+- **Store schema** — Migrated to v45; new `evolutionMode` field
+  ("zams" default, "evolved") persisted in localStorage
+- **Star page toggle** — "Evolved" checkbox wired to applyFromInputs,
+  updateWorld, Sol preset, and Reset handlers
+
+**NASA validation** (tests/star-evolution-nasa-validation.test.js)
+
+Validated against 9 benchmark main-sequence stars (Sun, Alpha Cen A/B,
+Tau Ceti, 70 Oph A, Epsilon Eridani, 61 Cyg A, Sirius A, Pi3 Orionis)
+with observed L, R, T from IAU 2015, Kervella+ 2017, Bond+ 2017, and
+other interferometric sources. Also validated downstream propagation
+to planet insolation and habitable zone boundaries.
+
+| Metric          | Mean error | Max error |
+| --------------- | ---------- | --------- |
+| Luminosity (L)  | 9.8%       | 15.5%     |
+| Radius (R)      | 1.1%       | 4.4%      |
+| Temperature (T) | 1.7%       | 3.8%      |
+
+R and T accuracy is near the practical ceiling of Hurley analytical
+SSE. The ~10% mean L error is intrinsic to the polynomial fits
+(Tout 1996 ZAMS baseline + Hurley evolution rates); sub-2% L accuracy
+would require tabulated MIST/MESA isochrone grids.
+
+**Tests** (tests/star.test.js, tests/star-evolution-nasa-validation.test.js)
+
+- 22 new unit tests: feHtoZ conversion, ZAMS L/R values and
+  monotonicity, MS lifetime scaling, evolved Sun at 4.6 Gyr,
+  evolution-exceeds-ZAMS at mid-MS, age=0 matches ZAMS, calcStar
+  evolved/zams mode fields, metallicity effects on lifetime and
+  luminosity
+- 10 NASA validation tests: per-star L/R/T assertions, ZAMS vs
+  standard solar model, MS lifetime benchmarks, calcStar integration,
+  evolved-vs-ZAMS comparison, metallicity effects, planet insolation
+  propagation, HZ boundary shift, summary table with quality gates
+
+**References**
+
+- Hurley, J. R., Pols, O. R. & Tout, C. A. (2000), "Comprehensive
+  analytic formulae for stellar evolution as a function of mass and
+  metallicity", MNRAS 315, 543
+- Tout, C. A. et al. (1996), "Rapid fitting formulae for the ZAMS",
+  MNRAS 281, 257
+- Eker, Z. et al. (2018), "Interrelated main-sequence mass–luminosity,
+  mass–radius, and mass–effective temperature relations", MNRAS 479, 5491
+
 ## 1.11.1
 
 ### System Poster
