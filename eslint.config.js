@@ -10,6 +10,7 @@ export default [
       "panoptesv/**",
       "tmp-veg-samples/**",
       "scripts/extract-veg-colours.mjs",
+      "projects-showcase/**",
     ],
   },
   js.configs.recommended,

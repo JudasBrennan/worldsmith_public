@@ -11,6 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { calcGasGiant } from "../engine/gasGiant.js";
+import { suggestStyles, computeGasGiantVisualProfile } from "../ui/gasGiantStyles.js";
 
 const SOLAR = {
   starMassMsol: 1,
@@ -251,5 +252,43 @@ for (const [name, cfg] of Object.entries(GIANTS)) {
       err <= 1.5,
       `${m.physical.equatorialGravityMs2} vs ${n.gravityMs2}: ${err.toFixed(1)}%`,
     );
+  });
+}
+
+// ── Visual type & ring validation ────────────────────────────────
+
+const EXPECTED_VISUAL = {
+  Jupiter: { styleId: "jupiter", sudarsky: "I", rings: false, ringDepth: "Tenuous" },
+  Saturn: { styleId: "saturn", sudarsky: "I", rings: true, ringDepth: "Dense" },
+  Uranus: { styleId: "uranus", sudarsky: "I-ice", rings: false, ringDepth: "Tenuous" },
+  Neptune: { styleId: "neptune", sudarsky: "I-ice", rings: false, ringDepth: "Tenuous" },
+};
+
+for (const [name, expected] of Object.entries(EXPECTED_VISUAL)) {
+  const m = models[name];
+
+  test(`${name}: Sudarsky class = ${expected.sudarsky}`, () => {
+    assert.equal(m.classification.sudarsky, expected.sudarsky);
+  });
+
+  test(`${name}: visual style = "${expected.styleId}"`, () => {
+    const { primary } = suggestStyles(m);
+    assert.equal(primary, expected.styleId, `suggestStyles primary for ${name}`);
+  });
+
+  test(`${name}: computeGasGiantVisualProfile styleId = "${expected.styleId}"`, () => {
+    const profile = computeGasGiantVisualProfile(m);
+    assert.equal(profile.bodyType, "gasGiant");
+    assert.equal(profile.styleId, expected.styleId);
+  });
+
+  test(`${name}: ring optical depth = "${expected.ringDepth}"`, () => {
+    assert.equal(m.ringProperties.opticalDepthClass, expected.ringDepth);
+  });
+
+  test(`${name}: rings displayed = ${expected.rings}`, () => {
+    const depth = m.ringProperties.opticalDepthClass;
+    const showRings = depth === "Dense" || depth === "Moderate";
+    assert.equal(showRings, expected.rings);
   });
 }

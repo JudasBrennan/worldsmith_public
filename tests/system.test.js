@@ -97,3 +97,43 @@ test("input star mass is clamped to valid range", () => {
   });
   assert.equal(huge.inputs.starMassMsol, 100);
 });
+
+// ── Override tests ──────────────────────────────
+
+test("luminosity override changes frost line and HZ", () => {
+  const base = calcSystem({ ...SOLAR_SYSTEM });
+  const bright = calcSystem({ ...SOLAR_SYSTEM, luminosityLsolOverride: 4 });
+  // frost line = 4.85 * sqrt(L); L=4 → frost ~2× base
+  assert.ok(bright.frostLineAu > base.frostLineAu, "brighter override → farther frost line");
+  approxEqual(bright.frostLineAu, 4.85 * Math.sqrt(4), 1e-6, "frost line with L=4");
+  assert.ok(bright.star.luminosityLsol === 4, "star.luminosityLsol reflects override");
+  assert.ok(bright.habitableZoneAu.outer > base.habitableZoneAu.outer, "HZ widens with higher L");
+});
+
+test("radius override changes inner limit and density", () => {
+  const base = calcSystem({ ...SOLAR_SYSTEM });
+  const big = calcSystem({ ...SOLAR_SYSTEM, radiusRsolOverride: 3 });
+  assert.ok(big.systemInnerLimitAu > base.systemInnerLimitAu, "larger star → farther inner limit");
+  assert.ok(big.star.radiusRsol === 3, "star.radiusRsol reflects override");
+  assert.ok(big.star.densityDsol < base.star.densityDsol, "larger radius → lower density");
+});
+
+test("both overrides applied together", () => {
+  const model = calcSystem({
+    ...SOLAR_SYSTEM,
+    luminosityLsolOverride: 10,
+    radiusRsolOverride: 5,
+  });
+  assert.equal(model.star.luminosityLsol, 10);
+  assert.equal(model.star.radiusRsol, 5);
+  approxEqual(model.frostLineAu, 4.85 * Math.sqrt(10), 1e-6, "frost line with L=10");
+});
+
+test("invalid overrides are ignored", () => {
+  const base = calcSystem({ ...SOLAR_SYSTEM });
+  const neg = calcSystem({ ...SOLAR_SYSTEM, luminosityLsolOverride: -1, radiusRsolOverride: 0 });
+  assert.equal(neg.star.luminosityLsol, base.star.luminosityLsol);
+  assert.equal(neg.star.radiusRsol, base.star.radiusRsol);
+  const nan = calcSystem({ ...SOLAR_SYSTEM, luminosityLsolOverride: NaN, radiusRsolOverride: NaN });
+  assert.equal(nan.star.luminosityLsol, base.star.luminosityLsol);
+});

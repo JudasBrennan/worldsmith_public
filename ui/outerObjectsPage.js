@@ -1,3 +1,4 @@
+import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";
 import { calcDebrisDisk, calcDebrisDiskSuggestions } from "../engine/debrisDisk.js";
 import { fmt } from "../engine/utils.js";
@@ -5,6 +6,7 @@ import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   loadWorld,
+  getStarOverrides,
   listSystemGasGiants,
   listSystemDebrisDisks,
   saveSystemDebrisDisks,
@@ -652,10 +654,21 @@ Ice-to-rock ratio: ${dm.display.iceToRock}</div>
     isRendering = true;
     try {
       let world = loadWorld();
+      const dSov = getStarOverrides(world.star);
+      const dStarCalc = calcStar({
+        massMsol: Number(world.star.massMsol),
+        ageGyr: Number(world.star.ageGyr) || 4.6,
+        radiusRsolOverride: dSov.r,
+        luminosityLsolOverride: dSov.l,
+        tempKOverride: dSov.t,
+        evolutionMode: dSov.ev,
+      });
       const model = calcSystem({
         starMassMsol: Number(world.star.massMsol),
         spacingFactor: Number(world.system.spacingFactor),
         orbit1Au: Number(world.system.orbit1Au),
+        luminosityLsolOverride: dStarCalc.luminosityLsol,
+        radiusRsolOverride: dStarCalc.radiusRsol,
       });
 
       // Auto-sync: when gas giants change, update any suggested debris disks

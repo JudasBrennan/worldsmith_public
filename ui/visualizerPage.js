@@ -25,6 +25,7 @@ import { attachTooltips, tipIcon } from "./tooltip.js";
 import { captureCanvasGif, downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
 import { gasStylePalette, drawGasGiantViz } from "./gasGiantStyles.js";
 import { computeRockyVisualProfile, drawRockyPlanetViz } from "./rockyPlanetStyles.js";
+import { computeMoonVisualProfile, drawMoonViz } from "./moonStyles.js";
 import { drawTransitionBar } from "./vizTransition.js";
 import { buildClusterSnapshot, drawClusterScene } from "./vizClusterRenderer.js";
 
@@ -736,6 +737,8 @@ export function initVisualiserPage(root, options = {}) {
       starMassMsol,
       spacingFactor: Number(w.system?.spacingFactor),
       orbit1Au: Number(w.system?.orbit1Au),
+      luminosityLsolOverride: starLuminosityLsun,
+      radiusRsolOverride: starRadiusRsol,
     });
     const debugOn = !!chkDebug?.checked;
     dbg(debugOn, "system inputs", w.system);
@@ -821,8 +824,9 @@ export function initVisualiserPage(root, options = {}) {
               const semiMajorAxisKm = Number(m.inputs?.semiMajorAxisKm);
               let mPeriodDays = null;
               let mRadiusKm = null;
+              let mCalc = null;
               try {
-                const moonCalc = calcMoonExact({
+                mCalc = calcMoonExact({
                   starMassMsol,
                   starAgeGyr,
                   starRadiusRsolOverride: sov.r,
@@ -832,15 +836,16 @@ export function initVisualiserPage(root, options = {}) {
                   planet: planetInputs,
                   moon: { ...m.inputs },
                 });
-                mPeriodDays = Number(moonCalc?.orbit?.orbitalPeriodSiderealDays);
+                mPeriodDays = Number(mCalc?.orbit?.orbitalPeriodSiderealDays);
                 if (!Number.isFinite(mPeriodDays) || mPeriodDays <= 0) mPeriodDays = null;
-                const moonRadiusMoon = Number(moonCalc?.physical?.radiusMoon);
+                const moonRadiusMoon = Number(mCalc?.physical?.radiusMoon);
                 if (Number.isFinite(moonRadiusMoon) && moonRadiusMoon > 0) {
                   mRadiusKm = moonRadiusMoon * MOON_RADIUS_KM;
                 }
               } catch {
                 mPeriodDays = null;
                 mRadiusKm = null;
+                mCalc = null;
               }
               return {
                 id: m.id,
@@ -849,6 +854,7 @@ export function initVisualiserPage(root, options = {}) {
                   Number.isFinite(semiMajorAxisKm) && semiMajorAxisKm > 0 ? semiMajorAxisKm : null,
                 periodDays: mPeriodDays,
                 radiusKm: mRadiusKm,
+                moonCalc: mCalc,
                 eccentricity: clamp(Number(m.inputs?.eccentricity ?? 0), 0, 0.99),
                 inclinationDeg: clamp(Number(m.inputs?.inclinationDeg ?? 0), 0, 180),
                 longitudeOfPeriapsisDeg: hashUnit(m.id) * 360,
@@ -915,9 +921,10 @@ export function initVisualiserPage(root, options = {}) {
             const semiMajorAxisKm = Number(m.inputs?.semiMajorAxisKm);
             let mPeriodDays = null;
             let mRadiusKm = null;
+            let mCalc = null;
             if (parentOverride) {
               try {
-                const moonCalc = calcMoonExact({
+                mCalc = calcMoonExact({
                   starMassMsol,
                   starAgeGyr,
                   starRadiusRsolOverride: sov.r,
@@ -927,15 +934,16 @@ export function initVisualiserPage(root, options = {}) {
                   moon: { ...m.inputs },
                   parentOverride,
                 });
-                mPeriodDays = Number(moonCalc?.orbit?.orbitalPeriodSiderealDays);
+                mPeriodDays = Number(mCalc?.orbit?.orbitalPeriodSiderealDays);
                 if (!Number.isFinite(mPeriodDays) || mPeriodDays <= 0) mPeriodDays = null;
-                const moonRadiusMoon = Number(moonCalc?.physical?.radiusMoon);
+                const moonRadiusMoon = Number(mCalc?.physical?.radiusMoon);
                 if (Number.isFinite(moonRadiusMoon) && moonRadiusMoon > 0) {
                   mRadiusKm = moonRadiusMoon * MOON_RADIUS_KM;
                 }
               } catch {
                 mPeriodDays = null;
                 mRadiusKm = null;
+                mCalc = null;
               }
             }
             return {
@@ -945,6 +953,7 @@ export function initVisualiserPage(root, options = {}) {
                 Number.isFinite(semiMajorAxisKm) && semiMajorAxisKm > 0 ? semiMajorAxisKm : null,
               periodDays: mPeriodDays,
               radiusKm: mRadiusKm,
+              moonCalc: mCalc,
               eccentricity: clamp(Number(m.inputs?.eccentricity ?? 0), 0, 0.99),
               inclinationDeg: clamp(Number(m.inputs?.inclinationDeg ?? 0), 0, 180),
               longitudeOfPeriapsisDeg: hashUnit(m.id) * 360,
@@ -2444,16 +2453,21 @@ export function initVisualiserPage(root, options = {}) {
             drawPositionIndicator(ctx, mx, my, "rgba(200,198,195,0.75)");
           } else {
             const visM = Math.max(moonR, 0.5);
-            const mhx = mx + mux * (visM * 0.55);
-            const mhy = my + muy * (visM * 0.55);
-            const mGrad = ctx.createRadialGradient(mhx, mhy, visM * 0.25, mx, my, visM * 1.2);
-            mGrad.addColorStop(0, "rgba(232,230,225,0.96)");
-            mGrad.addColorStop(0.55, "rgba(170,168,165,0.94)");
-            mGrad.addColorStop(1, "rgba(55,58,62,0.92)");
-            ctx.fillStyle = mGrad;
-            ctx.beginPath();
-            ctx.arc(mx, my, visM, 0, Math.PI * 2);
-            ctx.fill();
+            if (moon.moonCalc) {
+              const moonProfile = computeMoonVisualProfile(moon.moonCalc);
+              drawMoonViz(ctx, mx, my, visM, moonProfile, { lightDx: mux, lightDy: muy });
+            } else {
+              const mhx = mx + mux * (visM * 0.55);
+              const mhy = my + muy * (visM * 0.55);
+              const mGrad = ctx.createRadialGradient(mhx, mhy, visM * 0.25, mx, my, visM * 1.2);
+              mGrad.addColorStop(0, "rgba(232,230,225,0.96)");
+              mGrad.addColorStop(0.55, "rgba(170,168,165,0.94)");
+              mGrad.addColorStop(1, "rgba(55,58,62,0.92)");
+              ctx.fillStyle = mGrad;
+              ctx.beginPath();
+              ctx.arc(mx, my, visM, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
           if (chkLabels.checked) {
@@ -2670,16 +2684,21 @@ export function initVisualiserPage(root, options = {}) {
             drawPositionIndicator(ctx, mx, my, "rgba(200,198,195,0.75)");
           } else {
             const visM = Math.max(moonR, 0.5);
-            const mhx = mx + mux * (visM * 0.55);
-            const mhy = my + muy * (visM * 0.55);
-            const mGrad = ctx.createRadialGradient(mhx, mhy, visM * 0.25, mx, my, visM * 1.2);
-            mGrad.addColorStop(0, "rgba(232,230,225,0.96)"); // sunlit highlands
-            mGrad.addColorStop(0.55, "rgba(170,168,165,0.94)");
-            mGrad.addColorStop(1, "rgba(55,58,62,0.92)"); // night side
-            ctx.fillStyle = mGrad;
-            ctx.beginPath();
-            ctx.arc(mx, my, visM, 0, Math.PI * 2);
-            ctx.fill();
+            if (moon.moonCalc) {
+              const moonProfile = computeMoonVisualProfile(moon.moonCalc);
+              drawMoonViz(ctx, mx, my, visM, moonProfile, { lightDx: mux, lightDy: muy });
+            } else {
+              const mhx = mx + mux * (visM * 0.55);
+              const mhy = my + muy * (visM * 0.55);
+              const mGrad = ctx.createRadialGradient(mhx, mhy, visM * 0.25, mx, my, visM * 1.2);
+              mGrad.addColorStop(0, "rgba(232,230,225,0.96)");
+              mGrad.addColorStop(0.55, "rgba(170,168,165,0.94)");
+              mGrad.addColorStop(1, "rgba(55,58,62,0.92)");
+              ctx.fillStyle = mGrad;
+              ctx.beginPath();
+              ctx.arc(mx, my, visM, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
           if (chkLabels.checked) {

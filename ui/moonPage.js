@@ -3,6 +3,12 @@ import { calcGasGiant } from "../engine/gasGiant.js";
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import {
+  computeMoonVisualProfile,
+  drawMoonPreview,
+  MOON_RECIPES,
+  drawMoonRecipePreview,
+} from "./moonStyles.js";
+import {
   loadWorld,
   updateWorld,
   listPlanets,
@@ -448,7 +454,16 @@ export function initMoonPage(mountEl) {
       });
     }
 
+    const moonProfile = computeMoonVisualProfile(model);
+
     const items = [
+      // APPEARANCE PREVIEW
+      {
+        label: "Appearance",
+        isMoonPreview: true,
+        value: moonProfile.displayClass,
+        meta: moonProfile.terrain.type.replace("-", " "),
+      },
       // MAJOR MOON PHYSICAL CHARACTERISTICS
       { label: "Radius", value: model.display.radius, meta: "derived" },
       { label: "Gravity", value: model.display.gravity, meta: "" },
@@ -484,8 +499,18 @@ export function initMoonPage(mountEl) {
     ];
 
     kpisEl.innerHTML = items
-      .map(
-        (x) => `
+      .map((x) => {
+        if (x.isMoonPreview) {
+          return `
+      <div class="kpi-wrap"><div class="kpi kpi--preview">
+        <div class="kpi__label">${x.label}
+          <button type="button" class="small moon-recipe-btn">Recipes</button>
+        </div>
+        <canvas class="moon-preview-canvas" width="180" height="180"></canvas>
+        <div class="kpi__meta">${x.value} \u2014 ${x.meta || ""}</div>
+      </div></div>`;
+        }
+        return `
       <div class="kpi-wrap">
         <div class="kpi">
           <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.label] || "")}</div>
@@ -493,9 +518,24 @@ export function initMoonPage(mountEl) {
           <div class="kpi__meta">${x.meta}</div>
         </div>
       </div>
-    `,
-      )
+    `;
+      })
       .join("");
+
+    // Render moon preview canvas
+    const moonCvs = kpisEl.querySelector(".moon-preview-canvas");
+    if (moonCvs && moonProfile) {
+      drawMoonPreview(moonCvs, moonProfile);
+    }
+
+    // Wire recipe picker button
+    kpisEl.querySelector(".moon-recipe-btn")?.addEventListener("click", () => {
+      openMoonRecipePicker((recipe) => {
+        const selMoon = getSelectedMoon();
+        if (selMoon) updateMoon(selMoon.id, { inputs: recipe.apply });
+        render();
+      });
+    });
 
     limitsEl.textContent =
       `Moon Zone (Inner): ${model.display.zoneInner}
@@ -643,6 +683,70 @@ export function initMoonPage(mountEl) {
     loadIntoInputs();
     render();
   });
+
+  /* ── Moon recipe picker modal ──────────────────────────────────────── */
+
+  function openMoonRecipePicker(onSelect) {
+    const categories = [...new Set(MOON_RECIPES.map((r) => r.category))];
+    const overlay = document.createElement("div");
+    overlay.className = "rp-picker-overlay";
+    overlay.innerHTML = `
+      <div class="rp-picker-dialog panel">
+        <div class="panel__header">
+          <h2>Select Moon Recipe</h2>
+          <button type="button" class="small rp-picker-close">Close</button>
+        </div>
+        <div class="panel__body">
+          ${categories
+            .map(
+              (cat) => `
+            <div class="rp-picker-category">${cat}</div>
+            <div class="rp-picker-grid">
+              ${MOON_RECIPES.filter((r) => r.category === cat)
+                .map(
+                  (r) => `
+                <div class="rp-picker-card" data-recipe="${r.id}">
+                  <canvas width="90" height="90"></canvas>
+                  <div class="rp-picker-card__label">${r.label}</div>
+                </div>`,
+                )
+                .join("")}
+            </div>`,
+            )
+            .join("")}
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    for (const card of overlay.querySelectorAll(".rp-picker-card")) {
+      const recipe = MOON_RECIPES.find((r) => r.id === card.dataset.recipe);
+      if (recipe) drawMoonRecipePreview(card.querySelector("canvas"), recipe);
+    }
+
+    function close() {
+      overlay.remove();
+      document.removeEventListener("keydown", onKey);
+    }
+
+    for (const card of overlay.querySelectorAll(".rp-picker-card")) {
+      card.addEventListener("click", () => {
+        const recipe = MOON_RECIPES.find((r) => r.id === card.dataset.recipe);
+        if (recipe) onSelect(recipe);
+        close();
+      });
+    }
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    overlay.querySelector(".rp-picker-close").addEventListener("click", close);
+
+    function onKey(e) {
+      if (e.key === "Escape") close();
+    }
+    document.addEventListener("keydown", onKey);
+  }
 
   // Init
   loadIntoInputs();

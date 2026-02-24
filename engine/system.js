@@ -53,14 +53,26 @@ const AU_TO_MILLION_KM = 149.6;
  *   frost line, inner limit, 20 orbit slots (AU & million km), and
  *   pre-formatted display strings
  */
-export function calcSystem({ starMassMsol, spacingFactor, orbit1Au }) {
+export function calcSystem({
+  starMassMsol,
+  spacingFactor,
+  orbit1Au,
+  luminosityLsolOverride,
+  radiusRsolOverride,
+}) {
   const m = clamp(starMassMsol, 0.075, 100);
   const s = clamp(spacingFactor, 0, 10); // spacing is a "knob"; allow wide but sane
   const o1 = clamp(orbit1Au, 0, 1e6);
 
   // --- Star properties (Eker et al. 2018 relations from star.js) ---
-  const luminosityLsol = massToLuminosity(m);
-  const radiusRsol = massToRadius(m);
+  const luminosityLsol =
+    Number.isFinite(luminosityLsolOverride) && luminosityLsolOverride > 0
+      ? luminosityLsolOverride
+      : massToLuminosity(m);
+  const radiusRsol =
+    Number.isFinite(radiusRsolOverride) && radiusRsolOverride > 0
+      ? radiusRsolOverride
+      : massToRadius(m);
 
   const densityDsol = m / radiusRsol ** 3;
   const densityGcm3 = 1.408 * densityDsol;

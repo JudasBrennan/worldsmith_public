@@ -2221,6 +2221,19 @@ input.auto-value {
   margin-top: 4px;
   margin-bottom: 6px;
 }
+.moon-preview-canvas {
+  display: block;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  margin: -74px auto 0;
+  flex-shrink: 0;
+}
+.kpi-wrap:hover > .kpi.kpi--preview .moon-preview-canvas,
+.kpi-wrap:focus-within > .kpi.kpi--preview .moon-preview-canvas {
+  margin-top: 4px;
+  margin-bottom: 6px;
+}
 
 /* Gas giant style picker button */
 .gg-style-btn {
@@ -2341,6 +2354,13 @@ input.auto-value {
   border-color: var(--accent, #5b8def);
   background: rgba(91, 141, 239, 0.1);
 }
+.gg-picker-card.is-primary {
+  box-shadow: 0 0 0 2px rgba(91, 200, 130, 0.45);
+}
+.gg-picker-card.is-primary .gg-picker-card__label::after {
+  content: " \u2605";
+  color: rgba(91, 200, 130, 0.85);
+}
 .gg-picker-card canvas,
 .rp-picker-card canvas {
   width: 90px;
@@ -2362,7 +2382,8 @@ input.auto-value {
 .gg-picker-rings-toggle {
   min-width: 160px;
 }
-.rp-recipe-btn {
+.rp-recipe-btn,
+.moon-recipe-btn {
   float: right;
   margin-top: -2px;
 }

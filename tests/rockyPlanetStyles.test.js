@@ -44,57 +44,66 @@ function makeInputs(overrides = {}) {
 
 // ── Palette from composition class ───────────────────────────────
 
-test("Earth-like composition -> tan/brown palette", () => {
-  const p = computeRockyVisualProfile(makeDerived(), makeInputs());
+test("Earth-like composition -> tan/brown palette (untinted)", () => {
+  const p = computeRockyVisualProfile(makeDerived(), makeInputs({ albedoBond: undefined }));
   assert.equal(p.palette.c1, "#c4a882");
   assert.equal(p.palette.c2, "#8b6e4e");
   assert.equal(p.palette.c3, "#4a3726");
 });
 
-test("Mars-like composition -> rust palette", () => {
-  const p = computeRockyVisualProfile(makeDerived({ compositionClass: "Mars-like" }), makeInputs());
+test("Mars-like composition -> rust palette (untinted)", () => {
+  const p = computeRockyVisualProfile(
+    makeDerived({ compositionClass: "Mars-like" }),
+    makeInputs({ albedoBond: undefined }),
+  );
   assert.equal(p.palette.c1, "#c77b4a");
 });
 
-test("Mercury-like composition -> grey palette", () => {
+test("Mercury-like composition -> grey palette (untinted)", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Mercury-like" }),
-    makeInputs(),
+    makeInputs({ albedoBond: undefined }),
   );
   assert.equal(p.palette.c1, "#b0b0b0");
 });
 
-test("Iron world -> dark grey-blue palette", () => {
+test("Iron world -> dark grey-blue palette (untinted)", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Iron world" }),
-    makeInputs(),
+    makeInputs({ albedoBond: undefined }),
   );
   assert.equal(p.palette.c1, "#6e7080");
 });
 
-test("Coreless -> pale tan palette", () => {
-  const p = computeRockyVisualProfile(makeDerived({ compositionClass: "Coreless" }), makeInputs());
+test("Coreless -> pale tan palette (untinted)", () => {
+  const p = computeRockyVisualProfile(
+    makeDerived({ compositionClass: "Coreless" }),
+    makeInputs({ albedoBond: undefined }),
+  );
   assert.equal(p.palette.c1, "#d4c4a8");
 });
 
-test("Ice world -> pale blue palette", () => {
+test("Ice world -> pale blue palette (untinted)", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Ice world", waterRegime: "Ice world" }),
-    makeInputs(),
+    makeInputs({ albedoBond: undefined }),
   );
   assert.equal(p.palette.c1, "#d8e4f0");
 });
 
-test("Ocean world -> ocean blue palette", () => {
+test("Ocean world -> ocean blue palette (untinted)", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Ocean world", waterRegime: "Global ocean" }),
-    makeInputs(),
+    makeInputs({ albedoBond: undefined }),
   );
   assert.equal(p.palette.c1, "#4a8cb0");
 });
 
-test("unknown composition falls back to Earth-like", () => {
-  const p = computeRockyVisualProfile(makeDerived({ compositionClass: "Unknown" }), makeInputs());
+test("unknown composition falls back to Earth-like (untinted)", () => {
+  const p = computeRockyVisualProfile(
+    makeDerived({ compositionClass: "Unknown" }),
+    makeInputs({ albedoBond: undefined }),
+  );
   assert.equal(p.palette.c1, "#c4a882");
 });
 
@@ -360,4 +369,46 @@ test("tidally locked flag propagated", () => {
 test("seed comes from planet name", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ name: "Arrakis" }));
   assert.equal(p.seed, "Arrakis");
+});
+
+// ── Albedo-based palette tinting ────────────────────────────────
+
+test("low albedo darkens palette vs high albedo", () => {
+  const d = makeDerived({ compositionClass: "Earth-like" });
+  const dark = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.1 }));
+  const bright = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.7 }));
+  // c1 red channel: low-albedo should be darker
+  const darkR = parseInt(dark.palette.c1.slice(1, 3), 16);
+  const brightR = parseInt(bright.palette.c1.slice(1, 3), 16);
+  assert.ok(darkR < brightR, `dark ${darkR} should be less than bright ${brightR}`);
+});
+
+test("no albedo -> untinted base palette", () => {
+  const p = computeRockyVisualProfile(makeDerived(), makeInputs({ albedoBond: undefined }));
+  assert.equal(p.palette.c1, "#c4a882"); // exact Earth-like base
+});
+
+test("ocean world land palette is tinted by albedo", () => {
+  const d = makeDerived({ compositionClass: "Ocean world", waterRegime: "Global ocean" });
+  const dark = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.1 }));
+  const bright = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.7 }));
+  const darkR = parseInt(dark.landPalette.c1.slice(1, 3), 16);
+  const brightR = parseInt(bright.landPalette.c1.slice(1, 3), 16);
+  assert.ok(darkR < brightR, `dark land ${darkR} < bright land ${brightR}`);
+});
+
+test("ice world + low albedo produces darker palette", () => {
+  const d = makeDerived({ compositionClass: "Ice world", waterRegime: "Ice world" });
+  const p = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.1 }));
+  // Base Ice world c1 is #d8e4f0 (216,228,240); at factor 0.76 → ~164
+  const r = parseInt(p.palette.c1.slice(1, 3), 16);
+  assert.ok(r < 200, `ice world c1 red ${r} should be darkened below 200`);
+});
+
+test("ice world + high albedo produces brighter palette", () => {
+  const d = makeDerived({ compositionClass: "Ice world", waterRegime: "Ice world" });
+  const p = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.7 }));
+  // At factor 1.12 → ~242 (capped at 255)
+  const r = parseInt(p.palette.c1.slice(1, 3), 16);
+  assert.ok(r > 216, `ice world c1 red ${r} should be brightened above 216`);
 });

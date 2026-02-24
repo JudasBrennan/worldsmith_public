@@ -6,10 +6,14 @@ import {
   classifyBodyType,
   SOL_REFERENCES,
 } from "../engine/apparent.js";
+import { calcMoonExact } from "../engine/moon.js";
 import { calcPlanetExact } from "../engine/planet.js";
 import { calcStar } from "../engine/star.js";
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
+import { drawGasGiantViz } from "./gasGiantStyles.js";
+import { computeMoonVisualProfile, drawMoonViz } from "./moonStyles.js";
+import { computeRockyVisualProfile, drawRockyPlanetViz } from "./rockyPlanetStyles.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   getSelectedPlanet,
@@ -397,17 +401,23 @@ function drawSkyCanvas(canvas, model, starColourHex, skyMode, moonPhaseDeg, skyC
         const lightness = Math.min(90, 25 + albedo * 250);
         const moonR = Math.max(MIN_DOT, arcsecR);
 
-        // Draw illuminated disk
+        // Draw illuminated disk — physics-driven when large enough
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(cx, diskCy, moonR, 0, Math.PI * 2);
-        ctx.fillStyle = `hsl(40, 5%, ${lightness}%)`;
-        ctx.fill();
+        if (m.moonCalc && moonR > 6) {
+          const moonProfile = computeMoonVisualProfile(m.moonCalc);
+          drawMoonViz(ctx, cx, diskCy, moonR, moonProfile, { lightDx: -0.3, lightDy: -0.2 });
+        } else {
+          ctx.beginPath();
+          ctx.arc(cx, diskCy, moonR, 0, Math.PI * 2);
+          ctx.fillStyle = `hsl(40, 5%, ${lightness}%)`;
+          ctx.fill();
+        }
 
-        // Phase shadow: darken one side
+        // Phase shadow: crescent path from limb arc + terminator ellipse.
+        // Phase 0°=full (no shadow), 180°=new (all shadow).
         if (moonPhaseDeg > 2 && moonR > 3) {
-          const phase = (moonPhaseDeg / 180) * Math.PI; // 0=full, π=new
-          const terminatorX = Math.cos(phase) * moonR;
+          const phase = (moonPhaseDeg / 180) * Math.PI;
+          const tRx = Math.abs(Math.cos(phase) * moonR) || 0.5;
 
           ctx.save();
           ctx.beginPath();
@@ -415,15 +425,13 @@ function drawSkyCanvas(canvas, model, starColourHex, skyMode, moonPhaseDeg, skyC
           ctx.clip();
 
           ctx.beginPath();
-          // Dark side: right half when phase < 90, expanding left
-          ctx.ellipse(cx, diskCy, Math.abs(terminatorX) || 0.5, moonR, 0, 0, Math.PI * 2);
-          if (moonPhaseDeg <= 90) {
-            // Less than half lit: dark region is big, draw shadow on right
-            ctx.rect(cx, diskCy - moonR - 1, moonR + 1, moonR * 2 + 2);
-          } else {
-            // More than half lit: small crescent of shadow on right
-            ctx.rect(cx + terminatorX, diskCy - moonR - 1, moonR - terminatorX + 1, moonR * 2 + 2);
-          }
+          // Right limb arc: top to bottom clockwise (right semicircle)
+          ctx.arc(cx, diskCy, moonR, -Math.PI / 2, Math.PI / 2, false);
+          // Terminator ellipse: bottom back to top.
+          // < 90°: counterclockwise traces right side → thin crescent
+          // > 90°: clockwise traces left side → wide shadow past center
+          ctx.ellipse(cx, diskCy, tRx, moonR, 0, Math.PI / 2, -Math.PI / 2, moonPhaseDeg <= 90);
+          ctx.closePath();
           ctx.fillStyle = isNight ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.55)";
           ctx.fill();
           ctx.restore();
@@ -443,27 +451,49 @@ function drawSkyCanvas(canvas, model, starColourHex, skyMode, moonPhaseDeg, skyC
         ctx.fillText(angLabel(obj.arcsec), cx, sizeY);
         clearShadow();
       } else {
-        // Planet/gas giant: point source with glow
+        // Planet/gas giant
         const b = obj.data;
-        const mag = Number.isFinite(b.apparentMagnitude) ? b.apparentMagnitude : 6;
-        const glowR = Math.max(4, 6 + Math.max(0, 2 - mag) * 3);
+        const bodyR = Math.max(MIN_DOT, arcsecR);
         const isGas = b.classLabel === "Gas giant" || (b.bodyTypeLabel || "").includes("Gas");
-        const dotColor = isGas ? "#e8d8b0" : "#d0d8e8";
+        let drawn = false;
 
-        // Glow halo
-        const gGrad = ctx.createRadialGradient(cx, diskCy, 0, cx, diskCy, glowR);
-        gGrad.addColorStop(0, hexToRgba(dotColor, 0.6));
-        gGrad.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = gGrad;
-        ctx.beginPath();
-        ctx.arc(cx, diskCy, glowR, 0, Math.PI * 2);
-        ctx.fill();
+        // Physics-driven rendering when large enough on canvas
+        if (bodyR > 6) {
+          if (isGas && b._styleId) {
+            drawGasGiantViz(ctx, cx, diskCy, bodyR, b._styleId, {
+              lightDx: -0.3,
+              lightDy: -0.2,
+            });
+            drawn = true;
+          } else if (!isGas && b._derived) {
+            const profile = computeRockyVisualProfile(b._derived, b._planetInputs);
+            drawRockyPlanetViz(ctx, cx, diskCy, bodyR, profile, {
+              lightDx: -0.3,
+              lightDy: -0.2,
+            });
+            drawn = true;
+          }
+        }
 
-        // Dot
-        ctx.beginPath();
-        ctx.arc(cx, diskCy, Math.max(MIN_DOT, arcsecR), 0, Math.PI * 2);
-        ctx.fillStyle = dotColor;
-        ctx.fill();
+        if (!drawn) {
+          // Point source with glow fallback
+          const mag = Number.isFinite(b.apparentMagnitude) ? b.apparentMagnitude : 6;
+          const glowR = Math.max(4, 6 + Math.max(0, 2 - mag) * 3);
+          const dotColor = isGas ? "#e8d8b0" : "#d0d8e8";
+
+          const gGrad = ctx.createRadialGradient(cx, diskCy, 0, cx, diskCy, glowR);
+          gGrad.addColorStop(0, hexToRgba(dotColor, 0.6));
+          gGrad.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = gGrad;
+          ctx.beginPath();
+          ctx.arc(cx, diskCy, glowR, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(cx, diskCy, bodyR, 0, Math.PI * 2);
+          ctx.fillStyle = dotColor;
+          ctx.fill();
+        }
 
         // Label
         setLabelShadow();
@@ -556,6 +586,8 @@ function buildApparentSamples(world, homePlanetId, state) {
         skyDayHex: model?.derived?.skyColourDayHex || null,
         skyDayEdgeHex: model?.derived?.skyColourDayEdgeHex || null,
         skyHorizonHex: model?.derived?.skyColourHorizonHex || null,
+        _derived: model?.derived || null,
+        _planetInputs: planet.inputs || null,
       };
     })
     .filter((item) => Number.isFinite(item.orbitAu) && item.orbitAu > 0);
@@ -570,6 +602,7 @@ function buildApparentSamples(world, homePlanetId, state) {
       radiusKm: convertGasGiantRadiusRjToKm(giant.radiusRj),
       geometricAlbedo: gasGiantAlbedo(giant.style),
       hasAtmosphere: true,
+      _styleId: giant.style || "jupiter",
     }))
     .filter((item) => Number.isFinite(item.orbitAu) && item.orbitAu > 0);
 
@@ -796,6 +829,7 @@ export function initApparentPage(mountEl) {
   const skyCanvasEl = wrap.querySelector("#skyCanvas");
   const skyWrapEl = wrap.querySelector("#skyCanvasWrap");
 
+  const moonPhaseSliderEl = wrap.querySelector("#apparentMoonPhase_slider");
   bindPair("apparentMoonPhase", moonPhaseEl, 0, 180, 1, "auto");
 
   function bindPair(id, numberEl, min, max, step, mode) {
@@ -837,13 +871,36 @@ export function initApparentPage(mountEl) {
     // Moon store field is Bond albedo; apparent engine needs geometric albedo.
     // Phase integral q ≈ 0.9 for regolith-covered rocky bodies (opposition surge).
     const MOON_Q = 0.9;
-    const moonSamples = homeMoons.map((moon) => ({
-      name: moon.name || moon.inputs?.name || moon.id,
-      semiMajorAxisKm: Number(moon.inputs?.semiMajorAxisKm) || 384748,
-      radiusMoon: moonRadiusFromInputs(moon.inputs),
-      geometricAlbedo: (Number(moon.inputs?.albedo) || 0.11) / MOON_Q,
-      phaseDeg: state.moonPhaseDeg,
-    }));
+    const sov = getStarOverrides(latest?.star);
+    const starAgeGyr = Number(latest?.star?.ageGyr) || 4.6;
+    const homePlanetInputs = latest?.planets?.byId?.[state.homePlanetId]?.inputs;
+    const moonSamples = homeMoons.map((moon) => {
+      let moonCalc = null;
+      if (homePlanetInputs) {
+        try {
+          moonCalc = calcMoonExact({
+            starMassMsol: sample.starMassMsol,
+            starAgeGyr,
+            starRadiusRsolOverride: sov.r,
+            starLuminosityLsolOverride: sov.l,
+            starTempKOverride: sov.t,
+            starEvolutionMode: sov.ev,
+            planet: homePlanetInputs,
+            moon: { ...moon.inputs },
+          });
+        } catch {
+          moonCalc = null;
+        }
+      }
+      return {
+        name: moon.name || moon.inputs?.name || moon.id,
+        semiMajorAxisKm: Number(moon.inputs?.semiMajorAxisKm) || 384748,
+        radiusMoon: moonRadiusFromInputs(moon.inputs),
+        geometricAlbedo: (Number(moon.inputs?.albedo) || 0.11) / MOON_Q,
+        phaseDeg: state.moonPhaseDeg,
+        moonCalc,
+      };
+    });
 
     const model = calcApparentModel({
       starMassMsol: sample.starMassMsol,
@@ -851,6 +908,11 @@ export function initApparentPage(mountEl) {
       orbitSamples: sample.orbitSamples.filter((row) => row.id !== `planet:${state.homePlanetId}`),
       bodySamples: sample.bodySamples,
       moonSamples,
+    });
+
+    // Re-attach moonCalc from original samples (stripped by engine normalizer)
+    model.moons.forEach((m, i) => {
+      if (moonSamples[i]?.moonCalc) m.moonCalc = moonSamples[i].moonCalc;
     });
 
     const brightestBody = [...model.bodiesFromHome]
@@ -1015,12 +1077,14 @@ export function initApparentPage(mountEl) {
     render();
   });
 
-  moonPhaseEl?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
+  // Slider input: syncFromSlider sets moonPhaseEl.value but doesn't fire DOM
+  // events, so listen on the slider directly for real-time updates.
+  moonPhaseSliderEl?.addEventListener("input", () => {
     state.moonPhaseDeg = Number(moonPhaseEl.value) || 0;
     render();
   });
 
+  // Number input: change fires on blur/Enter
   moonPhaseEl?.addEventListener("change", () => {
     state.moonPhaseDeg = Number(moonPhaseEl.value) || 0;
     render();

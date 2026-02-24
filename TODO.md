@@ -3,16 +3,19 @@
 ## Next
 
 - [ ] Icy planets (Ganymede, for example)
+- [ ] Improve planet and moon colour logic in system visualiser
+- [ ] Refresh canvas when turning on lagrange points.
+- [ ] Fix artifacts on bottom of canvas.
+- [ ] Camera briefly jumps to star when selecting a planet to focus (fix it)
+- [ ] Add rotation and axial tilt in visualiser.
 
 ## Definitely
 
 - [ ] Limit local cluster to 25 ly radius OR improve star generation logic so there isn't a soft cap on number of objects
 - [ ] Implement calculated planet colour logic
-- [ ] Improve planet and moon colour logic in system visualiser
 - [ ] Add support for binary, ternary, and quaternary home systems.
 - [ ] Debris disk composition influenced by stellar metallicity
 - [ ] Link gas giant atmospheric metallicity default to stellar [Fe/H]
-- [ ] Overhaul and increase complexity and usefulness of Debris Disks.
 - [ ] Implement Oord Clouds.
 - [ ] Implement Dwarf Planets.
 - [ ] Implement Commets.
@@ -45,3 +48,4 @@
 - [x] Planet & satellite visualiser
 - [x] Utilise metallicity [Fe/H] in local cluster star generation
 - [x] Overhaul and increase depth and complexity of Gas Giants.
+- [x] Overhaul and increase complexity and usefulness of Debris Disks.

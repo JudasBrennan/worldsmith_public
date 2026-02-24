@@ -6,6 +6,8 @@
  * visualizerPage.
  */
 
+import { seededRng } from "./renderUtils.js";
+
 // ── Style definitions ───────────────────────────────────────────────
 
 const STYLE_DEFS = [
@@ -600,22 +602,110 @@ export function normalizeStyleId(id) {
   return ALIASES[s] || s;
 }
 
-// ── Canvas preview renderer ─────────────────────────────────────────
+// ── Physics-driven style suggestion ─────────────────────────────────
 
 /**
- * Deterministic pseudo-random from a string seed.
- * Returns a function that produces values in [0,1).
+ * Suggest visual styles based on gas giant engine properties.
+ *
+ * Maps Sudarsky classification, mass, temperature, atmosphere, and ring
+ * properties to an ordered list of physically appropriate style candidates.
+ * Fantastical styles (storm, ember, crystal, void, aurora, machine,
+ * shattered) are never auto-suggested.
+ *
+ * @param {object} ggCalc - Result of calcGasGiant()
+ * @returns {{ primary: string, candidates: string[] }}
+ *   primary: recommended style ID
+ *   candidates: all valid style IDs (2–5 entries, includes primary first)
  */
-function seededRng(seed) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) {
-    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+export function suggestStyles(ggCalc) {
+  if (!ggCalc || !ggCalc.classification) {
+    return { primary: "jupiter", candidates: ["jupiter", "saturn"] };
   }
-  return () => {
-    h = (Math.imul(h, 1597334677) + 1013904223) | 0;
-    return ((h >>> 0) / 4294967296 + 0.5) % 1;
-  };
+
+  const cls = ggCalc.classification.sudarsky; // "I", "II", ..., "V", "I-ice"
+  const mass = ggCalc.inputs?.massMjup ?? 1;
+  const teq = ggCalc.thermal?.equilibriumTempK ?? 130;
+  const metallicity = ggCalc.atmosphere?.metallicitySolar ?? 1;
+  const ringDepth = ggCalc.ringProperties?.opticalDepthClass ?? "Tenuous";
+  const prominentRings = ringDepth === "Dense" || ringDepth === "Moderate";
+  const saturnMassRegime = mass >= 0.2 && mass <= 0.6;
+  const actualR = ggCalc.physical?.radiusRj ?? 1;
+  const suggestedR = ggCalc.physical?.suggestedRadiusRj ?? actualR;
+  const candidates = [];
+
+  if (cls === "I-ice") {
+    // Ice giants — Dense/Moderate rings override to ringed-ice;
+    // otherwise mass differentiates sub-types
+    if (ringDepth === "Dense" || ringDepth === "Moderate") {
+      candidates.push("ringed-ice", "neptune", "uranus");
+    } else if (mass <= 0.035) {
+      candidates.push("sub-neptune", "neptune", "uranus");
+    } else if (mass <= 0.05) {
+      candidates.push("uranus", "neptune", "neptune-classic");
+    } else if (mass <= 0.065) {
+      candidates.push("neptune", "uranus", "neptune-classic");
+    } else {
+      candidates.push("ringed-ice", "neptune", "uranus");
+    }
+  } else if (cls === "I") {
+    // Class I ammonia clouds.
+    // Ring-dominated Saturn-mass objects should stay in the Saturn-like visual
+    // family even when atmospheric metallicity is elevated.
+    if (prominentRings && saturnMassRegime) {
+      candidates.push("saturn", "water-cloud", "jupiter");
+      if (metallicity > 10) candidates.push("hazy");
+    } else if (metallicity > 10) {
+      candidates.push("hazy");
+      if (mass > 1.0) candidates.push("super-jupiter", "jupiter");
+      else if (mass > 0.5) candidates.push("jupiter", "saturn");
+      else candidates.push("saturn", "water-cloud");
+      candidates.push("sub-neptune");
+    } else if (mass > 1.0) {
+      candidates.push("super-jupiter", "jupiter", "hazy");
+    } else if (mass > 0.5) {
+      candidates.push("jupiter", "saturn", "hazy");
+    } else {
+      candidates.push("saturn", "water-cloud", "hazy");
+    }
+  } else if (cls === "II") {
+    // Class II water clouds
+    candidates.push("water-cloud", "warm-giant", "saturn", "hazy");
+  } else if (cls === "III") {
+    // Class III cloudless — primary depends on temperature
+    if (teq < 500) {
+      candidates.push("warm-giant", "hazy", "cloudless");
+    } else {
+      candidates.push("cloudless", "hazy", "warm-giant");
+    }
+  } else if (cls === "IV") {
+    // Class IV alkali metals
+    candidates.push("alkali", "hot-jupiter", "cloudless");
+  } else {
+    // Class V silicate/iron clouds
+    if (teq > 1800) {
+      candidates.push("hot-jupiter", "silicate");
+    } else {
+      candidates.push("silicate", "hot-jupiter");
+    }
+  }
+
+  // Significantly inflated radius → puffy overrides Sudarsky-based primary
+  if (suggestedR > 0 && actualR / suggestedR > 1.2) {
+    candidates.unshift("puffy");
+  }
+
+  // Helium-dominated → helium giant
+  const hePct = ggCalc.atmosphere?.hePct ?? 0;
+  if (hePct > 50 && !candidates.includes("helium")) {
+    candidates.push("helium");
+  }
+
+  // Deduplicate (in case of overlapping rules)
+  const unique = [...new Set(candidates)];
+  return { primary: unique[0], candidates: unique };
 }
+
+// ── Canvas preview renderer ─────────────────────────────────────────
 
 /**
  * Draw a detailed gas giant preview onto a <canvas> element.
@@ -1465,4 +1555,263 @@ function drawShatterDebris(ctx, cx, cy, r, rng) {
     }
   }
   ctx.restore();
+}
+
+// ── Physics-driven visual profile ───────────────────────────────────
+
+/**
+ * Compute a visual profile for a gas giant from engine properties.
+ *
+ * Style is always auto-derived via suggestStyles() — no manual override.
+ * Matches the pattern of computeRockyVisualProfile / computeMoonVisualProfile.
+ *
+ * @param {object} ggCalc - Result of calcGasGiant()
+ * @returns {{ bodyType: "gasGiant", styleId: string }}
+ */
+export function computeGasGiantVisualProfile(ggCalc) {
+  const { primary } = suggestStyles(ggCalc);
+  return { bodyType: "gasGiant", styleId: primary };
+}
+
+// ── Gas giant recipes ───────────────────────────────────────────────
+
+/**
+ * Input-template presets for gas giants.
+ * Selecting a recipe sets the planet's physics inputs; the visual style
+ * is then auto-derived from the resulting engine output.
+ *
+ * Structure mirrors ROCKY_RECIPES / MOON_RECIPES:
+ *   preview  — data for the 90×90 picker thumbnail
+ *   apply    — values written to the gas giant data on selection
+ */
+export const GAS_GIANT_RECIPES = [
+  // ── Cold Giants (Class I) ──────────────────────────────────────────
+  {
+    id: "jupiter",
+    label: "Jupiter",
+    category: "Cold Giants",
+    hint: "~5+ AU from a Sun-like star",
+    preview: { styleId: "jupiter", rings: false },
+    apply: {
+      massMjup: 1.0,
+      radiusRj: null,
+      rotationPeriodHours: 9.93,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "saturn",
+    label: "Saturn",
+    category: "Cold Giants",
+    hint: "~9+ AU from a Sun-like star",
+    preview: { styleId: "saturn", rings: true },
+    apply: {
+      massMjup: 0.299,
+      radiusRj: null,
+      rotationPeriodHours: 10.66,
+      metallicity: null,
+      rings: true,
+    },
+  },
+  {
+    id: "super-jupiter",
+    label: "Super-Jupiter",
+    category: "Cold Giants",
+    hint: "~5+ AU, massive gas giant",
+    preview: { styleId: "super-jupiter", rings: false },
+    apply: {
+      massMjup: 3.0,
+      radiusRj: null,
+      rotationPeriodHours: 8,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "hazy-giant",
+    label: "Hazy Giant",
+    category: "Cold Giants",
+    hint: "~5+ AU, metal-rich atmosphere",
+    preview: { styleId: "hazy", rings: false },
+    apply: {
+      massMjup: 0.5,
+      radiusRj: null,
+      rotationPeriodHours: 12,
+      metallicity: 15,
+      rings: false,
+    },
+  },
+
+  // ── Ice Giants (Class I-ice) ───────────────────────────────────────
+  {
+    id: "neptune",
+    label: "Neptune",
+    category: "Ice Giants",
+    hint: "~20+ AU, methane-blue ice giant",
+    preview: { styleId: "neptune", rings: false },
+    apply: {
+      massMjup: 0.054,
+      radiusRj: null,
+      rotationPeriodHours: 16.1,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "uranus",
+    label: "Uranus",
+    category: "Ice Giants",
+    hint: "~15+ AU, faint rings",
+    preview: { styleId: "uranus", rings: true },
+    apply: {
+      massMjup: 0.046,
+      radiusRj: null,
+      rotationPeriodHours: 17.2,
+      metallicity: null,
+      rings: true,
+    },
+  },
+  {
+    id: "sub-neptune",
+    label: "Sub-Neptune",
+    category: "Ice Giants",
+    hint: "~10+ AU, high metallicity",
+    preview: { styleId: "sub-neptune", rings: false },
+    apply: {
+      massMjup: 0.03,
+      radiusRj: null,
+      rotationPeriodHours: 20,
+      metallicity: 30,
+      rings: false,
+    },
+  },
+  {
+    id: "ringed-ice",
+    label: "Ringed Ice Giant",
+    category: "Ice Giants",
+    hint: "~15+ AU, prominent ring system",
+    preview: { styleId: "ringed-ice", rings: true },
+    apply: {
+      massMjup: 0.08,
+      radiusRj: null,
+      rotationPeriodHours: 15,
+      metallicity: null,
+      rings: true,
+    },
+  },
+
+  // ── Warm Giants (Class II–III) ─────────────────────────────────────
+  {
+    id: "water-cloud",
+    label: "Water-Cloud Giant",
+    category: "Warm Giants",
+    hint: "~1.5\u20133 AU, water vapour clouds",
+    preview: { styleId: "water-cloud", rings: false },
+    apply: {
+      massMjup: 0.5,
+      radiusRj: null,
+      rotationPeriodHours: 12,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "warm-giant",
+    label: "Warm Giant",
+    category: "Warm Giants",
+    hint: "~0.3\u20131.5 AU, sparse cloud cover",
+    preview: { styleId: "warm-giant", rings: false },
+    apply: {
+      massMjup: 0.5,
+      radiusRj: null,
+      rotationPeriodHours: 12,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "cloudless",
+    label: "Cloudless Giant",
+    category: "Warm Giants",
+    hint: "~0.1\u20130.3 AU, clear atmosphere",
+    preview: { styleId: "cloudless", rings: false },
+    apply: {
+      massMjup: 0.8,
+      radiusRj: null,
+      rotationPeriodHours: 11,
+      metallicity: null,
+      rings: false,
+    },
+  },
+
+  // ── Hot Giants (Class IV–V) ────────────────────────────────────────
+  {
+    id: "alkali",
+    label: "Alkali Giant",
+    category: "Hot Giants",
+    hint: "~0.05\u20130.1 AU, alkali-metal haze",
+    preview: { styleId: "alkali", rings: false },
+    apply: {
+      massMjup: 1.0,
+      radiusRj: null,
+      rotationPeriodHours: 15,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "hot-jupiter",
+    label: "Hot Jupiter",
+    category: "Hot Giants",
+    hint: "< 0.05 AU, extreme irradiation",
+    preview: { styleId: "hot-jupiter", rings: false },
+    apply: {
+      massMjup: 1.0,
+      radiusRj: 1.3,
+      rotationPeriodHours: 40,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "silicate-cloud",
+    label: "Silicate-Cloud Giant",
+    category: "Hot Giants",
+    hint: "~0.02\u20130.05 AU, iron/silicate clouds",
+    preview: { styleId: "silicate", rings: false },
+    apply: {
+      massMjup: 1.5,
+      radiusRj: null,
+      rotationPeriodHours: 30,
+      metallicity: null,
+      rings: false,
+    },
+  },
+  {
+    id: "puffy",
+    label: "Puffy Giant",
+    category: "Hot Giants",
+    hint: "Inflated radius, low density",
+    preview: { styleId: "puffy", rings: false },
+    apply: {
+      massMjup: 0.3,
+      radiusRj: 1.5,
+      rotationPeriodHours: 30,
+      metallicity: null,
+      rings: false,
+    },
+  },
+];
+
+/**
+ * Draw a 90×90 px gas giant recipe preview for the picker modal.
+ *
+ * @param {HTMLCanvasElement} canvas
+ * @param {object} recipe - Entry from GAS_GIANT_RECIPES
+ */
+export function drawGgRecipePreview(canvas, recipe) {
+  drawGasGiantPreview(canvas, recipe.preview.styleId, {
+    showRings: recipe.preview.rings,
+  });
 }

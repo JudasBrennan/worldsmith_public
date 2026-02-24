@@ -7,6 +7,8 @@ import { bindNumberAndSlider } from "./bind.js";
 import { downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
 import { drawGasGiantViz, styleLabel } from "./gasGiantStyles.js";
 import { computeRockyVisualProfile, drawRockyPlanetViz } from "./rockyPlanetStyles.js";
+import { computeMoonVisualProfile, drawMoonViz } from "./moonStyles.js";
+import { calcMoonExact } from "../engine/moon.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   loadWorld,
@@ -430,15 +432,27 @@ function drawSystemPoster(canvas, data, opts = {}) {
           const ratio = Math.pow(moonKm / body.radiusKm, 0.4);
           const mr = Math.max(1.2, pr * Math.max(0.08, Math.min(0.5, ratio)));
           moonY += mr + 2;
-          // Small lit sphere
-          const mGrad = ctx.createRadialGradient(bx - mr * 0.3, moonY - mr * 0.2, 0, bx, moonY, mr);
-          mGrad.addColorStop(0, "rgba(200,200,210,0.9)");
-          mGrad.addColorStop(0.7, "rgba(140,140,150,0.85)");
-          mGrad.addColorStop(1, "rgba(80,80,90,0.8)");
-          ctx.fillStyle = mGrad;
-          ctx.beginPath();
-          ctx.arc(bx, moonY, mr, 0, Math.PI * 2);
-          ctx.fill();
+          // Physics-driven moon sphere (fallback: grey gradient)
+          if (m.moonCalc) {
+            const moonProfile = computeMoonVisualProfile(m.moonCalc);
+            drawMoonViz(ctx, bx, moonY, mr, moonProfile, { lightDx: -0.3, lightDy: -0.2 });
+          } else {
+            const mGrad = ctx.createRadialGradient(
+              bx - mr * 0.3,
+              moonY - mr * 0.2,
+              0,
+              bx,
+              moonY,
+              mr,
+            );
+            mGrad.addColorStop(0, "rgba(200,200,210,0.9)");
+            mGrad.addColorStop(0.7, "rgba(140,140,150,0.85)");
+            mGrad.addColorStop(1, "rgba(80,80,90,0.8)");
+            ctx.fillStyle = mGrad;
+            ctx.beginPath();
+            ctx.arc(bx, moonY, mr, 0, Math.PI * 2);
+            ctx.fill();
+          }
           // Moon name label
           if (showLabels && m.name) {
             ctx.save();
@@ -822,10 +836,23 @@ export function initSystemPage(mountEl) {
 
       const w0 = loadWorld();
 
+      const sov = getStarOverrides(w0.star);
+      const starModel = calcStar({
+        massMsol: state.starMassMsol,
+        ageGyr: Number(w0.star.ageGyr) || 4.6,
+        metallicityFeH: Number(w0.star.metallicityFeH) || 0,
+        radiusRsolOverride: sov.r,
+        luminosityLsolOverride: sov.l,
+        tempKOverride: sov.t,
+        evolutionMode: sov.ev,
+      });
+
       const model = calcSystem({
         starMassMsol: state.starMassMsol,
         spacingFactor: state.spacingFactor,
         orbit1Au: state.orbit1Au,
+        luminosityLsolOverride: starModel.luminosityLsol,
+        radiusRsolOverride: starModel.radiusRsol,
       });
 
       const items = [
@@ -998,11 +1025,6 @@ export function initSystemPage(mountEl) {
         .join("\n");
 
       // ── System Poster ──────────────────────────────
-      const starModel = calcStar({
-        massMsol: state.starMassMsol,
-        ageGyr: Number(w.star.ageGyr) || 4.6,
-      });
-
       const posterPlanets = planetsForUi
         .filter((p) => p.slotIndex != null)
         .map((p) => {
@@ -1012,7 +1034,7 @@ export function initSystemPage(mountEl) {
           let radiusKm = EARTH_R_KM;
           let visualProfile = null;
           try {
-            const sov = getStarOverrides(w.star);
+            const planetInputs = { ...p.inputs, semiMajorAxisAu: slotAu };
             const pm = calcPlanetExact({
               starMassMsol: state.starMassMsol,
               starAgeGyr: Number(w.star.ageGyr) || 4.6,
@@ -1020,7 +1042,7 @@ export function initSystemPage(mountEl) {
               starLuminosityLsolOverride: sov.l,
               starTempKOverride: sov.t,
               starEvolutionMode: sov.ev,
-              planet: p.inputs,
+              planet: planetInputs,
             });
             dayHex = pm.derived.skyColourDayHex || dayHex;
             horizonHex = pm.derived.skyColourHorizonHex || horizonHex;
@@ -1058,25 +1080,89 @@ export function initSystemPage(mountEl) {
         return { id: g.id, name: g.name, au: g.au, radiusKm, style: g.style, rings: g.rings };
       });
 
+      const posterStarAge = Number(w.star.ageGyr) || 4.6;
+      const gasGiantsById = new Map(gasGiants.map((g) => [g.id, g]));
+      const correctedInputsByPlanetId = new Map();
+      for (const p of planetsForUi) {
+        if (p.slotIndex != null) {
+          const slotAu = model.orbitsAu[p.slotIndex - 1];
+          correctedInputsByPlanetId.set(p.id, { ...p.inputs, semiMajorAxisAu: slotAu });
+        }
+      }
       const posterMoons = moonsForUi
         .filter((m) => m.planetId)
-        .map((m) => ({
-          parentId: m.planetId,
-          name: m.name || m.inputs?.name || "",
-          radiusMoon: Number(m.inputs?.massMoon) > 0 ? null : 0.1,
-          // Approximate radius from density + mass if available
-          ...(() => {
-            const densG = Number(m.inputs?.densityGcm3);
-            const massM = Number(m.inputs?.massMoon);
-            if (densG > 0 && massM > 0) {
-              const earthMoonMassKg = 7.342e22;
-              const massKg = massM * earthMoonMassKg;
-              const rM = Math.cbrt((3 * massKg) / (4 * Math.PI * densG * 1000)) / MOON_R_KM;
-              return { radiusMoon: rM };
+        .map((m) => {
+          let radiusMoon = 0.1;
+          const densG = Number(m.inputs?.densityGcm3);
+          const massM = Number(m.inputs?.massMoon);
+          if (densG > 0 && massM > 0) {
+            const earthMoonMassKg = 7.342e22;
+            const massKg = massM * earthMoonMassKg;
+            radiusMoon = Math.cbrt((3 * massKg) / (4 * Math.PI * densG * 1000)) / MOON_R_KM;
+          }
+          let moonCalc = null;
+          try {
+            const parentPlanetInputs =
+              correctedInputsByPlanetId.get(m.planetId) || planetsById[m.planetId]?.inputs;
+            const parentGg = gasGiantsById.get(m.planetId);
+            if (parentPlanetInputs) {
+              moonCalc = calcMoonExact({
+                starMassMsol: state.starMassMsol,
+                starAgeGyr: posterStarAge,
+                starRadiusRsolOverride: sov.r,
+                starLuminosityLsolOverride: sov.l,
+                starTempKOverride: sov.t,
+                starEvolutionMode: sov.ev,
+                planet: parentPlanetInputs,
+                moon: { ...m.inputs },
+              });
+            } else if (parentGg) {
+              const gm = calcGasGiant({
+                massMjup: parentGg.massMjup,
+                radiusRj: parentGg.radiusRj,
+                orbitAu: parentGg.au,
+                rotationPeriodHours: parentGg.rotationPeriodHours || 10,
+                starMassMsol: state.starMassMsol,
+                starLuminosityLsol: starModel.luminosityLsol,
+              });
+              moonCalc = calcMoonExact({
+                starMassMsol: state.starMassMsol,
+                starAgeGyr: posterStarAge,
+                starRadiusRsolOverride: sov.r,
+                starLuminosityLsolOverride: sov.l,
+                starTempKOverride: sov.t,
+                starEvolutionMode: sov.ev,
+                moon: { ...m.inputs },
+                parentOverride: {
+                  inputs: {
+                    massEarth: gm.physical.massEarth,
+                    semiMajorAxisAu: gm.inputs.orbitAu,
+                    eccentricity: 0,
+                    rotationPeriodHours: gm.inputs.rotationPeriodHours,
+                    cmfPct: 0,
+                  },
+                  derived: {
+                    densityGcm3: gm.physical.densityGcm3,
+                    radiusEarth: gm.physical.radiusEarth,
+                    gravityG: gm.physical.gravityG,
+                  },
+                },
+              });
             }
-            return { radiusMoon: 0.1 };
-          })(),
-        }));
+          } catch {
+            moonCalc = null;
+          }
+          if (moonCalc) {
+            const calcR = Number(moonCalc.physical?.radiusMoon);
+            if (Number.isFinite(calcR) && calcR > 0) radiusMoon = calcR;
+          }
+          return {
+            parentId: m.planetId,
+            name: m.name || m.inputs?.name || "",
+            radiusMoon,
+            moonCalc,
+          };
+        });
 
       const posterDebris = debrisRows.map((d) => ({
         innerAu: d.inner,

@@ -10,6 +10,8 @@
 //   drawRockyPlanetPreview()     → 180×180 px detailed preview
 //   drawRockyPlanetViz()         → 8–20 px system poster scale
 
+import { seededRng, hexToRgba, tintPalette } from "./renderUtils.js";
+
 // ── Constants ─────────────────────────────────────────────────────
 
 const SURFACE_PALETTES = {
@@ -42,22 +44,6 @@ const DEFAULT_OCEAN_COLOUR = "#1a4a7a";
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function seededRng(seed) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) {
-    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
-  }
-  return () => {
-    h = (Math.imul(h, 1597334677) + 1013904223) | 0;
-    return ((h >>> 0) / 4294967296 + 0.5) % 1;
-  };
-}
-
-function hexToRgba(hex, a) {
-  const n = parseInt((hex || "#888888").replace("#", ""), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-}
-
 function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }
@@ -86,8 +72,10 @@ export function computeRockyVisualProfile(derived, inputs) {
   const d = derived || {};
   const inp = inputs || {};
 
-  // Palette
-  const palette = SURFACE_PALETTES[d.compositionClass] || SURFACE_PALETTES["Earth-like"];
+  // Palette — tinted by albedo when available
+  const basePalette = SURFACE_PALETTES[d.compositionClass] || SURFACE_PALETTES["Earth-like"];
+  const albedo = Number(inp.albedoBond);
+  const palette = Number.isFinite(albedo) ? tintPalette(basePalette, albedo) : basePalette;
 
   // Ocean
   const oceanCoverage = OCEAN_COVERAGE[d.waterRegime] ?? 0;
@@ -155,8 +143,9 @@ export function computeRockyVisualProfile(derived, inputs) {
   else if (tempK < 100 && pressure <= 0.01) special = "frozen";
 
   // Land palette — for Ocean worlds, exposed land is rocky/earthy, not ocean-blue
-  const landPalette =
-    d.compositionClass === "Ocean world" ? SURFACE_PALETTES["Earth-like"] : palette;
+  const baseLand =
+    d.compositionClass === "Ocean world" ? SURFACE_PALETTES["Earth-like"] : basePalette;
+  const landPalette = Number.isFinite(albedo) ? tintPalette(baseLand, albedo) : baseLand;
 
   return {
     palette,

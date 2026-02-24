@@ -366,8 +366,6 @@ const REALMSPACE_PRESET_WORLD = {
           name: "Coliar",
           au: 0.5,
           slotIndex: 2,
-          style: "jupiter", // Air Body with floating islands; gas giant is closest fit
-          rings: false,
           radiusRj: 0.68,
           massMjup: null,
           rotationPeriodHours: null,

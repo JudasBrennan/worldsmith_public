@@ -2,6 +2,156 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## Unreleased (post-1.13.0)
+
+## 1.13.0 — 2026-02-24
+
+### Bug Fixes
+
+**Star overrides not propagated to System page layout**
+(engine/system.js, ui/systemPage.js, ui/visualizerPage.js,
+ui/planetPage.js, ui/outerObjectsPage.js)
+
+- `calcSystem` computed habitable zone, frost line, and inner limit
+  from mass-derived luminosity and radius only, ignoring Advanced-mode
+  R/L/T overrides and stellar evolution. Added optional
+  `luminosityLsolOverride` and `radiusRsolOverride` parameters to
+  `calcSystem`; all five UI call sites now resolve star properties via
+  `calcStar` with full overrides before passing resolved L/R through.
+- System Poster `calcStar` call only received mass and age — evolution
+  mode, metallicity, and R/L/T overrides were missing. Gas giant poster
+  calcs used the resulting non-evolved luminosity. Hoisted the
+  `calcStar` call to the top of `render()` with full `getStarOverrides`
+  propagation.
+- System page star resolution now also passes `metallicityFeH` into
+  `calcStar`, so evolved-mode metallicity-dependent outputs match the
+  Star page's physics path.
+- Rocky planet poster visuals (`calcPlanetExact`) received raw
+  `p.inputs` instead of slot-AU-corrected inputs, so climate and sky
+  colours were computed at the stored semi-major axis rather than the
+  assigned orbit slot. Applied the `{ ...p.inputs, semiMajorAxisAu:
+  slotAu }` override pattern already used by the Visualiser.
+- Moon parent planet inputs passed to `calcMoonExact` on the System
+  page also lacked the slot-AU override. Added a
+  `correctedInputsByPlanetId` lookup built from assigned slot positions,
+  matching the Visualiser's existing pattern.
+
+**Tests** (tests/system.test.js)
+
+- 4 new tests: luminosity override affects frost line and HZ, radius
+  override affects inner limit and density, both overrides together,
+  invalid overrides (negative, zero, NaN) fall back to mass-derived
+  values
+
+
+### Planet Visualisation System
+
+**Unified rocky/gas/moon visualisation pipeline**
+(ui/bodyRenderer.js, ui/renderUtils.js, ui/rockyPlanetStyles.js,
+ui/gasGiantStyles.js, ui/moonStyles.js, ui/systemPage.js,
+ui/visualizerPage.js, ui/apparentPage.js)
+
+- Added a shared body-rendering pipeline so rocky planets, gas giants,
+  and moons use one consistent rendering path across Planet, System
+  Poster, Visualiser, and Apparent views.
+- Centralised scale-aware rendering decisions and fallback behaviour so
+  bodies keep consistent style and readability across different canvas
+  sizes and page contexts.
+- Unified profile-driven rendering hooks for all three body classes to
+  reduce duplicate draw logic and keep cross-page visuals in sync.
+
+### Gas Giant Visual Automation
+
+**Auto-ring detection and style-sync for gas giants**
+(ui/planetPage.js, ui/gasGiantStyles.js,
+tests/gasGiantSuggest.test.js, tests/gasGiant-nasa-validation.test.js)
+
+- Gas giant ring visibility is now auto-derived from physics output:
+  `Dense`/`Moderate` ring optical-depth classes enable rings, otherwise
+  rings are hidden.
+- Planet page gas giant visuals now auto-sync style and ring state after
+  edits and recipe application, removing manual style/ring drift from
+  the physics model.
+- Style suggestion now keeps Class I Saturn-mass, ring-prominent giants
+  in the Saturn-like family while still allowing hazy candidates for
+  high-metallicity cases.
+
+### Debris Disk Engine & Outer Objects Page
+
+**Resonance-sculpted debris disk physics** (engine/debrisDisk.js,
+ui/outerObjectsPage.js)
+
+Added a debris disk engine and dedicated Outer Objects page for
+configuring asteroid-belt and Kuiper-belt-like zones. Disks are
+auto-suggested from gas giant positions using mean-motion resonance
+(MMR) placement across five priority levels, or from the frost line
+when no gas giants are present.
+
+The engine computes comprehensive disk properties from orbital
+boundaries, host-star parameters, and gas giant positions:
+
+- **Resonance placement** — Five priority tiers: primary outer belt
+  (outermost giant 3:2→2:1 exterior MMR), primary inner belt
+  (innermost giant 4:1→2:1 interior MMR), inter-giant gap disks,
+  extended outer belt (2:1→5:2), and warm inner belt (8:1→4:1).
+  Verified against Solar System: Kuiper belt 39.4–47.7 AU from
+  Neptune, asteroid belt 2.06–3.28 AU from Jupiter.
+- **Composition** — Condensation-sequence classification (Lodders 2003)
+  from equilibrium temperature: Refractory silicate, Mixed rock/ice,
+  Icy, or Ultra-cold. Twelve species from corundum (1700 K) to N₂ ice
+  (22 K) with mass fractions.
+- **Fractional luminosity** — Wyatt et al. (2007) steady-state maximum:
+  f_max ∝ r^(7/3) × (Δr/r) × t^(-1). Optical depth derived from
+  fractional luminosity.
+- **Grain physics** — Radiation-pressure blowout size (Burns, Lamy &
+  Soter 1979), Poynting-Robertson drag timescale, and collisional
+  lifetime. Collision vs PR-drag dominance classification.
+- **Mass estimation** — Dohnanyi (1969) cascade from optical depth, or
+  user override with reverse-derived optical depth.
+- **Collision dynamics** — Kepler velocity at midpoint, eccentricity-
+  scaled collision velocity, and regime classification (gentle/
+  erosive/catastrophic).
+- **IR detectability** — 24 μm excess from Planck-function ratio of
+  disk and star emission, with detection-threshold labels.
+- **Zodiacal delivery** — PR-drag inflow rate of small grains toward
+  the inner system.
+- **Dynamical stability** — Chaotic-zone overlap check against gas
+  giant positions using Wisdom (1980) zone widths.
+- **Surface density** — Absolute value and ratio to the Minimum Mass
+  Solar Nebula (MMSN) profile.
+
+The UI page provides inputs for disk name, inner/outer edges (or
+center + width), eccentricity, inclination, and optional mass override.
+Auto-sync updates suggested disks when gas giant positions change.
+
+**NASA validation** (tests/debrisDisk-nasa-validation.test.js)
+
+Validated against Solar System asteroid belt and classical Kuiper belt
+using observed values from Pitjeva & Pitjev (2018), JPL Kirkwood gap
+diagrams, and Stern & Colwell (1997).
+
+**Tests** (tests/debrisDisk.test.js,
+tests/debrisDisk-nasa-validation.test.js)
+
+- 68 tests: resonance suggestions (frost-line fallback, single/multi-
+  giant placement, count limiting, overlap filtering), disk physics
+  (temperature, composition, luminosity, mass, grains, collision
+  regime, stability, IR excess, zodiacal delivery), NASA validation
+  (asteroid belt and Kuiper belt properties)
+
+**References**
+
+- Wyatt, M. C. et al. (2007), "Steady State Evolution of Debris
+  Disks around A Stars", ApJ 663, 365
+- Dohnanyi, J. S. (1969), "Collisional Model of Asteroids and Their
+  Debris", JGR 74, 2531
+- Burns, J. A., Lamy, P. L. & Soter, S. (1979), "Radiation forces on
+  small particles in the solar system", Icarus 40, 1
+- Lodders, K. (2003), "Solar System Abundances and Condensation
+  Temperatures of the Elements", ApJ 591, 1220
+- Pitjeva, E. V. & Pitjev, N. P. (2018), "Mass of the Kuiper belt",
+  Astron. Lett. 44, 554
+
 ## 1.12.0
 
 ### 3D Planet Splash Screen

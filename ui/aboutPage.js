@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.12.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.13.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -59,6 +59,14 @@ export function initAboutPage(mountEl) {
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.13.0</b> (from 1.12.0)</p>
+        <ul>
+          <li><b>Debris Disk Modelling</b> &mdash; Added resonance-driven asteroid belt and outer disk generation with derived composition, collision regime, and detection estimates.</li>
+          <li><b>Unified Body Visuals</b> &mdash; Rocky planets, gas giants, and moons now use a shared rendering pipeline for more consistent presentation across Planet, System Poster, Visualiser, and Apparent views.</li>
+          <li><b>Gas Giant Auto-Rings</b> &mdash; Ring visibility and visual style now auto-update from gas giant physics outputs, so appearance stays aligned with calculated ring properties.</li>
+          <li><b>System Page Consistency</b> &mdash; Star evolution overrides and slot-aware orbit inputs now propagate correctly into System Poster planet and moon calculations.</li>
+        </ul>
 
         <p><b>Version 1.12.0</b> (from 1.11.1)</p>
         <ul>

@@ -698,25 +698,27 @@ test("hot giant → rocky rings", () => {
   assert.equal(m.ringProperties.ringType, "Rocky");
 });
 
-test("heavier planet → more ring mass", () => {
-  const light = calcGasGiant({
+test("ring mass peaks near Saturn mass (0.3 Mjup)", () => {
+  const saturn = calcGasGiant({
     massMjup: 0.3,
     radiusRj: 0.9,
-    orbitAu: 5,
+    orbitAu: 9,
     rotationPeriodHours: 10,
     ...SOLAR,
   });
-  const heavy = calcGasGiant({
-    massMjup: 5,
-    radiusRj: 1.1,
+  const jupiter = calcGasGiant({
+    massMjup: 1.0,
+    radiusRj: 1.0,
     orbitAu: 5,
     rotationPeriodHours: 10,
     ...SOLAR,
   });
   assert.ok(
-    heavy.ringProperties.estimatedMassKg > light.ringProperties.estimatedMassKg,
-    "Heavier planet should have more ring mass",
+    saturn.ringProperties.estimatedMassKg > jupiter.ringProperties.estimatedMassKg,
+    "Saturn-mass planet should have more ring mass than Jupiter-mass",
   );
+  assert.equal(saturn.ringProperties.opticalDepthClass, "Dense");
+  assert.equal(jupiter.ringProperties.opticalDepthClass, "Tenuous");
 });
 
 /* ── Tidal effects ──────────────────────────────────────────────── */

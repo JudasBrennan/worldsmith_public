@@ -1,10 +1,17 @@
 import { calcPlanetExact } from "../engine/planet.js";
+import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";
 import { calcGasGiant } from "../engine/gasGiant.js";
 import { fmt, relativeLuminance } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
-import { GAS_GIANT_STYLES, styleLabel, drawGasGiantPreview } from "./gasGiantStyles.js";
+import {
+  styleLabel,
+  drawGasGiantPreview,
+  suggestStyles,
+  GAS_GIANT_RECIPES,
+  drawGgRecipePreview,
+} from "./gasGiantStyles.js";
 import {
   computeRockyVisualProfile,
   drawRockyPlanetPreview,
@@ -44,17 +51,17 @@ import {
   getStarOverrides,
 } from "./store.js";
 
-/* ── Tooltip dictionary (rocky planet + gas giant) ──────────────── */
+/* â”€â”€ Tooltip dictionary (rocky planet + gas giant) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const TIP_LABEL = {
-  // ── Star context ──
+  // â”€â”€ Star context â”€â”€
   "Star (read-only)": "Read-only context from your currently selected star.",
 
-  // ── Body selector ──
+  // â”€â”€ Body selector â”€â”€
   "Body selection":
     "Choose which body you are editing. Bodies are sorted by orbital distance. [R] = rocky planet, [G] = gas giant.",
 
-  // ── Rocky planet inputs ──
+  // â”€â”€ Rocky planet inputs â”€â”€
   "Orbital slot": "Assign this body to an available system slot. One body per slot.",
   Name: "Set the body's display name used across tabs and exports.",
   Physical: "Core physical inputs that control the planet's bulk properties.",
@@ -68,19 +75,19 @@ const TIP_LABEL = {
   "Greenhouse Effect":
     "Manual dimensionless greenhouse multiplier (Manual mode only). 0 = no atmosphere. ~1.2 = Earth-equivalent. ~217 = Venus-equivalent.\n\nIn Core and Full modes this is computed from atmospheric gases automatically.",
   "Greenhouse Mode":
-    "Core — greenhouse computed from CO₂, H₂O, and CH₄ with pressure broadening.\n\nFull — adds H₂, SO₂, and NH₃ (expert gases) to the greenhouse model.\n\nManual — set the greenhouse effect directly via the slider.",
+    "Core â€” greenhouse computed from COâ‚‚, Hâ‚‚O, and CHâ‚„ with pressure broadening.\n\nFull â€” adds Hâ‚‚, SOâ‚‚, and NHâ‚ƒ (expert gases) to the greenhouse model.\n\nManual â€” set the greenhouse effect directly via the slider.",
   "Water Vapor (H\u2082O)":
-    "Average column water-vapor fraction. Earth averages ~0.4%. Treated as a user input rather than a feedback gas to avoid circular temperature dependence.\n\nH₂O is the strongest greenhouse gas by total contribution on Earth (~50% of the greenhouse effect).",
+    "Average column water-vapor fraction. Earth averages ~0.4%. Treated as a user input rather than a feedback gas to avoid circular temperature dependence.\n\nHâ‚‚O is the strongest greenhouse gas by total contribution on Earth (~50% of the greenhouse effect).",
   "Methane (CH\u2084)":
-    "Atmospheric methane fraction. Earth ≈ 0.00018% (1.8 ppm). Titan ≈ 5%.\n\nCH₄ absorbs in the 7.7 µm IR band with square-root forcing (IPCC TAR).",
+    "Atmospheric methane fraction. Earth â‰ˆ 0.00018% (1.8 ppm). Titan â‰ˆ 5%.\n\nCHâ‚„ absorbs in the 7.7 Âµm IR band with square-root forcing (IPCC TAR).",
   "Hydrogen (H\u2082)":
-    "Atmospheric hydrogen fraction (Full mode). Greenhouse effect via collision-induced absorption with N₂ (Wordsworth & Pierrehumbert 2013). Important for reducing/primordial atmospheres and early-Earth scenarios.",
+    "Atmospheric hydrogen fraction (Full mode). Greenhouse effect via collision-induced absorption with Nâ‚‚ (Wordsworth & Pierrehumbert 2013). Important for reducing/primordial atmospheres and early-Earth scenarios.",
   "Helium (He)":
-    "Atmospheric helium fraction (Full mode). No greenhouse effect — helium is IR-transparent. Affects mean molecular weight and scale height only.",
+    "Atmospheric helium fraction (Full mode). No greenhouse effect â€” helium is IR-transparent. Affects mean molecular weight and scale height only.",
   "Sulfur Dioxide (SO\u2082)":
-    "Atmospheric SO₂ fraction (Full mode). Strong 7.3 µm and 8.7 µm IR absorber. Relevant for volcanic worlds. Venus has ~150 ppm.",
+    "Atmospheric SOâ‚‚ fraction (Full mode). Strong 7.3 Âµm and 8.7 Âµm IR absorber. Relevant for volcanic worlds. Venus has ~150 ppm.",
   "Ammonia (NH\u2083)":
-    "Atmospheric ammonia fraction (Full mode). Potent greenhouse gas absorbing at 10.5 µm (atmospheric window). Rapidly photodissociated by UV, so sustained levels require an active source.",
+    "Atmospheric ammonia fraction (Full mode). Potent greenhouse gas absorbing at 10.5 Âµm (atmospheric window). Rapidly photodissociated by UV, so sustained levels require an active source.",
   "Height of Observer":
     "Input the height from which the horizon is to be observed, in metres, here.",
   "Orbit & Rotation":
@@ -98,7 +105,7 @@ const TIP_LABEL = {
   "Subsolar Longitude":
     "Input your longitude of the subsolar point at the vernal equinox, in degrees, here. The range here is between 0 and 360 degrees.",
   Atmosphere:
-    "Atmospheric composition and pressure inputs for derived climate and density outputs.\n\nN₂ is derived: 100% minus all other gases. If the sum exceeds 100%, N₂ is clamped to 0%.",
+    "Atmospheric composition and pressure inputs for derived climate and density outputs.\n\nNâ‚‚ is derived: 100% minus all other gases. If the sum exceeds 100%, Nâ‚‚ is clamped to 0%.",
   "Atmospheric Pressure":
     "Input your planets atmospheric pressure at sea level, in standard atmospheres, here. Earth = 1 atm",
   "Oxygen (O2)": "The partial pressure of Oxygen gas should be between 0.16 and 0.5 atm.",
@@ -109,7 +116,7 @@ const TIP_LABEL = {
     "Override the auto-calculated vegetation colours with manually chosen pale and deep hex values. In Auto mode, colours are derived from the star's spectrum, atmospheric pressure, insolation, and tidal lock status.",
   Moons: "Major moons currently assigned to this body.",
 
-  // ── Rocky planet outputs ──
+  // â”€â”€ Rocky planet outputs â”€â”€
   Appearance:
     "Physics-driven visual of the planet from space. Surface colour, oceans, ice caps, clouds, and terrain are derived from composition, water regime, temperature, pressure, and tectonics.\n\nClick Recipes to browse preset input combinations for different planet types.",
   Composition:
@@ -145,26 +152,26 @@ const TIP_LABEL = {
   "Year length": "The orbital period shown in Earth days and local days.",
   "Star apparent size": "Apparent angular diameter of the star as seen from the planet.",
   "Sky colour (sun high)":
-    "Estimated daytime sky colour near local noon based on stellar spectrum, surface pressure, gravity, temperature, and atmospheric composition.\n\nLower gravity or higher temperature increases the atmospheric column depth, shifting colours toward thicker-atmosphere entries. CO₂-rich atmospheres receive a warm amber tint.",
+    "Estimated daytime sky colour near local noon based on stellar spectrum, surface pressure, gravity, temperature, and atmospheric composition.\n\nLower gravity or higher temperature increases the atmospheric column depth, shifting colours toward thicker-atmosphere entries. COâ‚‚-rich atmospheres receive a warm amber tint.",
   "Sky colour (low sun)":
-    "Estimated sky colour near the horizon based on stellar spectrum, surface pressure, gravity, temperature, and atmospheric composition.\n\nThe same column-density and CO₂ corrections apply as for the high-sun colour.",
+    "Estimated sky colour near the horizon based on stellar spectrum, surface pressure, gravity, temperature, and atmospheric composition.\n\nThe same column-density and COâ‚‚ corrections apply as for the high-sun colour.",
   Details:
     "Detailed derived outputs and atmospheric composition values.\n\nIncludes a guardrail note when O2 + CO2 + Ar exceeds 100% and N2 is clamped to 0%.",
   Insolation:
-    "Stellar energy received at the planet's orbit relative to Earth. Insolation = L☉ / d² where L is stellar luminosity and d is the semi-major axis in AU.\n\nEarth = 1.0× by definition.",
+    "Stellar energy received at the planet's orbit relative to Earth. Insolation = Lâ˜‰ / dÂ² where L is stellar luminosity and d is the semi-major axis in AU.\n\nEarth = 1.0Ã— by definition.",
   "Tidal lock":
-    "Estimated tidal-evolution state of the planet's rotation.\n\n• Synchronous (1:1) — rotation period equals orbital period (permanent day/night sides).\n• Spin-orbit resonance (3:2, 2:1, …) — higher-order lock driven by orbital eccentricity (Goldreich & Peale 1966). Mercury is a real 3:2 example.\n• Atmosphere-stabilised — thick atmospheres generate thermal tides that counteract gravitational locking (Leconte+ 2015). Venus is the classic case.\n• Otherwise shows the estimated time to despin (Love-number k₂ / quality-factor Q model).\n\nHigh eccentricity favours higher-order resonances; thick atmospheres resist all locking.",
+    "Estimated tidal-evolution state of the planet's rotation.\n\nâ€¢ Synchronous (1:1) â€” rotation period equals orbital period (permanent day/night sides).\nâ€¢ Spin-orbit resonance (3:2, 2:1, â€¦) â€” higher-order lock driven by orbital eccentricity (Goldreich & Peale 1966). Mercury is a real 3:2 example.\nâ€¢ Atmosphere-stabilised â€” thick atmospheres generate thermal tides that counteract gravitational locking (Leconte+ 2015). Venus is the classic case.\nâ€¢ Otherwise shows the estimated time to despin (Love-number kâ‚‚ / quality-factor Q model).\n\nHigh eccentricity favours higher-order resonances; thick atmospheres resist all locking.",
   "In habitable zone":
     "Whether the planet's semi-major axis falls within the star's conservative habitable zone (liquid water on the surface). The HZ boundaries use temperature-dependent Seff polynomials.",
   "Liquid water":
-    "Whether the average surface temperature and pressure allow liquid water to exist. Checks against the water phase diagram: pressure ≥ triple point (0.006 atm) and temperature between freezing (273 K) and the pressure-dependent boiling point.",
+    "Whether the average surface temperature and pressure allow liquid water to exist. Checks against the water phase diagram: pressure â‰¥ triple point (0.006 atm) and temperature between freezing (273 K) and the pressure-dependent boiling point.",
   "Vegetation colour":
-    "Estimated plant/vegetation colour based on photosynthetic pigment adaptation to the host star's spectrum.\n\nHotter stars (F/A) → plants absorb UV/blue and reflect yellow-orange.\nSun-like stars (G) → green, like Earth.\nCool stars (K) → dark green/teal, broader absorption.\nRed dwarfs (M) → near-black, absorbing all available light.\n\nGradient shows low concentration (pale) → high concentration (deep).\n\nReferences: Kiang (2007), Lehmer et al. (2021), Arp et al. (2020), PanoptesV.",
+    "Estimated plant/vegetation colour based on photosynthetic pigment adaptation to the host star's spectrum.\n\nHotter stars (F/A) â†’ plants absorb UV/blue and reflect yellow-orange.\nSun-like stars (G) â†’ green, like Earth.\nCool stars (K) â†’ dark green/teal, broader absorption.\nRed dwarfs (M) â†’ near-black, absorbing all available light.\n\nGradient shows low concentration (pale) â†’ high concentration (deep).\n\nReferences: Kiang (2007), Lehmer et al. (2021), Arp et al. (2020), PanoptesV.",
   "Vegetation colour (twilight)":
     "Plant colours adapted to the permanent twilight zone on tidally locked worlds. Only shown for K/M star planets that are tidally locked.\n\nOrganisms at the terminator receive only scattered and refracted starlight, so pigments are paler and more tan/brown.",
   "Atmospheric circulation": "Derived circulation-cell summary for the current planet.",
 
-  // ── Gas giant inputs ──
+  // â”€â”€ Gas giant inputs â”€â”€
   "GG Slot":
     "Orbital slot from the system layout. Each slot has a fixed distance determined by the orbit spacing formula. Slots occupied by rocky planets are unavailable.",
   "Custom orbit":
@@ -176,12 +183,8 @@ const TIP_LABEL = {
     "Sidereal rotation period in hours. Jupiter rotates in ~9.9 h, Saturn in ~10.7 h. Faster rotation strengthens the magnetic dynamo, increases the number of atmospheric jet streams (bands), and raises equatorial wind speeds.",
   "GG Metallicity":
     "Atmospheric heavy-element enrichment relative to solar (Z/Z\u2299). If blank, estimated from mass via Thorngren & Fortney 2019. Higher metallicity increases CH\u2084, NH\u2083, and H\u2082O cloud abundances. Jupiter is ~3* solar; Saturn ~10*; Uranus/Neptune ~50\u2013100*.",
-  "Visual style":
-    "Appearance preset for the visualiser and system map. Choose from realistic solar-system analogues or fantastical colour schemes.",
-  Rings:
-    "Toggle a visible ring system. Ring geometry is computed from the Roche limit (tidal disruption radius) to the Hill sphere. All gas giants can physically support rings; Saturn\u2019s are just the most prominent in our solar system.",
 
-  // ── Gas giant outputs ──
+  // â”€â”€ Gas giant outputs â”€â”€
   "GG Output Radius":
     "Equatorial radius in Jupiter radii. Due to degeneracy pressure, giant planets above ~4 Mj barely increase in radius with added mass.\n\n1 Rj = 71,492 km",
   "GG Density":
@@ -210,7 +213,7 @@ const TIP_LABEL = {
     "Tidal locking timescale \u221d a\u2076: hot Jupiters at <0.05 AU lock within ~1 Gyr. Circularisation timescale \u221d a^6.5. Both compared to the host star\u2019s age to determine current state.",
 };
 
-/* ── Helpers ─────────────────────────────────────────────────────── */
+/* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function escapeHtml(s) {
   return String(s)
@@ -260,7 +263,7 @@ function numWithSlider(id, label, unit, hint, min, max, step, tipKey) {
   </div>`;
 }
 
-/* ── Page ────────────────────────────────────────────────────────── */
+/* â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 export function initPlanetPage(mountEl) {
   // CMF auto-mode state (shared between selection handler and renderRockyOutputs)
@@ -366,7 +369,7 @@ export function initPlanetPage(mountEl) {
     }, 0);
   }
 
-  /* ── Body selector ──────────────────────────────────────────────── */
+  /* â”€â”€ Body selector â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function populateBodySelector(world) {
     const planets = listPlanets(world);
@@ -409,7 +412,7 @@ export function initPlanetPage(mountEl) {
       .join("");
   }
 
-  /* ── Rocky planet rendering ─────────────────────────────────────── */
+  /* â”€â”€ Rocky planet rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function renderRockyInputs(world, planet, sysModel) {
     const p = planet.inputs || {};
@@ -1022,7 +1025,7 @@ export function initPlanetPage(mountEl) {
         label: "Sky Colour (Sun High)",
         tipLabel: "Sky colour (sun high)",
         value: d.skyColourDayHex || "-",
-        meta: "Hex (spectrum + pressure + gravity + CO₂)",
+        meta: "Hex (spectrum + pressure + gravity + COâ‚‚)",
         kpiClass: "kpi--colour",
         kpiAttrs: `data-gradient="radial" data-light="${relativeLuminance(d.skyColourDayHex) > 0.18 ? 1 : 0}"`,
         kpiStyle: `--kpi-colour: ${d.skyColourDayHex || "#93B6FF"}; --kpi-colour-center: ${d.skyColourDayHex || "#93B6FF"}; --kpi-colour-edge: ${d.skyColourDayEdgeHex || d.skyColourDayHex || "#CFE8FF"};`,
@@ -1031,7 +1034,7 @@ export function initPlanetPage(mountEl) {
         label: "Sky Colour (Low Sun)",
         tipLabel: "Sky colour (low sun)",
         value: d.skyColourHorizonHex || "-",
-        meta: "Hex (spectrum + pressure + gravity + CO₂)",
+        meta: "Hex (spectrum + pressure + gravity + COâ‚‚)",
         kpiClass: "kpi--colour",
         kpiAttrs: `data-gradient="radial" data-horizon="1" data-light="${relativeLuminance(d.skyColourHorizonHex) > 0.18 ? 1 : 0}"`,
         kpiStyle: `--kpi-colour: ${d.skyColourHorizonHex || "#0B1020"}; --kpi-colour-center: ${d.skyColourHorizonHex || "#0B1020"}; --kpi-colour-edge: ${d.skyColourHorizonEdgeHex || d.skyColourHorizonHex || "#D6B06B"};`,
@@ -1039,7 +1042,7 @@ export function initPlanetPage(mountEl) {
       {
         label: "Vegetation Colour",
         tipLabel: "Vegetation colour",
-        value: `${d.vegetationPaleHex} → ${d.vegetationDeepHex}`,
+        value: `${d.vegetationPaleHex} â†’ ${d.vegetationDeepHex}`,
         meta: `${d.vegetationNote} <button type="button" class="veg-details-btn" id="btn-veg-details">Details</button>`,
         kpiClass: "kpi--colour",
         kpiAttrs: `data-gradient="linear" data-light="${relativeLuminance(d.vegetationPaleHex) > 0.18 ? 1 : 0}"`,
@@ -1052,7 +1055,7 @@ export function initPlanetPage(mountEl) {
       items.push({
         label: "Vegetation (Twilight)",
         tipLabel: "Vegetation colour (twilight)",
-        value: `${d.vegetationTwilightPaleHex} → ${d.vegetationTwilightDeepHex}`,
+        value: `${d.vegetationTwilightPaleHex} â†’ ${d.vegetationTwilightDeepHex}`,
         meta: "Terminator-zone adapted",
         kpiClass: "kpi--colour",
         kpiAttrs: `data-gradient="linear" data-light="${relativeLuminance(d.vegetationTwilightPaleHex) > 0.18 ? 1 : 0}"`,
@@ -1220,7 +1223,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
     }
   }
 
-  /* ── Vegetation info dialog ─────────────────────────────────────── */
+  /* â”€â”€ Vegetation info dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   const VEG_GRID_STARS = [
     { label: "A0", mass: 2.5, age: 0.5 },
@@ -1294,7 +1297,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
         const s = d.vegetationStops || [d.vegetationPaleHex, d.vegetationDeepHex];
         rows += `<td class="veg-grid-cell">
           <div class="veg-grid-swatch" style="background:linear-gradient(to right,${s.join(",")});"></div>
-          <div class="veg-grid-hex">${d.vegetationPaleHex} → ${d.vegetationDeepHex}</div>
+          <div class="veg-grid-hex">${d.vegetationPaleHex} â†’ ${d.vegetationDeepHex}</div>
         </td>`;
       }
       rows += "</tr>";
@@ -1326,7 +1329,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
           ];
           twiRows += `<td class="veg-grid-cell">
             <div class="veg-grid-swatch" style="background:linear-gradient(to right,${s.join(",")});"></div>
-            <div class="veg-grid-hex">${d.vegetationTwilightPaleHex} → ${d.vegetationTwilightDeepHex}</div>
+            <div class="veg-grid-hex">${d.vegetationTwilightPaleHex} â†’ ${d.vegetationTwilightDeepHex}</div>
           </td>`;
         } else {
           twiRows += `<td class="veg-grid-cell"><div class="veg-grid-hex">-</div></td>`;
@@ -1367,7 +1370,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
         <div class="veg-info-section">
           <div class="veg-info-heading">Twilight-adapted variant</div>
           <div class="veg-info-gradient" style="background: linear-gradient(to right, ${tStops.join(", ")});"></div>
-          <div class="veg-info-hex">${v.twilightPaleHex} → ${v.twilightDeepHex}</div>
+          <div class="veg-info-hex">${v.twilightPaleHex} â†’ ${v.twilightDeepHex}</div>
           <p>Organisms at the terminator of tidally locked worlds receive only scattered and refracted starlight, producing paler, more desaturated pigments.</p>
         </div>`;
     }
@@ -1382,7 +1385,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
         </div>
         <div class="panel__body">
           <div class="veg-info-gradient" style="background: ${grad};"></div>
-          <div class="veg-info-hex">${v.paleHex} → ${v.deepHex}</div>
+          <div class="veg-info-hex">${v.paleHex} â†’ ${v.deepHex}</div>
           <div class="veg-info-note">${v.note}</div>
 
           <div class="veg-info-section">
@@ -1506,7 +1509,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
     document.addEventListener("keydown", onKey);
   }
 
-  /* ── Gas giant rendering ────────────────────────────────────────── */
+  /* â”€â”€ Gas giant rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function renderGasGiantInputs(world, giant, sysModel) {
     if (!giant) {
@@ -1616,24 +1619,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
         </div>
       </div>
 
-      <div class="form-row" style="margin-top:8px">
-        <div>
-          <div class="label">Visual style ${tipIcon(TIP_LABEL["Visual style"])}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <button type="button" class="gg-style-btn" id="ggStyleBtn" data-style="${giant.style}">
-            <span class="gg-style-btn__label">${styleLabel(giant.style)}</span>
-            <span class="gg-style-btn__arrow">&#x25BE;</span>
-          </button>
-          <div class="physics-duo-toggle" id="ggRingsToggle" data-toggle="rings">
-            <input type="radio" name="ggRings" id="ggRingsOff" value="off" ${giant.rings ? "" : "checked"} />
-            <label for="ggRingsOff">No rings</label>
-            <input type="radio" name="ggRings" id="ggRingsOn" value="on" ${giant.rings ? "checked" : ""} />
-            <label for="ggRingsOn">Rings</label>
-            <span></span>
-          </div>
-        </div>
-      </div>
+      <!-- Appearance is data-driven; recipe picker lives in the KPI output -->
     `;
 
     // Bind sliders and attach events
@@ -1663,8 +1649,24 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
       g.rotationPeriodHours = rotVal !== "" ? Number(rotVal) || null : null;
       const metVal = bodyInputsEl.querySelector("#ggMetallicity").value;
       g.metallicity = metVal !== "" ? Number(metVal) || null : null;
-      g.style = bodyInputsEl.querySelector("#ggStyleBtn").dataset.style;
-      g.rings = bodyInputsEl.querySelector("#ggRingsOn").checked;
+      // Auto-derive visual style and rings from physics
+      const starData = {
+        starMassMsol: Number(world.star.massMsol) || 1,
+        starLuminosityLsol: sysModel.star.luminosityLsol,
+        starAgeGyr: Number(world.star.ageGyr) || 4.6,
+        starRadiusRsol: sysModel.star.radiusRsol,
+      };
+      const ggCalc = calcGasGiant({
+        massMjup: g.massMjup,
+        radiusRj: g.radiusRj,
+        orbitAu: Number(g.au) || sysModel.frostLineAu,
+        rotationPeriodHours: g.rotationPeriodHours,
+        metallicity: g.metallicity,
+        ...starData,
+      });
+      g.style = suggestStyles(ggCalc).primary;
+      const depth = ggCalc.ringProperties?.opticalDepthClass;
+      g.rings = depth === "Dense" || depth === "Moderate";
 
       saveSystemGasGiants(now);
       scheduleRender(true);
@@ -1753,22 +1755,6 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
     bodyInputsEl.querySelector("#ggName").addEventListener("change", () => {
       if (!hydrating) saveGiant();
     });
-    bodyInputsEl.querySelector("#ggRingsToggle").addEventListener("change", () => {
-      if (!hydrating) saveGiant();
-    });
-    bodyInputsEl.querySelector("#ggStyleBtn").addEventListener("click", () => {
-      openStylePicker(
-        bodyInputsEl.querySelector("#ggStyleBtn").dataset.style,
-        bodyInputsEl.querySelector("#ggRingsOn").checked,
-        (newStyle) => {
-          bodyInputsEl.querySelector("#ggStyleBtn").dataset.style = newStyle;
-          bodyInputsEl
-            .querySelector("#ggStyleBtn")
-            .querySelector(".gg-style-btn__label").textContent = styleLabel(newStyle);
-          saveGiant();
-        },
-      );
-    });
 
     // Fire initial slider sync
     [auEl, radiusEl, massEl, rotEl, metEl].forEach((el) => {
@@ -1797,7 +1783,6 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
       metallicity: giant.metallicity,
       ...starData,
     });
-
     const clouds = m.clouds.map((c) => c.name).join(", ") || "None";
     const massNote =
       m.inputs.massSource === "derived"
@@ -1813,8 +1798,32 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
           : "";
     const metNote = m.inputs.metallicitySource === "derived" ? "Derived from mass" : "";
 
+    // Derive style and ring display from physics (keeps stored value in sync)
+    const derivedStyle = suggestStyles(m).primary;
+    const depthClass = m.ringProperties?.opticalDepthClass;
+    const showRings = depthClass === "Dense" || depthClass === "Moderate";
+    if (giant.rings !== showRings || giant.style !== derivedStyle) {
+      giant.rings = showRings;
+      giant.style = derivedStyle;
+      const w = loadWorld();
+      const all = listSystemGasGiants(w);
+      const g = all.find((x) => x.id === giant.id);
+      if (g) {
+        g.rings = showRings;
+        g.style = derivedStyle;
+        saveSystemGasGiants(all);
+      }
+    }
+
     bodyOutputsEl.innerHTML = `
       <div class="kpi-grid">
+        <div class="kpi-wrap"><div class="kpi kpi--preview">
+          <div class="kpi__label">Appearance ${tipIcon(TIP_LABEL["Sudarsky"])}
+            <button type="button" class="small gg-recipe-btn">Recipes</button>
+          </div>
+          <canvas class="gg-preview-canvas" data-style="${derivedStyle}" data-rings="${showRings}" width="180" height="180"></canvas>
+          <div class="kpi__meta">${styleLabel(derivedStyle)} \u2014 Class ${m.classification.sudarsky}</div>
+        </div></div>
         <div class="kpi-wrap"><div class="kpi">
           <div class="kpi__label">Mass ${tipIcon(TIP_LABEL["GG Mass"])}</div>
           <div class="kpi__value">${m.display.mass}</div>
@@ -1847,11 +1856,6 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
           <div class="kpi__label">Orbital Period ${tipIcon(TIP_LABEL["GG Orbital Period"])}</div>
           <div class="kpi__value">${m.display.orbitalPeriod}</div>
           <div class="kpi__meta">${m.display.orbitalVelocity}</div>
-        </div></div>
-        <div class="kpi-wrap"><div class="kpi kpi--preview">
-          <div class="kpi__label">Appearance ${tipIcon(TIP_LABEL["Sudarsky"])}</div>
-          <canvas class="gg-preview-canvas" data-style="${giant.style}" data-rings="${giant.rings}" width="180" height="180"></canvas>
-          <div class="kpi__meta">Class ${m.classification.sudarsky} \u2014 ${m.classification.cloudType}</div>
         </div></div>
       </div>
       <div style="margin-top:14px">
@@ -1898,40 +1902,65 @@ Circularisation: ${m.display.circularisation}</div>
     for (const cvs of bodyOutputsEl.querySelectorAll(".gg-preview-canvas")) {
       drawGasGiantPreview(cvs, cvs.dataset.style, { showRings: cvs.dataset.rings === "true" });
     }
+
+    // Recipe picker (in output KPI, like rocky/moon)
+    bodyOutputsEl.querySelector(".gg-recipe-btn")?.addEventListener("click", () => {
+      openGgRecipePicker((recipe) => {
+        const w = loadWorld();
+        const giants = listSystemGasGiants(w);
+        const g = giants.find((x) => x.id === giant.id);
+        if (!g) return;
+        if (recipe.apply.massMjup !== undefined) g.massMjup = recipe.apply.massMjup;
+        if (recipe.apply.radiusRj !== undefined) g.radiusRj = recipe.apply.radiusRj;
+        if (recipe.apply.rotationPeriodHours !== undefined)
+          g.rotationPeriodHours = recipe.apply.rotationPeriodHours;
+        if (recipe.apply.metallicity !== undefined) g.metallicity = recipe.apply.metallicity;
+        // Auto-derive style and rings from new physics
+        const ggCalc = calcGasGiant({
+          massMjup: g.massMjup,
+          radiusRj: g.radiusRj,
+          orbitAu: Number(g.au) || sysModel.frostLineAu,
+          rotationPeriodHours: g.rotationPeriodHours,
+          metallicity: g.metallicity,
+          starMassMsol: Number(w.star.massMsol) || 1,
+          starLuminosityLsol: sysModel.star.luminosityLsol,
+          starAgeGyr: Number(w.star.ageGyr) || 4.6,
+          starRadiusRsol: sysModel.star.radiusRsol,
+        });
+        g.style = suggestStyles(ggCalc).primary;
+        const recipeDepth = ggCalc.ringProperties?.opticalDepthClass;
+        g.rings = recipeDepth === "Dense" || recipeDepth === "Moderate";
+        saveSystemGasGiants(giants);
+        scheduleRender(true);
+      });
+    });
   }
 
-  /* ── Style picker modal ─────────────────────────────────────────── */
+  /* â”€â”€ Gas giant recipe picker modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-  function openStylePicker(currentStyle, ringsOn, onSelect) {
+  function openGgRecipePicker(onSelect) {
+    const categories = [...new Set(GAS_GIANT_RECIPES.map((r) => r.category))];
     const overlay = document.createElement("div");
-    overlay.className = "gg-picker-overlay";
+    overlay.className = "rp-picker-overlay";
     overlay.innerHTML = `
-      <div class="gg-picker-dialog panel">
+      <div class="rp-picker-dialog panel">
         <div class="panel__header">
-          <h2>Select Gas Giant Style</h2>
-          <div class="gg-picker-header-actions">
-            <div class="physics-duo-toggle gg-picker-rings-toggle" data-toggle="picker-rings">
-              <input type="radio" name="pickerRings" id="pickerRingsOff" value="off" ${ringsOn ? "" : "checked"} />
-              <label for="pickerRingsOff">No rings</label>
-              <input type="radio" name="pickerRings" id="pickerRingsOn" value="on" ${ringsOn ? "checked" : ""} />
-              <label for="pickerRingsOn">Rings</label>
-              <span></span>
-            </div>
-            <button type="button" class="small gg-picker-close">Close</button>
-          </div>
+          <h2>Gas Giant Recipes</h2>
+          <button type="button" class="small rp-picker-close">Close</button>
         </div>
         <div class="panel__body">
-          ${["Realistic", "Fantastical"]
+          ${categories
             .map(
               (cat) => `
-            <div class="gg-picker-category">${cat}</div>
-            <div class="gg-picker-grid">
-              ${GAS_GIANT_STYLES.filter((s) => s.category === cat)
+            <div class="rp-picker-category">${cat}</div>
+            <div class="rp-picker-grid">
+              ${GAS_GIANT_RECIPES.filter((r) => r.category === cat)
                 .map(
-                  (s) => `
-                <div class="gg-picker-card${s.id === currentStyle ? " is-selected" : ""}" data-style="${s.id}">
+                  (r) => `
+                <div class="rp-picker-card" data-recipe="${r.id}">
                   <canvas width="90" height="90"></canvas>
-                  <div class="gg-picker-card__label">${s.label}</div>
+                  <div class="rp-picker-card__label">${r.label}</div>
+                  ${r.hint ? `<div class="rp-picker-card__hint">${r.hint}</div>` : ""}
                 </div>`,
                 )
                 .join("")}
@@ -1943,25 +1972,20 @@ Circularisation: ${m.display.circularisation}</div>
 
     document.body.appendChild(overlay);
 
-    function renderAllPreviews() {
-      const showRings = overlay.querySelector('.gg-picker-rings-toggle input[value="on"]').checked;
-      for (const card of overlay.querySelectorAll(".gg-picker-card")) {
-        const cvs = card.querySelector("canvas");
-        drawGasGiantPreview(cvs, card.dataset.style, { showRings });
-      }
+    for (const card of overlay.querySelectorAll(".rp-picker-card")) {
+      const recipe = GAS_GIANT_RECIPES.find((r) => r.id === card.dataset.recipe);
+      if (recipe) drawGgRecipePreview(card.querySelector("canvas"), recipe);
     }
-    renderAllPreviews();
-
-    overlay.querySelector(".gg-picker-rings-toggle").addEventListener("change", renderAllPreviews);
 
     function close() {
       overlay.remove();
       document.removeEventListener("keydown", onKey);
     }
 
-    for (const card of overlay.querySelectorAll(".gg-picker-card")) {
+    for (const card of overlay.querySelectorAll(".rp-picker-card")) {
       card.addEventListener("click", () => {
-        onSelect(card.dataset.style);
+        const recipe = GAS_GIANT_RECIPES.find((r) => r.id === card.dataset.recipe);
+        if (recipe) onSelect(recipe);
         close();
       });
     }
@@ -1969,7 +1993,7 @@ Circularisation: ${m.display.circularisation}</div>
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) close();
     });
-    overlay.querySelector(".gg-picker-close").addEventListener("click", close);
+    overlay.querySelector(".rp-picker-close").addEventListener("click", close);
 
     function onKey(e) {
       if (e.key === "Escape") close();
@@ -1977,7 +2001,7 @@ Circularisation: ${m.display.circularisation}</div>
     document.addEventListener("keydown", onKey);
   }
 
-  /* ── Rocky recipe picker modal ─────────────────────────────────── */
+  /* â”€â”€ Rocky recipe picker modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function openRecipePicker(onSelect) {
     const categories = ["Terrestrial", "Barren", "Extreme", "Ocean"];
@@ -2042,7 +2066,7 @@ Circularisation: ${m.display.circularisation}</div>
     document.addEventListener("keydown", onKey);
   }
 
-  /* ── Moons section ──────────────────────────────────────────────── */
+  /* â”€â”€ Moons section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function renderMoons(world, bodyType, bodyId) {
     const moons = listMoons(world)
@@ -2103,7 +2127,7 @@ Circularisation: ${m.display.circularisation}</div>
     });
   }
 
-  /* ── Actions (presets/reset) ────────────────────────────────────── */
+  /* â”€â”€ Actions (presets/reset) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function renderActions(bodyType) {
     if (bodyType === "planet") {
@@ -2168,7 +2192,7 @@ Circularisation: ${m.display.circularisation}</div>
     }
   }
 
-  /* ── Main render ────────────────────────────────────────────────── */
+  /* â”€â”€ Main render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function render(outputsOnly = false) {
     if (isRendering) return;
@@ -2176,10 +2200,21 @@ Circularisation: ${m.display.circularisation}</div>
     try {
       const world = loadWorld();
       const bodyType = world.selectedBodyType || "planet";
+      const pSov = getStarOverrides(world.star);
+      const pStarCalc = calcStar({
+        massMsol: Number(world.star.massMsol),
+        ageGyr: Number(world.star.ageGyr) || 4.6,
+        radiusRsolOverride: pSov.r,
+        luminosityLsolOverride: pSov.l,
+        tempKOverride: pSov.t,
+        evolutionMode: pSov.ev,
+      });
       const sysModel = calcSystem({
         starMassMsol: Number(world.star.massMsol),
         spacingFactor: Number(world.system.spacingFactor),
         orbit1Au: Number(world.system.orbit1Au),
+        luminosityLsolOverride: pStarCalc.luminosityLsol,
+        radiusRsolOverride: pStarCalc.radiusRsol,
       });
 
       if (!outputsOnly) {
@@ -2213,7 +2248,7 @@ Circularisation: ${m.display.circularisation}</div>
     }
   }
 
-  /* ── Body selector events ───────────────────────────────────────── */
+  /* â”€â”€ Body selector events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   bodySel.addEventListener("change", () => {
     const val = bodySel.value;
@@ -2238,10 +2273,21 @@ Circularisation: ${m.display.circularisation}</div>
   wrap.querySelector("#newGasGiant").addEventListener("click", () => {
     const w = loadWorld();
     const gasGiants = listSystemGasGiants(w);
+    const ggSov = getStarOverrides(w.star);
+    const ggStarCalc = calcStar({
+      massMsol: Number(w.star.massMsol),
+      ageGyr: Number(w.star.ageGyr) || 4.6,
+      radiusRsolOverride: ggSov.r,
+      luminosityLsolOverride: ggSov.l,
+      tempKOverride: ggSov.t,
+      evolutionMode: ggSov.ev,
+    });
     const sysModel = calcSystem({
       starMassMsol: Number(w.star.massMsol),
       spacingFactor: Number(w.system.spacingFactor),
       orbit1Au: Number(w.system.orbit1Au),
+      luminosityLsolOverride: ggStarCalc.luminosityLsol,
+      radiusRsolOverride: ggStarCalc.radiusRsol,
     });
     const planetSlots = new Set();
     for (const p of listPlanets(w)) {
@@ -2300,7 +2346,7 @@ Circularisation: ${m.display.circularisation}</div>
     render();
   });
 
-  /* ── Init ───────────────────────────────────────────────────────── */
+  /* â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   render();
 }

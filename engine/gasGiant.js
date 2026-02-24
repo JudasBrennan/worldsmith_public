@@ -478,7 +478,18 @@ function calcRingProperties(massMjup, teqK, rocheLimitRockKm, rocheLimitIceKm) {
     ringType = "Rocky";
     ringComposition = "Silicate dust, rocky debris";
   }
-  const estimatedMassKg = 3e19 * Math.sqrt(massMjup / SATURN_MASS_MJUP);
+  // Ring mass model: small baseline (captured debris) plus a Gaussian
+  // enhancement centred on ~0.3 Mjup.  Saturn-mass cold giants sit in
+  // a "sweet spot" where icy moon tidal disruption is most likely
+  // (Canup 2010; Crida & Charnoz 2012).  σ = 0.12 in log₁₀(M) keeps
+  // the enhancement narrow enough that Jupiter (1 Mjup) stays Tenuous
+  // while Saturn (0.3 Mjup) reaches Dense.
+  const baseMassKg = 1e12 * Math.sqrt(massMjup);
+  const logM = Math.log10(Math.max(0.01, massMjup));
+  const logMPeak = Math.log10(SATURN_MASS_MJUP); // ≈ −0.524
+  const sigma = 0.12;
+  const enhancement = Math.exp(-((logM - logMPeak) ** 2) / (2 * sigma * sigma));
+  const estimatedMassKg = baseMassKg + 3e19 * enhancement;
   const areaKm2 = Math.PI * (rocheLimitIceKm ** 2 - rocheLimitRockKm ** 2);
   const surfaceDensity = areaKm2 > 0 ? estimatedMassKg / (areaKm2 * 1e6) : 0;
   const opticalDepth = surfaceDensity / 67;
