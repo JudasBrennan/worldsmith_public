@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <clipPath id="moon-wg-clip">
+      <circle cx="12" cy="12" r="10" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#moon-wg-clip)">
+    <ellipse cx="14" cy="12" rx="8.5" ry="10" fill="#fff" />
+  </g>
+</svg>

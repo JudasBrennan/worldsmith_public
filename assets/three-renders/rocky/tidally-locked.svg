@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#427d9d"/>
+      <stop offset="55%" stop-color="#255272"/>
+      <stop offset="100%" stop-color="#172e47"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><rect x="0" y="0" width="256" height="256" fill="#1a3a6a" opacity="0.52"/><ellipse cx="196.27" cy="116.45" rx="33.23" ry="28.45" transform="rotate(34.07 196.27 116.45)" fill="#af9674" opacity="0.82"/><ellipse cx="174.05" cy="157.08" rx="21.38" ry="19.15" transform="rotate(11.10 174.05 157.08)" fill="#7c6246" opacity="0.82"/><ellipse cx="70.71" cy="92.85" rx="28.59" ry="27.56" transform="rotate(169.62 70.71 92.85)" fill="#af9674" opacity="0.82"/><ellipse cx="172.57" cy="95.42" rx="26.55" ry="22.44" transform="rotate(90.69 172.57 95.42)" fill="#7c6246" opacity="0.82"/><ellipse cx="170.99" cy="128.12" rx="33.11" ry="31.08" transform="rotate(8.53 170.99 128.12)" fill="#af9674" opacity="0.82"/><ellipse cx="85.96" cy="114.89" rx="33.49" ry="25.23" transform="rotate(71.75 85.96 114.89)" fill="#7c6246" opacity="0.82"/><ellipse cx="99.55" cy="176.61" rx="34.25" ry="33.56" transform="rotate(93.02 99.55 176.61)" fill="#af9674" opacity="0.82"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

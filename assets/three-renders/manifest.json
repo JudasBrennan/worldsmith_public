@@ -1,0 +1,309 @@
+{
+  "generatedAtUtc": "2026-02-25T01:06:11.117Z",
+  "stars": [
+    {
+      "id": "o",
+      "file": "stars/o.svg"
+    },
+    {
+      "id": "b",
+      "file": "stars/b.svg"
+    },
+    {
+      "id": "a",
+      "file": "stars/a.svg"
+    },
+    {
+      "id": "f",
+      "file": "stars/f.svg"
+    },
+    {
+      "id": "g",
+      "file": "stars/g.svg"
+    },
+    {
+      "id": "k",
+      "file": "stars/k.svg"
+    },
+    {
+      "id": "m",
+      "file": "stars/m.svg"
+    },
+    {
+      "id": "d",
+      "file": "stars/d.svg"
+    }
+  ],
+  "gas": [
+    {
+      "id": "jupiter",
+      "file": "gas/jupiter.svg"
+    },
+    {
+      "id": "saturn",
+      "file": "gas/saturn.svg"
+    },
+    {
+      "id": "neptune",
+      "file": "gas/neptune.svg"
+    },
+    {
+      "id": "neptune-classic",
+      "file": "gas/neptune-classic.svg"
+    },
+    {
+      "id": "uranus",
+      "file": "gas/uranus.svg"
+    },
+    {
+      "id": "hot-jupiter",
+      "file": "gas/hot-jupiter.svg"
+    },
+    {
+      "id": "warm-giant",
+      "file": "gas/warm-giant.svg"
+    },
+    {
+      "id": "cloudless",
+      "file": "gas/cloudless.svg"
+    },
+    {
+      "id": "alkali",
+      "file": "gas/alkali.svg"
+    },
+    {
+      "id": "silicate",
+      "file": "gas/silicate.svg"
+    },
+    {
+      "id": "super-jupiter",
+      "file": "gas/super-jupiter.svg"
+    },
+    {
+      "id": "sub-neptune",
+      "file": "gas/sub-neptune.svg"
+    },
+    {
+      "id": "ringed-ice",
+      "file": "gas/ringed-ice.svg"
+    },
+    {
+      "id": "puffy",
+      "file": "gas/puffy.svg"
+    },
+    {
+      "id": "hazy",
+      "file": "gas/hazy.svg"
+    },
+    {
+      "id": "water-cloud",
+      "file": "gas/water-cloud.svg"
+    },
+    {
+      "id": "helium",
+      "file": "gas/helium.svg"
+    },
+    {
+      "id": "storm",
+      "file": "gas/storm.svg"
+    },
+    {
+      "id": "ember",
+      "file": "gas/ember.svg"
+    },
+    {
+      "id": "crystal",
+      "file": "gas/crystal.svg"
+    },
+    {
+      "id": "void",
+      "file": "gas/void.svg"
+    },
+    {
+      "id": "aurora",
+      "file": "gas/aurora.svg"
+    },
+    {
+      "id": "machine",
+      "file": "gas/machine.svg"
+    },
+    {
+      "id": "shattered",
+      "file": "gas/shattered.svg"
+    }
+  ],
+  "rocky": [
+    {
+      "id": "blue-marble",
+      "file": "rocky/blue-marble.svg"
+    },
+    {
+      "id": "tropical-jungle",
+      "file": "rocky/tropical-jungle.svg"
+    },
+    {
+      "id": "arid-steppe",
+      "file": "rocky/arid-steppe.svg"
+    },
+    {
+      "id": "tidally-locked",
+      "file": "rocky/tidally-locked.svg"
+    },
+    {
+      "id": "red-desert",
+      "file": "rocky/red-desert.svg"
+    },
+    {
+      "id": "cratered-husk",
+      "file": "rocky/cratered-husk.svg"
+    },
+    {
+      "id": "iron-fortress",
+      "file": "rocky/iron-fortress.svg"
+    },
+    {
+      "id": "pale-mantle",
+      "file": "rocky/pale-mantle.svg"
+    },
+    {
+      "id": "lava-world",
+      "file": "rocky/lava-world.svg"
+    },
+    {
+      "id": "venus-shroud",
+      "file": "rocky/venus-shroud.svg"
+    },
+    {
+      "id": "frozen-wasteland",
+      "file": "rocky/frozen-wasteland.svg"
+    },
+    {
+      "id": "snowball",
+      "file": "rocky/snowball.svg"
+    },
+    {
+      "id": "water-world",
+      "file": "rocky/water-world.svg"
+    },
+    {
+      "id": "archipelago",
+      "file": "rocky/archipelago.svg"
+    },
+    {
+      "id": "default",
+      "file": "rocky/default.svg"
+    },
+    {
+      "id": "oceanic",
+      "file": "rocky/oceanic.svg"
+    },
+    {
+      "id": "frozen",
+      "file": "rocky/frozen.svg"
+    },
+    {
+      "id": "volcanic",
+      "file": "rocky/volcanic.svg"
+    },
+    {
+      "id": "arid",
+      "file": "rocky/arid.svg"
+    }
+  ],
+  "moons": [
+    {
+      "id": "luna",
+      "file": "moons/luna.svg"
+    },
+    {
+      "id": "callisto",
+      "file": "moons/callisto.svg"
+    },
+    {
+      "id": "ganymede",
+      "file": "moons/ganymede.svg"
+    },
+    {
+      "id": "europa",
+      "file": "moons/europa.svg"
+    },
+    {
+      "id": "enceladus",
+      "file": "moons/enceladus.svg"
+    },
+    {
+      "id": "titan",
+      "file": "moons/titan.svg"
+    },
+    {
+      "id": "triton",
+      "file": "moons/triton.svg"
+    },
+    {
+      "id": "io",
+      "file": "moons/io.svg"
+    },
+    {
+      "id": "molten-companion",
+      "file": "moons/molten-companion.svg"
+    },
+    {
+      "id": "phobos",
+      "file": "moons/phobos.svg"
+    },
+    {
+      "id": "deimos",
+      "file": "moons/deimos.svg"
+    },
+    {
+      "id": "irregular-capture",
+      "file": "moons/irregular-capture.svg"
+    },
+    {
+      "id": "default",
+      "file": "moons/default.svg"
+    },
+    {
+      "id": "icy",
+      "file": "moons/icy.svg"
+    },
+    {
+      "id": "rocky",
+      "file": "moons/rocky.svg"
+    },
+    {
+      "id": "dark-icy",
+      "file": "moons/dark-icy.svg"
+    },
+    {
+      "id": "molten",
+      "file": "moons/molten.svg"
+    }
+  ],
+  "debris": [
+    {
+      "id": "warm-exozodiacal-dust",
+      "file": "debris/warm-exozodiacal-dust.svg"
+    },
+    {
+      "id": "rocky-asteroid-belt",
+      "file": "debris/rocky-asteroid-belt.svg"
+    },
+    {
+      "id": "icy-kuiper-like-belt",
+      "file": "debris/icy-kuiper-like-belt.svg"
+    },
+    {
+      "id": "extended-halo",
+      "file": "debris/extended-halo.svg"
+    },
+    {
+      "id": "metal-rich",
+      "file": "debris/metal-rich.svg"
+    },
+    {
+      "id": "carbon-rich",
+      "file": "debris/carbon-rich.svg"
+    }
+  ]
+}

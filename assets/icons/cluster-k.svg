@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="K-type star icon">
+  <defs>
+    <radialGradient id="k_g" cx="34%" cy="28%" r="74%">
+      <stop offset="0%" stop-color="#fff4e4" />
+      <stop offset="70%" stop-color="#ffd2a1" />
+      <stop offset="100%" stop-color="#d28c54" />
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="27" fill="url(#k_g)" stroke="#ffe0bc" stroke-width="2" />
+</svg>

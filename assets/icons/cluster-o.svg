@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="O-type star icon">
+  <defs>
+    <radialGradient id="o_g" cx="34%" cy="28%" r="74%">
+      <stop offset="0%" stop-color="#edf2ff" />
+      <stop offset="70%" stop-color="#9bb0ff" />
+      <stop offset="100%" stop-color="#6379d6" />
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="27" fill="url(#o_g)" stroke="#c7d4ff" stroke-width="2" />
+</svg>

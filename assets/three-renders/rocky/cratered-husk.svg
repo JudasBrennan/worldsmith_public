@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#888888"/>
+      <stop offset="55%" stop-color="#636363"/>
+      <stop offset="100%" stop-color="#393939"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><ellipse cx="73.59" cy="181.67" rx="34.75" ry="35.41" transform="rotate(46.65 73.59 181.67)" fill="#888888" opacity="0.82"/><ellipse cx="84.49" cy="129.70" rx="17.74" ry="11.91" transform="rotate(34.01 84.49 129.70)" fill="#636363" opacity="0.82"/><ellipse cx="161.19" cy="181.27" rx="31.97" ry="22.58" transform="rotate(96.70 161.19 181.27)" fill="#888888" opacity="0.82"/><ellipse cx="139.49" cy="119.28" rx="22.39" ry="19.16" transform="rotate(139.95 139.49 119.28)" fill="#636363" opacity="0.82"/><ellipse cx="142.56" cy="121.68" rx="31.50" ry="16.17" transform="rotate(115.96 142.56 121.68)" fill="#888888" opacity="0.82"/><ellipse cx="76.10" cy="100.37" rx="16.21" ry="13.66" transform="rotate(97.21 76.10 100.37)" fill="#636363" opacity="0.82"/><ellipse cx="93.22" cy="121.17" rx="27.84" ry="25.38" transform="rotate(133.48 93.22 121.17)" fill="#888888" opacity="0.82"/><ellipse cx="101.42" cy="116.89" rx="25.72" ry="15.41" transform="rotate(65.55 101.42 116.89)" fill="#636363" opacity="0.82"/><ellipse cx="191.90" cy="164.30" rx="32.04" ry="31.00" transform="rotate(120.96 191.90 164.30)" fill="#888888" opacity="0.82"/><ellipse cx="135.69" cy="115.34" rx="32.24" ry="33.52" transform="rotate(130.66 135.69 115.34)" fill="#636363" opacity="0.82"/><ellipse cx="123.92" cy="136.43" rx="25.68" ry="23.93" transform="rotate(170.00 123.92 136.43)" fill="#888888" opacity="0.82"/><ellipse cx="73.01" cy="95.74" rx="31.16" ry="18.85" transform="rotate(168.49 73.01 95.74)" fill="#636363" opacity="0.82"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>
