@@ -1,0 +1,130 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net ws: wss:; worker-src 'self' blob:"
+    />
+    <title>WorldSmith Web</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="./styles.css?release=1.13.0" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand__mark">WS</div>
+        <div class="brand__text">
+          <div class="brand__title">WorldSmith Web</div>
+          <div class="brand__subtitle">
+            Worldbuilding calculators <span id="versionTag" class="version-tag">1.13.0</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="top-nav" aria-label="Primary">
+        <a class="top-nav__link" href="#/star">Star</a>
+        <a class="top-nav__link" href="#/system">Planetary System</a>
+        <a class="top-nav__link" href="#/planet">Planets</a>
+        <a class="top-nav__link" href="#/moon">Moons</a>
+        <a class="top-nav__link" href="#/outer">Other Objects</a>
+        <a class="top-nav__link" href="#/cluster">Local Cluster</a>
+        <a class="top-nav__link" href="#/viz">Visualiser</a>
+        <a class="top-nav__link" href="#/io">Import/Export</a>
+        <a class="top-nav__link" href="#/about">About WorldSmith</a>
+        <a class="top-nav__link" href="#/science">Science &amp; Maths</a>
+      </nav>
+      <div class="header-controls">
+        <label class="splash-toggle" for="splashToggle" title="Enable splash screen at startup">
+          <input
+            id="splashToggle"
+            class="splash-toggle__input"
+            type="checkbox"
+            aria-label="Enable splash screen at startup"
+          />
+          <span class="splash-toggle__label">Splash</span>
+        </label>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">
+          <span class="theme-toggle__sun">&#9788;</span>
+          <span class="theme-toggle__moon">&#9789;</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="side-nav" aria-label="Sections">
+        <div class="side-nav__group">
+          <div class="side-nav__label">Core</div>
+          <a class="side-nav__item" href="#/star"
+            ><span class="ws-icon icon--star" aria-hidden="true"></span><span>Star</span></a
+          >
+          <a class="side-nav__item" href="#/system"
+            ><span class="ws-icon icon--system" aria-hidden="true"></span
+            ><span>Planetary System</span></a
+          >
+          <a class="side-nav__item" href="#/planet"
+            ><span class="ws-icon icon--inner-planets" aria-hidden="true"></span
+            ><span>Planets</span></a
+          >
+          <a class="side-nav__item" href="#/moon"
+            ><span class="ws-icon icon--moons" aria-hidden="true"></span><span>Moons</span></a
+          >
+          <a class="side-nav__item" href="#/outer"
+            ><span class="ws-icon icon--outer-objects" aria-hidden="true"></span
+            ><span>Other Objects</span></a
+          >
+          <a class="side-nav__item" href="#/cluster"
+            ><span class="ws-icon icon--local-cluster" aria-hidden="true"></span
+            ><span>Local Cluster</span></a
+          >
+          <a class="side-nav__item" href="#/viz"
+            ><span class="ws-icon icon--visualiser" aria-hidden="true"></span
+            ><span>Visualiser</span></a
+          >
+          <a class="side-nav__item" href="#/io"
+            ><span class="ws-icon icon--import-export" aria-hidden="true"></span
+            ><span>Import/Export</span></a
+          >
+        </div>
+
+        <div class="side-nav__group">
+          <div class="side-nav__label">Extra</div>
+          <a class="side-nav__item" href="#/apparent"
+            ><span class="ws-icon icon--apparent" aria-hidden="true"></span
+            ><span>Apparent Size &amp; Brightness</span></a
+          >
+          <a
+            class="side-nav__item is-disabled"
+            href="#/tectonics"
+            aria-disabled="true"
+            tabindex="-1"
+            >Tectonics</a
+          >
+          <a class="side-nav__item is-disabled" href="#/climate" aria-disabled="true" tabindex="-1"
+            >Climate Zones</a
+          >
+          <a
+            class="side-nav__item is-disabled"
+            href="#/population"
+            aria-disabled="true"
+            tabindex="-1"
+            >Population</a
+          >
+          <a class="side-nav__item" href="#/calendar"
+            ><span class="ws-icon icon--calendar" aria-hidden="true"></span><span>Calendar</span></a
+          >
+          <a class="side-nav__item" href="#/science"
+            ><span class="ws-icon icon--science" aria-hidden="true"></span
+            ><span>Science &amp; Maths</span></a
+          >
+        </div>
+      </aside>
+
+      <section class="content" id="app" aria-live="polite"></section>
+      <footer class="app-footer">Judas Brennan &middot; 2026</footer>
+    </main>
+
+    <script type="module" src="./app.js?release=1.13.0"></script>
+  </body>
+</html>
