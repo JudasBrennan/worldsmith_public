@@ -14,12 +14,14 @@ import { initSciencePage } from "./ui/sciencePage.js";
 import * as store from "./ui/store.js";
 import { createSolPresetEnvelope } from "./ui/solPreset.js";
 import { showSplashOverlay } from "./ui/splashOverlay.js";
+import { escapeHtml } from "./ui/uiHelpers.js";
 
 const appEl = document.getElementById("app");
 let startupSolPromptHandled = false;
 
 /* ── Theme (light / dark) ─────────────────────────────── */
 const THEME_KEY = "worldsmith.theme";
+const SPLASH_ENABLED_KEY = "worldsmith.splash.enabled";
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
@@ -53,6 +55,38 @@ function initTheme() {
 }
 
 initTheme();
+
+function isSplashEnabled() {
+  try {
+    const saved = localStorage.getItem(SPLASH_ENABLED_KEY);
+    if (saved === "0") return false;
+    if (saved === "1") return true;
+  } catch {
+    // Ignore storage errors and keep default behavior.
+  }
+  return true;
+}
+
+function setSplashEnabled(enabled) {
+  try {
+    localStorage.setItem(SPLASH_ENABLED_KEY, enabled ? "1" : "0");
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function initSplashToggle() {
+  const input = document.getElementById("splashToggle");
+  const enabled = isSplashEnabled();
+  if (!input) return enabled;
+  input.checked = enabled;
+  input.addEventListener("change", () => {
+    setSplashEnabled(!!input.checked);
+  });
+  return enabled;
+}
+
+const splashEnabled = initSplashToggle();
 
 function hasSavedWorldData() {
   if (typeof store.hasSavedWorldInLocalStorage === "function") {
@@ -117,7 +151,7 @@ function route() {
           <div class="panel__header"><h1 class="panel__title">Page Error</h1></div>
           <div class="panel__body">
             <p>Something went wrong loading the <b>${key}</b> page.</p>
-            <pre style="white-space:pre-wrap;color:var(--c-danger,#f44)">${String(err)}</pre>
+            <pre style="white-space:pre-wrap;color:var(--bad)">${escapeHtml(String(err))}</pre>
             <p class="hint">Try refreshing, or choose another page from the navigation menu.</p>
           </div>
         </div>`;
@@ -125,7 +159,7 @@ function route() {
     return;
   }
 
-  const safeKey = key.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safeKey = escapeHtml(key);
   appEl.innerHTML = `
     <div class="panel">
       <div class="panel__header"><h1>Coming soon</h1></div>
@@ -196,7 +230,18 @@ function maybeShowStartupSolPresetPrompt() {
 
 window.addEventListener("hashchange", route);
 
-showSplashOverlay().then(() => {
+function startApp() {
   route();
   maybeShowStartupSolPresetPrompt();
-});
+}
+
+if (splashEnabled) {
+  showSplashOverlay()
+    .then(startApp)
+    .catch((err) => {
+      console.error("[WorldSmith] Splash overlay failed:", err);
+      startApp();
+    });
+} else {
+  startApp();
+}

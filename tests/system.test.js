@@ -2,13 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { calcSystem } from "../engine/system.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} +/- ${tolerance}, got ${actual}`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 const SOLAR_SYSTEM = {
   starMassMsol: 1,

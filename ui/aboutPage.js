@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.13.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.14.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -38,14 +38,14 @@ export function initAboutPage(mountEl) {
 
         <div class="page-title" style="margin-top:18px">How to use it</div>
         <ol>
-          <li><b>Star</b>: choose a star mass (and any other inputs) to generate star properties.</li>
-          <li><b>Planetary System</b>: set spacing and orbit framework for the system.</li>
-          <li><b>Planets</b>: create and edit rocky planets and gas giants, then assign them to system slots.</li>
+          <li><b>Star</b>: choose a star mass (and any other inputs) to generate star properties. An animated preview shows real-time flare and CME events.</li>
+          <li><b>Planetary System</b>: set spacing and orbit framework for the system. The System Poster renders a 3D lineup of all bodies.</li>
+          <li><b>Planets</b>: create and edit rocky planets and gas giants, then assign them to system slots. Each body shows a live 3D preview driven by its physics.</li>
           <li><b>Other Objects</b>: configure debris disks and other non-planetary components.</li>
           <li><b>Moons</b>: create moons and assign them to parent planets.</li>
           <li><b>Apparent Size</b>: compare apparent magnitude, angular size, and visibility for star/object/moon setups.</li>
           <li><b>Calendar</b>: build a world-linked calendar from orbital periods, then define holidays, festivals, leap rules, and work/rest cycles.</li>
-          <li><b>Visualiser</b>: pan (drag) and zoom (mouse wheel) to inspect the system. Zoom out past the outermost object to seamlessly transition into the 3D local cluster view.</li>
+          <li><b>Visualiser</b>: left-drag to pan, right-drag to rotate, scroll to zoom. Click a body to center it; double-click to zoom in. Press <b>Esc</b> to release focus. Press <b>?</b> for full controls including touch gestures. Zoom out past the outermost object to transition into the local cluster view.</li>
           <li><b>Local Cluster</b>: generate nearby systems around your home star, manually add or remove stars and companions, and edit local system names.</li>
           <li><b>Science &amp; Maths</b>: reference page documenting every equation used across the engine, with LaTeX rendering and interactive calculators.</li>
         </ol>
@@ -54,11 +54,24 @@ export function initAboutPage(mountEl) {
         <ul>
           <li>If something looks wrong, use <b>Refresh</b> on the visualiser to redraw from latest data.</li>
           <li>Most inputs support both a <b>slider</b> and a <b>text box</b> for precision.</li>
+          <li>Use the <b>Splash</b> toggle in the header to skip the loading screen on startup.</li>
+          <li>Switch between <b>light</b> and <b>dark</b> themes with the toggle in the header.</li>
           <li>Your work is stored locally in your browser (LocalStorage). Clearing site data will reset the tool.</li>
         </ul>
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.14.0</b> (from 1.13.0)</p>
+        <ul>
+          <li><b>Three.js Rendering</b> &mdash; All major render surfaces (Visualiser, System Poster, Apparent Sky, body previews) now use native Three.js WebGL with procedural textures, PBR materials, and LOD quality tiers.</li>
+          <li><b>Procedural Celestial Textures</b> &mdash; Rocky planets, gas giants, and moons generate unique equirectangular texture maps using 3D noise, domain warping, and rule-driven composition layers (oceans, ice caps, clouds, craters, bands, storms, and more).</li>
+          <li><b>Cluster Visualiser Overhaul</b> &mdash; Rewritten as a pure 2D overlay with radial-gradient star dots, native text labels with collision detection, and a toggleable starfield background.</li>
+          <li><b>Stellar Activity Model</b> &mdash; Three-tier activity model with cycle-aware flare modulation, split-rate CME channels, and an animated star preview showing real-time flare bursts and CME events.</li>
+          <li><b>Camera Controls</b> &mdash; Momentum-based pan and rotate with inertia, smooth zoom interpolation, click-to-center, double-click-to-zoom, focus lock that survives drag, animated reset, and full touch gesture support. Press <b>?</b> on the visualiser for the control reference.</li>
+          <li><b>Splash Screen Toggle</b> &mdash; Persistent opt-out checkbox in the header to skip the loading overlay on startup.</li>
+          <li><b>Gas Giant Styles</b> &mdash; Fantastical styles removed; 17 realistic styles with tuned palettes for higher saturation and contrast.</li>
+        </ul>
 
         <p><b>Version 1.13.0</b> (from 1.12.0)</p>
         <ul>
@@ -137,7 +150,7 @@ export function initAboutPage(mountEl) {
         <p><b>Version 1.6.0</b> (from 1.5.0)</p>
         <ul>
           <li><b>Planets / Other Objects</b> &mdash; Reworked gas giant and debris disk mechanics.</li>
-          <li><b>System Visualiser</b> &mdash; Improved gas giant rendering covering many real and fantastical types.</li>
+          <li><b>System Visualiser</b> &mdash; Improved gas giant rendering covering many realistic types.</li>
         </ul>
 
         <p><b>Version 1.5.0</b> (from 1.4.0)</p>

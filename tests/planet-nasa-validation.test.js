@@ -10,11 +10,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { calcPlanetExact } from "../engine/planet.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = `${label}: expected ${expected} ± ${tolerance}, got ${actual}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 function pctError(actual, expected) {
   return Math.abs((actual - expected) / expected) * 100;

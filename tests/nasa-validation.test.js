@@ -8,13 +8,7 @@ import {
   calcBodyApparentFromHome,
   calcMoonApparentFromHome,
 } from "../engine/apparent.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} ±${tolerance}, got ${actual} (Δ=${(actual - expected).toFixed(4)})`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 const pad = (s, n) => String(s).padStart(n);
 const padEnd = (s, n) => String(s).padEnd(n);

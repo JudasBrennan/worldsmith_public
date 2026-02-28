@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#a6663e"/>
+      <stop offset="55%" stop-color="#814126"/>
+      <stop offset="100%" stop-color="#4d2314"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><rect x="0" y="0" width="256" height="256" fill="#2a4a5a" opacity="0.24"/><ellipse cx="73.55" cy="78.28" rx="16.59" ry="16.44" transform="rotate(157.42 73.55 78.28)" fill="#a6663e" opacity="0.82"/><ellipse cx="89.58" cy="180.35" rx="25.48" ry="25.24" transform="rotate(157.60 89.58 180.35)" fill="#814126" opacity="0.82"/><ellipse cx="112.28" cy="150.04" rx="20.48" ry="11.92" transform="rotate(115.19 112.28 150.04)" fill="#a6663e" opacity="0.82"/><ellipse cx="188.57" cy="168.68" rx="21.43" ry="15.29" transform="rotate(65.63 188.57 168.68)" fill="#814126" opacity="0.82"/><ellipse cx="106.58" cy="84.74" rx="33.11" ry="30.78" transform="rotate(170.57 106.58 84.74)" fill="#a6663e" opacity="0.82"/><ellipse cx="105.30" cy="93.76" rx="30.74" ry="21.51" transform="rotate(39.92 105.30 93.76)" fill="#814126" opacity="0.82"/><ellipse cx="142.44" cy="115.31" rx="16.05" ry="14.88" transform="rotate(167.15 142.44 115.31)" fill="#a6663e" opacity="0.82"/><ellipse cx="169.38" cy="179.87" rx="28.39" ry="29.72" transform="rotate(87.63 169.38 179.87)" fill="#814126" opacity="0.82"/><ellipse cx="138.09" cy="146.00" rx="17.40" ry="12.11" transform="rotate(104.40 138.09 146.00)" fill="#a6663e" opacity="0.82"/><ellipse cx="162.54" cy="152.97" rx="28.15" ry="13.47" transform="rotate(31.82 162.54 152.97)" fill="#814126" opacity="0.82"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

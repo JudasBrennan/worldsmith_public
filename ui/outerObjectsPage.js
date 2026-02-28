@@ -4,6 +4,7 @@ import { calcDebrisDisk, calcDebrisDiskSuggestions } from "../engine/debrisDisk.
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { escapeHtml } from "./uiHelpers.js";
 import {
   loadWorld,
   getStarOverrides,
@@ -34,7 +35,7 @@ const TIP_LABEL = {
   "Disk Temperature":
     "Blackbody equilibrium temperature at the disk midpoint. Determines which ices and minerals condense: water ice below ~170 K, CO\u2082 ice below ~80 K, CO/N\u2082 ice below ~25 K.",
   "Disk Composition":
-    "Dominant grain materials based on temperature. Inside the frost line (~170 K): rocky silicates and metals. Outside: water ice, organics, and at the coldest distances, volatile ices.",
+    "Dominant grain materials based on temperature and stellar metallicity. Inside the frost line (~170 K): rocky silicates and metals. Outside: water ice, organics, and at the coldest distances, volatile ices. Higher [Fe/H] biases solids modestly toward refractory content.",
   Resonance:
     "Debris disk edges sculpted by mean-motion resonances (MMR) with gas giants. 3:2 and 2:1 exterior MMRs define the outer disk; 4:1 and 2:1 interior MMRs define the inner disk.",
   "Estimated Mass":
@@ -73,14 +74,6 @@ const TIP_LABEL = {
   // ── Summary KPIs ──
   "Debris disks count": "Total number of debris disk zones in this system.",
 };
-
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 export function initOuterObjectsPage(mountEl) {
   const wrap = document.createElement("div");
@@ -521,6 +514,7 @@ export function initOuterObjectsPage(mountEl) {
       starLuminosityLsol: model.star.luminosityLsol,
       starAgeGyr: Number(world.star.ageGyr) || 4.6,
       starRadiusRsol: model.star.radiusRsol,
+      starMetallicityFeH: Number(world.star.metallicityFeH) || 0,
     };
     const giantsForEngine = gasGiants.map((g) => ({
       name: g.name,

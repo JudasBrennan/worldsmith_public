@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#3f7796"/>
+      <stop offset="55%" stop-color="#244e6d"/>
+      <stop offset="100%" stop-color="#162c44"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><rect x="0" y="0" width="256" height="256" fill="#1a3a6a" opacity="0.52"/><ellipse cx="193.50" cy="166.61" rx="21.19" ry="9.74" transform="rotate(111.43 193.50 166.61)" fill="#a78f6f" opacity="0.82"/><ellipse cx="59.82" cy="95.43" rx="29.04" ry="26.79" transform="rotate(43.67 59.82 95.43)" fill="#765e42" opacity="0.82"/><ellipse cx="70.32" cy="103.24" rx="29.58" ry="20.99" transform="rotate(56.78 70.32 103.24)" fill="#a78f6f" opacity="0.82"/><ellipse cx="115.84" cy="89.75" rx="24.82" ry="25.57" transform="rotate(63.25 115.84 89.75)" fill="#765e42" opacity="0.82"/><ellipse cx="190.00" cy="96.87" rx="25.20" ry="15.69" transform="rotate(77.34 190.00 96.87)" fill="#a78f6f" opacity="0.82"/><ellipse cx="139.37" cy="149.36" rx="21.63" ry="20.85" transform="rotate(96.35 139.37 149.36)" fill="#765e42" opacity="0.82"/><ellipse cx="123.22" cy="84.03" rx="33.45" ry="20.96" transform="rotate(44.46 123.22 84.03)" fill="#a78f6f" opacity="0.82"/><ellipse cx="173.92" cy="108.78" rx="13.67" ry="2.83" fill="#ffffff" opacity="0.048600000000000004"/><ellipse cx="82.83" cy="147.72" rx="27.73" ry="11.44" fill="#ffffff" opacity="0.048600000000000004"/><ellipse cx="135.38" cy="182.76" rx="17.98" ry="5.66" fill="#ffffff" opacity="0.048600000000000004"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

@@ -1,3 +1,4 @@
+import { clamp } from "../engine/utils.js";
 import { LOCAL_CLUSTER_DEFAULTS, normalizeLocalClusterInputs } from "../engine/localCluster.js";
 
 // Shared World Model store (local-only).
@@ -15,7 +16,7 @@ const LEGACY_KEY = "worldsmith.world";
 let volatileWorldRaw = null;
 
 // Schema version for migrations
-const SCHEMA_VERSION = 45;
+const SCHEMA_VERSION = 46;
 // Practical giant-planet radius bounds in Jupiter radii (Rj):
 // lower bound ~= Neptune-size (~0.35 Rj), upper bound ~= inflated HAT-P-67 b (2.14 Rj).
 export const GAS_GIANT_RADIUS_MIN_RJ = 0.35;
@@ -43,10 +44,6 @@ export function hasSavedWorldInLocalStorage() {
   } catch {
     return false;
   }
-}
-
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
 }
 
 function roundToStep(v, step = 1) {
@@ -106,7 +103,7 @@ function listFromCollection(coll) {
 }
 
 // Legacy style alias map — old id → canonical id
-const GAS_GIANT_STYLE_ALIASES = { ice: "neptune", hot: "hot-jupiter", exotic: "crystal" };
+const GAS_GIANT_STYLE_ALIASES = { ice: "neptune", hot: "hot-jupiter" };
 
 function normalizeGasGiantStyle(style) {
   const s = String(style || "jupiter").toLowerCase();
@@ -141,6 +138,7 @@ function normalizeGasGiant(raw, idx = 1) {
   const parsedMet = Number(rawMet);
   const metallicity =
     rawMet != null && Number.isFinite(parsedMet) && parsedMet > 0 ? parsedMet : null;
+  const appearanceRecipeId = String(raw?.appearanceRecipeId || raw?.recipeId || "").trim();
   return {
     id: String(raw?.id || `gg${idx}`),
     name: String(raw?.name || `Gas giant ${idx}`),
@@ -152,6 +150,7 @@ function normalizeGasGiant(raw, idx = 1) {
     massMjup,
     rotationPeriodHours,
     metallicity,
+    appearanceRecipeId: appearanceRecipeId || "",
   };
 }
 
@@ -272,44 +271,6 @@ function readWorldRaw() {
 }
 
 function defaultWorld() {
-  const p1 = {
-    id: "p1",
-    name: "New Planet",
-    slotIndex: null,
-    locked: false,
-    inputs: {
-      name: "New Planet",
-      // Orbit
-      semiMajorAxisAu: 1.0,
-      eccentricity: 0.0167,
-      inclinationDeg: 0.0,
-      longitudeOfPeriapsisDeg: 283.0,
-      subsolarLongitudeDeg: 0.0,
-      // Rotation / Physical
-      rotationPeriodHours: 24.0,
-      axialTiltDeg: 23.44,
-      // Composition / Atmosphere
-      massEarth: 1.0,
-      cmfPct: -1,
-      wmfPct: 0.02,
-      albedoBond: 0.3,
-      greenhouseEffect: 1.65,
-      observerHeightM: 1.75,
-      pressureAtm: 1.0,
-      o2Pct: 20.95,
-      co2Pct: 0.04,
-      arPct: 0.93,
-      h2oPct: 0.4,
-      ch4Pct: 0.0,
-      h2Pct: 0.0,
-      hePct: 0.0,
-      so2Pct: 0.0,
-      nh3Pct: 0.0,
-      greenhouseMode: "core",
-      tectonicRegime: "auto",
-      mantleOxidation: "earth",
-    },
-  };
   return {
     version: SCHEMA_VERSION,
     star: {
@@ -323,6 +284,7 @@ function defaultWorld() {
       physicsMode: "simple",
       advancedDerivationMode: "rl",
       evolutionMode: "zams",
+      activityModelVersion: "v2",
     },
     selectedBodyType: "planet",
     system: {
@@ -344,48 +306,20 @@ function defaultWorld() {
       removedSystemIds: [],
       componentOverrides: {},
     },
-    // Multi-planet model (v18)
     planets: {
-      selectedId: "p1",
-      order: ["p1"],
-      byId: { p1 },
+      selectedId: null,
+      order: [],
+      byId: {},
     },
-    // Moons (v22)
     moons: {
-      selectedId: "m1",
-      order: ["m1"],
-      byId: {
-        m1: {
-          id: "m1",
-          name: "Luna",
-          planetId: "p1",
-          locked: false,
-          inputs: {
-            name: "Luna",
-            semiMajorAxisKm: 384748,
-            eccentricity: 0.055,
-            inclinationDeg: 5.15,
-            massMoon: 1.0,
-            densityGcm3: 3.34,
-            albedo: 0.11,
-            compositionOverride: null,
-          },
-        },
-      },
+      selectedId: null,
+      order: [],
+      byId: {},
     },
     // Back-compat single-planet view used by older pages (kept in sync)
-    planet: { ...p1.inputs },
+    planet: {},
     // Back-compat single-moon view used by older pages (kept in sync)
-    moon: {
-      name: "Luna",
-      semiMajorAxisKm: 384748,
-      eccentricity: 0.055,
-      inclinationDeg: 5.15,
-      massMoon: 1.0,
-      densityGcm3: 3.34,
-      albedo: 0.11,
-      compositionOverride: null,
-    },
+    moon: {},
   };
 }
 
@@ -419,6 +353,9 @@ function migrateWorld(world) {
   if (world.star.metallicityFeH == null) world.star.metallicityFeH = 0.0;
   // v45: add evolutionMode to star (default "zams" for backwards compat)
   if (!world.star.evolutionMode) world.star.evolutionMode = "zams";
+  // v46: activity model version flag (v1 legacy / v2 calibrated split-rate model)
+  const activityModelVersion = String(world.star.activityModelVersion || "v2").toLowerCase();
+  world.star.activityModelVersion = activityModelVersion === "v1" ? "v1" : "v2";
 
   // Local cluster defaults/sanity
   world.cluster = normalizeLocalClusterInputs(world.cluster || LOCAL_CLUSTER_DEFAULTS);
@@ -1152,12 +1089,13 @@ export function clearAllSavedData() {
       removed += 1;
     } catch {}
 
-    // Best-effort cleanup for orphaned backup keys not present in the index.
+    // Best-effort cleanup for any remaining worldsmith.* keys (orphaned
+    // backups, theme, splash preference, visualizer flags, etc.).
     if (typeof localStorage?.length === "number" && typeof localStorage?.key === "function") {
       const toRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && String(k).startsWith("worldsmith.world.backup.")) toRemove.push(k);
+        if (k && String(k).startsWith("worldsmith.")) toRemove.push(k);
       }
       for (const k of toRemove) {
         try {

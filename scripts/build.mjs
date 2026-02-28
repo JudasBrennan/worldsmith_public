@@ -16,16 +16,24 @@ const DIST = resolve(ROOT, "dist");
 rmSync(DIST, { recursive: true, force: true });
 
 // 1. Bundle app.js → dist/app.js (single file, minified)
-await build({
-  entryPoints: [resolve(ROOT, "app.js")],
+//    Bundle celestialTextureWorker.js separately — it runs in a Web Worker
+//    and is loaded at runtime via new URL("./celestialTextureWorker.js", import.meta.url).
+const shared = {
   bundle: true,
-  outfile: resolve(DIST, "app.js"),
   format: "esm",
   minify: true,
   sourcemap: true,
   target: ["es2020", "safari14"],
   logLevel: "info",
-});
+};
+await Promise.all([
+  build({ ...shared, entryPoints: [resolve(ROOT, "app.js")], outfile: resolve(DIST, "app.js") }),
+  build({
+    ...shared,
+    entryPoints: [resolve(ROOT, "ui/celestialTextureWorker.js")],
+    outfile: resolve(DIST, "celestialTextureWorker.js"),
+  }),
+]);
 
 // 2. Copy static assets
 cpSync(resolve(ROOT, "styles.css"), resolve(DIST, "styles.css"));

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#89837d"/>
+      <stop offset="55%" stop-color="#655f59"/>
+      <stop offset="100%" stop-color="#373330"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><circle cx="176.40" cy="59.63" r="9.75" fill="rgba(0,0,0,0.18)"/><circle cx="173.67" cy="57.29" r="7.02" fill="rgba(255,255,255,0.08)"/><circle cx="192.24" cy="68.42" r="5.66" fill="rgba(0,0,0,0.18)"/><circle cx="190.65" cy="67.06" r="4.08" fill="rgba(255,255,255,0.08)"/><circle cx="131.78" cy="151.86" r="6.79" fill="rgba(0,0,0,0.18)"/><circle cx="129.88" cy="150.23" r="4.89" fill="rgba(255,255,255,0.08)"/><circle cx="87.96" cy="103.59" r="7.17" fill="rgba(0,0,0,0.18)"/><circle cx="85.95" cy="101.87" r="5.16" fill="rgba(255,255,255,0.08)"/><circle cx="173.81" cy="72.18" r="3.98" fill="rgba(0,0,0,0.18)"/><circle cx="172.70" cy="71.22" r="2.86" fill="rgba(255,255,255,0.08)"/><circle cx="139.22" cy="69.67" r="8.49" fill="rgba(0,0,0,0.18)"/><circle cx="136.84" cy="67.63" r="6.11" fill="rgba(255,255,255,0.08)"/><circle cx="157.81" cy="174.39" r="6.74" fill="rgba(0,0,0,0.18)"/><circle cx="155.92" cy="172.77" r="4.85" fill="rgba(255,255,255,0.08)"/><circle cx="97.92" cy="104.08" r="8.89" fill="rgba(0,0,0,0.18)"/><circle cx="95.43" cy="101.95" r="6.40" fill="rgba(255,255,255,0.08)"/><circle cx="149.81" cy="146.17" r="10.89" fill="rgba(0,0,0,0.18)"/><circle cx="146.77" cy="143.56" r="7.84" fill="rgba(255,255,255,0.08)"/><circle cx="75.06" cy="98.38" r="11.10" fill="rgba(0,0,0,0.18)"/><circle cx="71.95" cy="95.72" r="8.00" fill="rgba(255,255,255,0.08)"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

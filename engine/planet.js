@@ -27,7 +27,7 @@
 //          numeric derived values for downstream use, and pre-formatted
 //          display strings for the UI.
 
-import { clamp, fmt } from "./utils.js";
+import { clamp, eccentricityFactor, fmt, k2LoveNumber } from "./utils.js";
 import { calcStar } from "./star.js";
 
 const PI = Math.PI;
@@ -41,7 +41,7 @@ const VELOCITY_EARTH_KMS = 11.186;
 const GRAVITY_EARTH_MS2 = 9.81;
 
 // Tidal-lock model constants (same formulation as moon.js)
-const G_CONST = 6.67e-11;
+const G = 6.67e-11;
 const M_PER_AU_PLANET = 149600000000;
 const KG_PER_MEARTH = 5.972e24;
 const KG_PER_MMOON = 7.342e22;
@@ -103,14 +103,6 @@ function spinOrbitResonance(eccentricity) {
 }
 
 // --- Moon tidal heating on the planet ---
-// Wisdom (2008) eccentricity enhancement factor for tidal heating.
-// Duplicated from moon.js to avoid circular import (moon.js imports planet.js).
-function eccentricityFactor(e) {
-  if (e === 0) return 0;
-  const e2 = e * e;
-  const Na = 1 + 15.5 * e2 + 31.875 * e2 ** 2 + 11.5625 * e2 ** 3 + 0.390625 * e2 ** 4;
-  return (Na * e2) / (1 - e2) ** 7.5;
-}
 
 // Peale et al. (1979) tidal heating formula applied to the planet.
 // Uses the planet's k₂ and Q (the planet is the body being heated),
@@ -129,7 +121,7 @@ function planetTidalHeatingFromMoon(
   return (
     (21 / 2) *
     (k2Planet / qualityFactor) *
-    ((G_CONST * moonMassKg ** 2 * radiusM ** 5 * n) / semiMajorAxisM ** 6) *
+    ((G * moonMassKg ** 2 * radiusM ** 5 * n) / semiMajorAxisM ** 6) *
     eccentricityFactor(ecc)
   );
 }
@@ -144,7 +136,7 @@ function totalPlanetTidalHeating(moons, k2Planet, qualityFactor, mPlanetKg, radi
     const ecc = Number(m.eccentricity) || 0;
     if (moonMassKg <= 0 || aM <= 0) continue;
     // Kepler's 3rd law: P = 2π √(a³ / (G × M_planet))
-    const orbitalPeriodS = 2 * PI * Math.sqrt(aM ** 3 / (G_CONST * mPlanetKg));
+    const orbitalPeriodS = 2 * PI * Math.sqrt(aM ** 3 / (G * mPlanetKg));
     total += planetTidalHeatingFromMoon(
       k2Planet,
       qualityFactor,
@@ -208,7 +200,7 @@ const SOLAR_SI_MG = 0.95; // solar Si/Mg number ratio
 
 function suggestedCmfFromMetallicity(feH) {
   // [Fe/H] scales the solar Fe/Mg ratio
-  const feMg = SOLAR_FE_MG * Math.pow(10, feH);
+  const feMg = SOLAR_FE_MG * 10 ** feH;
   const siMg = SOLAR_SI_MG; // Si/Mg is roughly constant across FGK stars
   // Mantle mass per Mg atom: MgO + SiO₂
   const muMantle = MU_MG + MU_O + siMg * (MU_SI + 2 * MU_O);
@@ -736,13 +728,8 @@ function lerpHex(hexA, hexB, t) {
 }
 
 // --- Tidal lock helpers ---
-function k2LoveNumber(densityKgM3, gMs2, radiusM, rigidity = 30e9) {
-  return 1.5 / (1 + (19 * rigidity) / (2 * densityKgM3 * gMs2 * radiusM));
-}
-
 function tidalLockTimeGyr(omega, orbitM, momentI, Q, mOtherKg, k2, radiusM) {
-  const sec =
-    (omega * orbitM ** 6 * momentI * Q) / (3 * G_CONST * mOtherKg ** 2 * k2 * radiusM ** 5);
+  const sec = (omega * orbitM ** 6 * momentI * Q) / (3 * G * mOtherKg ** 2 * k2 * radiusM ** 5);
   return sec * SECONDS_TO_GYR;
 }
 
@@ -1275,7 +1262,7 @@ export function computeGreenhouseTau({
   const P = pressureAtm;
   if (P <= 0) return 0;
 
-  const pb = Math.pow(P, GH_PB_EXP);
+  const pb = P ** GH_PB_EXP;
   const ref = GH_PP_REF;
 
   // Core greenhouse gases

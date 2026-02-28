@@ -8,12 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  computeMoonVisualProfile,
-  MOON_PALETTES,
-  MOON_RECIPES,
-  drawMoonRecipePreview,
-} from "../ui/moonStyles.js";
+import { computeMoonVisualProfile, MOON_PALETTES, MOON_RECIPES } from "../ui/moonStyles.js";
 
 // ── Helper factory ──────────────────────────────────────────────
 
@@ -197,7 +192,7 @@ test("low heating + medium density (2.0-3.2) -> worn terrain", () => {
     makeMoonCalc({ tides: { tidalHeatingEarth: 0 }, inputs: { densityGcm3: 2.5 } }),
   );
   assert.equal(p.terrain.type, "worn");
-  assert.ok(p.terrain.craterDensity === 0.4);
+  assert.equal(p.terrain.craterDensity, 0.4);
 });
 
 test("low heating + high density (>=3.2) -> cratered terrain", () => {
@@ -205,7 +200,7 @@ test("low heating + high density (>=3.2) -> cratered terrain", () => {
     makeMoonCalc({ tides: { tidalHeatingEarth: 0 }, inputs: { densityGcm3: 3.5 } }),
   );
   assert.equal(p.terrain.type, "cratered");
-  assert.ok(p.terrain.craterDensity === 0.7);
+  assert.equal(p.terrain.craterDensity, 0.7);
 });
 
 // ── Ice coverage from composition ───────────────────────────────
@@ -488,8 +483,4 @@ test("every recipe preview produces a valid visual profile", () => {
     assert.ok(profile.palette, `${r.id} profile palette`);
     assert.ok(profile.terrain, `${r.id} profile terrain`);
   }
-});
-
-test("drawMoonRecipePreview is a function", () => {
-  assert.equal(typeof drawMoonRecipePreview, "function");
 });

@@ -366,7 +366,7 @@ function generateSystemCoordinates(count, radiusLy, seed, zScale = 1.0) {
     const ii = f / PM_MOD;
     const j = g / PM_MOD;
 
-    const distRaw = Math.pow(h, 1 / 3) * radiusLy;
+    const distRaw = h ** (1 / 3) * radiusLy;
     const theta = ii * 2 * Math.PI;
     const phi = Math.acos(2 * j - 1);
 
@@ -429,9 +429,9 @@ export function calcLocalCluster(rawInputs = {}) {
   // Matches Lineweaver (2004) more closely than a hard annular band.
   const ghzPeak = 0.53 * inputs.galacticRadiusLy;
   const ghzSigma = 0.1 * inputs.galacticRadiusLy;
-  const ghzProbability = Math.exp(-0.5 * Math.pow((inputs.locationLy - ghzPeak) / ghzSigma, 2));
+  const ghzProbability = Math.exp(-0.5 * ((inputs.locationLy - ghzPeak) / ghzSigma) ** 2);
 
-  const neighbourhoodVolumeLy3 = (4 / 3) * Math.PI * Math.pow(inputs.neighbourhoodRadiusLy, 3);
+  const neighbourhoodVolumeLy3 = (4 / 3) * Math.PI * inputs.neighbourhoodRadiusLy ** 3;
   const rawStellarMassObjects = inputs.stellarDensityPerLy3 * neighbourhoodVolumeLy3;
 
   // Class fractions now sum to 100% of rawStellarMassObjects (corrected from WS8's 140%).

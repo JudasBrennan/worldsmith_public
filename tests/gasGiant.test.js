@@ -7,13 +7,7 @@ import {
   radiusToMassMjup,
   estimateMetallicity,
 } from "../engine/gasGiant.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} +/- ${tolerance}, got ${actual}`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 const SOLAR = {
   starMassMsol: 1,
@@ -366,6 +360,41 @@ test("default metallicity is derived from mass when not specified", () => {
   assert.ok(m.atmosphere.metallicitySolar > 0, "atmosphere metallicity should be set");
 });
 
+test("derived metallicity scales with host-star [Fe/H] when metallicity input is blank", () => {
+  const poor = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    stellarMetallicityFeH: -0.5,
+    ...SOLAR,
+  });
+  const solar = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    stellarMetallicityFeH: 0,
+    ...SOLAR,
+  });
+  const rich = calcGasGiant({
+    massMjup: 1,
+    radiusRj: 1,
+    orbitAu: 5.2,
+    rotationPeriodHours: 9.925,
+    stellarMetallicityFeH: 0.3,
+    ...SOLAR,
+  });
+  assert.ok(
+    poor.atmosphere.metallicitySolar < solar.atmosphere.metallicitySolar,
+    "metal-poor host should reduce default atmospheric metallicity",
+  );
+  assert.ok(
+    rich.atmosphere.metallicitySolar > solar.atmosphere.metallicitySolar,
+    "metal-rich host should increase default atmospheric metallicity",
+  );
+});
+
 test("user-specified metallicity is used when provided", () => {
   const m = calcGasGiant({
     massMjup: 1,
@@ -373,6 +402,7 @@ test("user-specified metallicity is used when provided", () => {
     orbitAu: 5.2,
     rotationPeriodHours: 9.925,
     metallicity: 20,
+    stellarMetallicityFeH: -1,
     ...SOLAR,
   });
   assert.equal(m.inputs.metallicitySource, "user");

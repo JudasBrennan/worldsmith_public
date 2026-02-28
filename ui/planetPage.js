@@ -5,19 +5,13 @@ import { calcGasGiant } from "../engine/gasGiant.js";
 import { fmt, relativeLuminance } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { escapeHtml } from "./uiHelpers.js";
+import { styleLabel, suggestStyles, GAS_GIANT_RECIPES } from "./gasGiantStyles.js";
+import { computeRockyVisualProfile, ROCKY_RECIPES } from "./rockyPlanetStyles.js";
 import {
-  styleLabel,
-  drawGasGiantPreview,
-  suggestStyles,
-  GAS_GIANT_RECIPES,
-  drawGgRecipePreview,
-} from "./gasGiantStyles.js";
-import {
-  computeRockyVisualProfile,
-  drawRockyPlanetPreview,
-  ROCKY_RECIPES,
-  drawRecipePreview,
-} from "./rockyPlanetStyles.js";
+  createCelestialVisualPreviewController,
+  renderCelestialRecipeBatch,
+} from "./celestialVisualPreview.js";
 import {
   GAS_GIANT_RADIUS_MAX_RJ,
   GAS_GIANT_RADIUS_MIN_RJ,
@@ -215,14 +209,6 @@ const TIP_LABEL = {
 
 /* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function clampGasGiantRadiusRj(value) {
   const raw = Number(value);
   if (!Number.isFinite(raw)) return GAS_GIANT_RADIUS_MIN_RJ;
@@ -296,6 +282,10 @@ export function initPlanetPage(mountEl) {
     tecPillsEl.classList.toggle("tec-recommended-active", getTecPillValue() === recVal);
   }
 
+  const celestialPreviewController = createCelestialVisualPreviewController({
+    speedDaysPerSec: 0.5,
+  });
+
   const wrap = document.createElement("div");
   wrap.className = "page";
   wrap.innerHTML = `
@@ -345,6 +335,13 @@ export function initPlanetPage(mountEl) {
     </div>
   `;
   mountEl.appendChild(wrap);
+
+  const previewCleanupObserver = new MutationObserver(() => {
+    if (wrap.isConnected) return;
+    celestialPreviewController.dispose();
+    previewCleanupObserver.disconnect();
+  });
+  previewCleanupObserver.observe(document.body, { childList: true, subtree: true });
 
   const starInfoEl = wrap.querySelector("#starInfo");
   const bodySel = wrap.querySelector("#bodySelect");
@@ -415,6 +412,11 @@ export function initPlanetPage(mountEl) {
   /* â”€â”€ Rocky planet rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   function renderRockyInputs(world, planet, sysModel) {
+    if (!planet) {
+      bodyInputsEl.innerHTML =
+        '<div class="hint">No planet selected. Add a planet to get started.</div>';
+      return;
+    }
     const p = planet.inputs || {};
 
     bodyInputsEl.innerHTML = `
@@ -1071,6 +1073,7 @@ export function initPlanetPage(mountEl) {
       <div class="kpi-wrap"><div class="kpi kpi--preview">
         <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.label] || "")}
           <button type="button" class="small rp-recipe-btn">Recipes</button>
+          <button type="button" class="small rp-pause-btn">Pause</button>
         </div>
         <canvas class="rocky-preview-canvas" width="180" height="180"></canvas>
         <div class="kpi__meta">${x.value} \u2014 ${x.meta || ""}</div>
@@ -1116,6 +1119,9 @@ export function initPlanetPage(mountEl) {
         ? `Greenhouse: manual (${fmt(d.greenhouseEffect, 3)})`
         : `Greenhouse: ${d.greenhouseMode} (computed ${fmt(d.computedGreenhouseEffect, 3)}, \u03C4 = ${fmt(d.computedGreenhouseTau, 3)})`;
 
+    // Capture existing canvas before innerHTML wipe to preserve WebGL context
+    const prevRockyCanvas = bodyOutputsEl.querySelector(".rocky-preview-canvas");
+
     bodyOutputsEl.innerHTML = `
       <div class="kpi-grid">${kpiHtml}</div>
       <div style="margin-top:14px">
@@ -1144,10 +1150,25 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
       </div>
     `;
 
-    // Render rocky planet preview canvas
-    const rockyCvs = bodyOutputsEl.querySelector(".rocky-preview-canvas");
+    // Render rocky planet preview canvas (animated native celestial controller)
+    let rockyCvs = bodyOutputsEl.querySelector(".rocky-preview-canvas");
+    if (prevRockyCanvas && rockyCvs && prevRockyCanvas !== rockyCvs) {
+      rockyCvs.replaceWith(prevRockyCanvas);
+      rockyCvs = prevRockyCanvas;
+    }
     if (rockyCvs && visualProfile) {
-      drawRockyPlanetPreview(rockyCvs, visualProfile);
+      celestialPreviewController.attach(rockyCvs, {
+        bodyType: "rocky",
+        name: p.name || "Rocky world",
+        recipeId: String(p.appearanceRecipeId || ""),
+        inputs: p,
+        derived: d,
+        visualProfile,
+        rotationPeriodHours: Number(p.rotationPeriodHours) || 24,
+        axialTiltDeg: Number(p.axialTiltDeg) || 0,
+      });
+    } else {
+      celestialPreviewController.detach();
     }
 
     // Wire recipe picker button
@@ -1155,11 +1176,22 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
       openRecipePicker((recipe) => {
         const w = loadWorld();
         const pid = w.planets.selectedId;
-        updatePlanet(pid, { inputs: recipe.apply });
-        updateWorld({ planet: recipe.apply });
+        const nextInputs = { ...recipe.apply, appearanceRecipeId: recipe.id };
+        updatePlanet(pid, { inputs: nextInputs });
+        updateWorld({ planet: nextInputs });
         render();
       });
     });
+
+    // Pause / resume rotation
+    const rpPauseBtn = bodyOutputsEl.querySelector(".rp-pause-btn");
+    if (rpPauseBtn) {
+      rpPauseBtn.addEventListener("click", () => {
+        const paused = rpPauseBtn.textContent === "Pause";
+        celestialPreviewController.setPaused(paused);
+        rpPauseBtn.textContent = paused ? "Play" : "Pause";
+      });
+    }
 
     // Update tectonic pills: mark recommended + auto-select if in auto mode
     if (tecPillsEl && d.tectonicSuggested) {
@@ -1815,11 +1847,13 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
       }
     }
 
+    const prevGasCanvas = bodyOutputsEl.querySelector(".gg-preview-canvas");
     bodyOutputsEl.innerHTML = `
       <div class="kpi-grid">
         <div class="kpi-wrap"><div class="kpi kpi--preview">
           <div class="kpi__label">Appearance ${tipIcon(TIP_LABEL["Sudarsky"])}
             <button type="button" class="small gg-recipe-btn">Recipes</button>
+            <button type="button" class="small gg-pause-btn">Pause</button>
           </div>
           <canvas class="gg-preview-canvas" data-style="${derivedStyle}" data-rings="${showRings}" width="180" height="180"></canvas>
           <div class="kpi__meta">${styleLabel(derivedStyle)} \u2014 Class ${m.classification.sudarsky}</div>
@@ -1898,9 +1932,26 @@ Circularisation: ${m.display.circularisation}</div>
       </div>
     `;
 
-    // Render gas giant preview canvas
-    for (const cvs of bodyOutputsEl.querySelectorAll(".gg-preview-canvas")) {
-      drawGasGiantPreview(cvs, cvs.dataset.style, { showRings: cvs.dataset.rings === "true" });
+    // Render gas giant preview canvas (animated native celestial controller)
+    let gasCanvas = bodyOutputsEl.querySelector(".gg-preview-canvas");
+    if (prevGasCanvas && gasCanvas && prevGasCanvas !== gasCanvas) {
+      prevGasCanvas.dataset.style = derivedStyle;
+      prevGasCanvas.dataset.rings = String(showRings);
+      gasCanvas.replaceWith(prevGasCanvas);
+      gasCanvas = prevGasCanvas;
+    }
+    if (gasCanvas) {
+      celestialPreviewController.attach(gasCanvas, {
+        bodyType: "gasGiant",
+        name: giant.name || "Gas giant",
+        recipeId: String(giant.appearanceRecipeId || ""),
+        gasCalc: m,
+        styleId: derivedStyle,
+        showRings,
+        rotationPeriodHours: Number(m.inputs?.rotationPeriodHours) || 10,
+      });
+    } else {
+      celestialPreviewController.detach();
     }
 
     // Recipe picker (in output KPI, like rocky/moon)
@@ -1915,6 +1966,7 @@ Circularisation: ${m.display.circularisation}</div>
         if (recipe.apply.rotationPeriodHours !== undefined)
           g.rotationPeriodHours = recipe.apply.rotationPeriodHours;
         if (recipe.apply.metallicity !== undefined) g.metallicity = recipe.apply.metallicity;
+        g.appearanceRecipeId = recipe.id;
         // Auto-derive style and rings from new physics
         const ggCalc = calcGasGiant({
           massMjup: g.massMjup,
@@ -1926,6 +1978,7 @@ Circularisation: ${m.display.circularisation}</div>
           starLuminosityLsol: sysModel.star.luminosityLsol,
           starAgeGyr: Number(w.star.ageGyr) || 4.6,
           starRadiusRsol: sysModel.star.radiusRsol,
+          stellarMetallicityFeH: Number(w.star.metallicityFeH) || 0,
         });
         g.style = suggestStyles(ggCalc).primary;
         const recipeDepth = ggCalc.ringProperties?.opticalDepthClass;
@@ -1934,6 +1987,16 @@ Circularisation: ${m.display.circularisation}</div>
         scheduleRender(true);
       });
     });
+
+    // Pause / resume rotation
+    const ggPauseBtn = bodyOutputsEl.querySelector(".gg-pause-btn");
+    if (ggPauseBtn) {
+      ggPauseBtn.addEventListener("click", () => {
+        const paused = ggPauseBtn.textContent === "Pause";
+        celestialPreviewController.setPaused(paused);
+        ggPauseBtn.textContent = paused ? "Play" : "Pause";
+      });
+    }
   }
 
   /* â”€â”€ Gas giant recipe picker modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -1948,6 +2011,7 @@ Circularisation: ${m.display.circularisation}</div>
           <h2>Gas Giant Recipes</h2>
           <button type="button" class="small rp-picker-close">Close</button>
         </div>
+        <div class="rp-picker-progress"><span></span></div>
         <div class="panel__body">
           ${categories
             .map(
@@ -1972,10 +2036,28 @@ Circularisation: ${m.display.circularisation}</div>
 
     document.body.appendChild(overlay);
 
+    const progressBar = overlay.querySelector(".rp-picker-progress > span");
+    const progressTrack = overlay.querySelector(".rp-picker-progress");
+    const items = [];
     for (const card of overlay.querySelectorAll(".rp-picker-card")) {
       const recipe = GAS_GIANT_RECIPES.find((r) => r.id === card.dataset.recipe);
-      if (recipe) drawGgRecipePreview(card.querySelector("canvas"), recipe);
+      if (!recipe) continue;
+      items.push({
+        canvas: card.querySelector("canvas"),
+        model: {
+          bodyType: "gasGiant",
+          name: recipe.label || "Gas giant",
+          styleId: recipe.preview?.styleId || "jupiter",
+          showRings: !!recipe.preview?.rings,
+          rotationPeriodHours: recipe.apply?.rotationPeriodHours || 10,
+        },
+      });
     }
+    renderCelestialRecipeBatch(items, (done, total) => {
+      const pct = total ? (done / total) * 100 : 100;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+      if (pct >= 100 && progressTrack) progressTrack.classList.add("is-done");
+    });
 
     function close() {
       overlay.remove();
@@ -2013,6 +2095,7 @@ Circularisation: ${m.display.circularisation}</div>
           <h2>Rocky Planet Recipes</h2>
           <button type="button" class="small rp-picker-close">Close</button>
         </div>
+        <div class="rp-picker-progress"><span></span></div>
         <div class="panel__body">
           ${categories
             .map(
@@ -2036,11 +2119,28 @@ Circularisation: ${m.display.circularisation}</div>
 
     document.body.appendChild(overlay);
 
-    // Render all recipe previews
+    const progressBar = overlay.querySelector(".rp-picker-progress > span");
+    const progressTrack = overlay.querySelector(".rp-picker-progress");
+    const items = [];
     for (const card of overlay.querySelectorAll(".rp-picker-card")) {
       const recipe = ROCKY_RECIPES.find((r) => r.id === card.dataset.recipe);
-      if (recipe) drawRecipePreview(card.querySelector("canvas"), recipe);
+      if (!recipe) continue;
+      items.push({
+        canvas: card.querySelector("canvas"),
+        model: {
+          bodyType: "rocky",
+          name: recipe.label || "Rocky world",
+          recipeId: recipe.id,
+          inputs: recipe.preview?.inputs || {},
+          derived: recipe.preview?.derived || {},
+        },
+      });
     }
+    renderCelestialRecipeBatch(items, (done, total) => {
+      const pct = total ? (done / total) * 100 : 100;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+      if (pct >= 100 && progressTrack) progressTrack.classList.add("is-done");
+    });
 
     function close() {
       overlay.remove();

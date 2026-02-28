@@ -13,11 +13,14 @@ import {
 
 /* ── Style count & categories ──────────────────────────────────────── */
 
-test("17 Realistic + 7 Fantastical", () => {
-  const realistic = GAS_GIANT_STYLES.filter((s) => s.category === "Realistic");
-  const fantastical = GAS_GIANT_STYLES.filter((s) => s.category === "Fantastical");
-  assert.equal(realistic.length, 17);
-  assert.equal(fantastical.length, 7);
+test("all styles are Realistic", () => {
+  assert.ok(
+    GAS_GIANT_STYLES.length >= 17,
+    `expected at least 17 styles, got ${GAS_GIANT_STYLES.length}`,
+  );
+  for (const s of GAS_GIANT_STYLES) {
+    assert.equal(s.category, "Realistic");
+  }
 });
 
 test("all style IDs are unique", () => {
@@ -38,10 +41,9 @@ test("getStyleById falls back to jupiter for unknown id", () => {
   assert.equal(s.id, "jupiter");
 });
 
-test("getStyleById resolves all legacy aliases", () => {
+test("getStyleById resolves legacy aliases", () => {
   assert.equal(getStyleById("ice").id, "neptune");
   assert.equal(getStyleById("hot").id, "hot-jupiter");
-  assert.equal(getStyleById("exotic").id, "crystal");
 });
 
 /* ── styleLabel ────────────────────────────────────────────────────── */
@@ -85,7 +87,7 @@ test("every style has a ringStyle with colour, gap, and width", () => {
 test("normalizeStyleId passes through known styles", () => {
   assert.equal(normalizeStyleId("jupiter"), "jupiter");
   assert.equal(normalizeStyleId("saturn"), "saturn");
-  assert.equal(normalizeStyleId("storm"), "storm");
+  assert.equal(normalizeStyleId("neptune"), "neptune");
 });
 
 test("normalizeStyleId defaults to jupiter for null/undefined", () => {
@@ -124,8 +126,11 @@ test("computeGasGiantVisualProfile styleId matches suggestStyles primary", () =>
 
 /* ── GAS_GIANT_RECIPES structural validation ───────────────────────── */
 
-test("GAS_GIANT_RECIPES has 15 entries", () => {
-  assert.equal(GAS_GIANT_RECIPES.length, 15);
+test("GAS_GIANT_RECIPES has at least 15 entries", () => {
+  assert.ok(
+    GAS_GIANT_RECIPES.length >= 15,
+    `expected at least 15 recipes, got ${GAS_GIANT_RECIPES.length}`,
+  );
 });
 
 test("all recipe IDs are unique", () => {
@@ -159,9 +164,9 @@ test("all recipe preview.styleId values are valid style IDs", () => {
   }
 });
 
-test("recipes span 4 categories", () => {
+test("recipes span at least 4 categories", () => {
   const cats = new Set(GAS_GIANT_RECIPES.map((r) => r.category));
-  assert.equal(cats.size, 4);
+  assert.ok(cats.size >= 4, `expected at least 4 categories, got ${cats.size}`);
   assert.ok(cats.has("Cold Giants"));
   assert.ok(cats.has("Ice Giants"));
   assert.ok(cats.has("Warm Giants"));

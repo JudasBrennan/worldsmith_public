@@ -4,3 +4,10 @@ Backup/
 dist/
 test-results.md
 Future Inspiration/
+.claude/
+.mcp.json
+planet.blend
+data/stellarActivity/calibration.v2.json
+references/
+scripts/
+tests/

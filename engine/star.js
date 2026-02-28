@@ -218,7 +218,7 @@ export function calcHabitableZoneAu({ luminosityLsol, teffK }) {
 // (Cumming et al. 2008, PASP 120, 531).  Clamped to [0, 1].
 export function giantPlanetProbability(metallicityFeH) {
   const feH = clamp(toFinite(metallicityFeH, 0), -3, 1);
-  return clamp(0.1 * Math.pow(10, 2 * feH), 0, 1);
+  return clamp(0.1 * 10 ** (2 * feH), 0, 1);
 }
 
 // Stellar population label based on [Fe/H].
@@ -243,7 +243,7 @@ const Z_SUN_SSE = 0.02;
 
 /** Convert [Fe/H] to metal mass fraction Z (SSE convention, Z☉ = 0.02). */
 export function feHtoZ(feH) {
-  return Z_SUN_SSE * Math.pow(10, clamp(toFinite(feH, 0), -3, 1));
+  return Z_SUN_SSE * 10 ** clamp(toFinite(feH, 0), -3, 1);
 }
 
 /** Evaluate polynomial c[0] + c[1]ζ + c[2]ζ² + … */
@@ -367,7 +367,7 @@ function tmsRadius(massMsol, Z) {
   const logZ = Math.log10(clamp(Z, 1e-4, 0.1));
   const e1 = 0.097 - 0.1072 * (logZ + 3);
   const e2 = 0.1462 + 0.1237 * (logZ + 2);
-  const a17 = Math.pow(10, Math.max(e1, Math.max(0.097, Math.min(0.1461, e2))));
+  const a17 = 10 ** Math.max(e1, Math.max(0.097, Math.min(0.1461, e2)));
   const lo = RTMS_LO.map((c) => zpoly(z, c));
   const a20 = lo[2];
   const rLo = Math.max(
@@ -448,7 +448,7 @@ export function evolvedLuminosity(massMsol, Z, ageGyr) {
   const bL = ssBetaL(m, zeta);
   const eta = m <= 1.0 ? 10 : m >= 1.1 ? 20 : 10 + 100 * (m - 1);
   const logRatio = aL * tau + bL * tau ** eta + (lx - aL - bL) * tau ** 2;
-  return lZams * Math.pow(10, logRatio);
+  return lZams * 10 ** logRatio;
 }
 
 /**
@@ -468,7 +468,7 @@ export function evolvedRadius(massMsol, Z, ageGyr) {
   const zeta = Math.log10(Zc / Z_SUN_SSE);
   const aR = ssAlphaR(m, zeta);
   const logRatio = aR * tau + (rx - aR) * tau ** 3;
-  return rZams * Math.pow(10, logRatio);
+  return rZams * 10 ** logRatio;
 }
 
 /**

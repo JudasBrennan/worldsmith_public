@@ -2,13 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { calcDebrisDisk, calcDebrisDiskSuggestions } from "../engine/debrisDisk.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} +/- ${tolerance}, got ${actual}`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 const SOLAR = {
   starMassMsol: 1,
@@ -200,6 +194,52 @@ test("asteroid belt → Mixed silicate-ice", () => {
 test("Kuiper belt → Ice-dominated", () => {
   const d = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
   assert.equal(d.composition.className, "Ice-dominated");
+});
+
+test("composition: metal-poor stars increase ice/rock, metal-rich decrease it", () => {
+  const lowFeH = calcDebrisDisk({
+    innerAu: 2.7,
+    outerAu: 3.5,
+    starMetallicityFeH: -0.5,
+    ...SOLAR,
+  });
+  const solarFeH = calcDebrisDisk({
+    innerAu: 2.7,
+    outerAu: 3.5,
+    starMetallicityFeH: 0.0,
+    ...SOLAR,
+  });
+  const highFeH = calcDebrisDisk({
+    innerAu: 2.7,
+    outerAu: 3.5,
+    starMetallicityFeH: 0.3,
+    ...SOLAR,
+  });
+  assert.ok(
+    lowFeH.composition.iceToRockRatio > solarFeH.composition.iceToRockRatio,
+    "low [Fe/H] should increase ice-to-rock ratio",
+  );
+  assert.ok(
+    highFeH.composition.iceToRockRatio < solarFeH.composition.iceToRockRatio,
+    "high [Fe/H] should decrease ice-to-rock ratio",
+  );
+});
+
+test("composition class stays temperature-driven across stellar metallicity", () => {
+  const lowFeH = calcDebrisDisk({
+    innerAu: 2.06,
+    outerAu: 3.28,
+    starMetallicityFeH: -1.5,
+    ...SOLAR,
+  });
+  const highFeH = calcDebrisDisk({
+    innerAu: 2.06,
+    outerAu: 3.28,
+    starMetallicityFeH: 0.5,
+    ...SOLAR,
+  });
+  assert.equal(lowFeH.composition.className, "Mixed silicate-ice");
+  assert.equal(highFeH.composition.className, "Mixed silicate-ice");
 });
 
 /* ── Fractional luminosity ─────────────────────────────────────────── */

@@ -2,7 +2,346 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
-## Unreleased (post-1.13.0)
+## 1.14.0 — 2026-02-28
+
+### Bug Fixes
+
+- Unified Visualiser cluster mode now renders from canvas
+  backing-store dimensions (instead of client dimensions), removing
+  fractional bottom-edge artifact strips on large/high-DPR canvases.
+- Cluster star rendering now culls fully off-canvas glows/companion
+  dots to prevent clipped edge speckling at the canvas border.
+- System Poster and Apparent Sky canvases now use the same
+  `ceil + backing-store` sizing path, preventing sub-pixel underpaint
+  rows in normal and fullscreen layouts.
+- Lagrange/Hill display toggles now trigger an immediate visualiser
+  redraw instead of waiting for the next animation frame.
+- Focus camera follow now couples pan with zoom ratio when
+  selecting/focusing bodies, removing the brief snap toward the host
+  star.
+- In System Poster fullscreen mode, the hide/show poster control is
+  now disabled and visibly greyed out for consistent behaviour.
+- Gas giant atmospheric metallicity now defaults to the mass-derived
+  Thorngren relation scaled by host-star metallicity (`10^[Fe/H]`)
+  when left blank, while manual metallicity overrides remain unchanged.
+- Debris disk composition now includes stellar metallicity influence:
+  condensed-species weighting and ice-to-rock ratio are modulated by
+  host-star `[Fe/H]` while retaining temperature-driven condensation
+  presence and class labels.
+- Planet and moon Appearance KPI preview cards now hide Recipes and
+  Pause buttons when collapsed, preventing the buttons from pushing
+  the canvas downward. Buttons reappear on hover or focus-within.
+- Gas giant preview materials now use a fully matte PBR finish
+  (roughness 1.0, metalness 0, clearcoat 0), removing the glossy
+  specular highlight that was inconsistent with gas giant appearance
+  at planetary scales.
+
+**Tests** (tests/debrisDisk.test.js, tests/gasGiant.test.js)
+
+- 2 new tests: metal-poor stars increase debris disk ice/rock ratio
+  while metal-rich decrease it; composition class stays
+  temperature-driven across metallicity extremes.
+- 1 new test: gas giant derived atmospheric metallicity scales with
+  host-star `[Fe/H]` when metallicity input is blank.
+
+### Rendering Platform
+
+**Three.js native rendering pipeline**
+(ui/celestialVisualPreview.js, ui/celestialComposer.js,
+ui/celestialArtProfiles.js, ui/threeNativePreview.js,
+ui/threeBridge2d.js, ui/threeRenderAssetMap.js,
+ui/apparentSkyNativeThree.js, ui/systemPosterNativeThree.js,
+ui/celestialTextureWorker.js, ui/celestialTextureWorkerClient.js,
+ui/starVisualPreview.js, ui/visualizerPage.js, ui/systemPage.js,
+ui/apparentPage.js, ui/planetPage.js, ui/moonPage.js,
+ui/gasGiantStyles.js, ui/rockyPlanetStyles.js, ui/moonStyles.js)
+
+Completed a full migration from Canvas2D to native Three.js WebGL
+rendering across all major render surfaces: the Unified Visualiser
+system view, System Poster, Apparent Sky comparison, and all body
+preview canvases.
+
+- Added a lazy-loading Three.js bridge (`ui/threeBridge2d.js`) for CDN
+  import (v0.170.0) with retry on failure.
+- Migrated rocky/gas/moon preview and recipe canvases to native Three
+  shader/material previews (`ui/threeNativePreview.js`) with a custom
+  `ShaderMaterial` implementing UV-mapped texture, diffuse lighting,
+  rim lighting, ambient term, and alpha transparency.
+- Added generated 3D-render asset pipeline
+  (`scripts/generate-three-render-assets.mjs`) producing SVG sprites
+  for 8 star, 17 gas giant, 19 rocky, 17 moon, and 6 debris disk
+  variants under `assets/three-renders/`, with an asset-map module
+  (`ui/threeRenderAssetMap.js`) for runtime lookup.
+- Promoted the star-only preview runtime into a unified
+  `ui/celestialVisualPreview.js` controller with compatibility
+  re-export from `ui/starVisualPreview.js`. Supports `attach/detach`,
+  `setPaused`, rotation animation at configurable speed, and disposal.
+- Added a modular rule-driven composition engine
+  (`ui/celestialComposer.js`) for rocky, gas giant, and moon textures
+  using deterministic seeded layer stacks. Layers include base
+  gradient, noise-based terrain, band patterns, oceans, ice caps,
+  vegetation, clouds, volcanic features, craters, and more.
+  Equirectangular texture maps are generated using 3D value noise,
+  fBm, ridged fBm, and domain warping.
+- Added full per-type celestial art-profile library
+  (`ui/celestialArtProfiles.js`) covering all established rocky
+  recipes, moon recipes, and gas styles, then wired those directives
+  into `ui/celestialComposer.js`. Includes 11 new procedural texture
+  modules: `dune-streaks`, `caustic-bloom`, `terminator-band`,
+  `impact-rays`, `rift-lines`, `plume-haze`, `band-shear`,
+  `storm-fronts`, `polar-haze`, `aurora-ovals`, `geo-grid`.
+- Added off-thread texture generation via a Web Worker
+  (`ui/celestialTextureWorker.js`,
+  `ui/celestialTextureWorkerClient.js`) with request queueing,
+  signature-based deduplication, and error recovery.
+- Added descriptor texture caching + hover-aware LOD tiers
+  (`low`/`medium`/`high`/`ultra`) for preview performance and quality
+  scaling.
+- Added preset-asset catalog generation
+  (`scripts/generate-celestial-preset-assets.mjs`) and generated
+  `assets/celestial-presets/manifest.json` covering established
+  rocky/gas/moon families.
+- Updated planet and moon Appearance KPI previews to use the unified
+  animated controller, with rotation driven at `0.5` simulated Earth
+  days per second. Added Pause/Play buttons that appear on
+  hover/focus-within.
+- Persisted recipe identifiers (`appearanceRecipeId`) through
+  rocky/moon/gas flows so preview rendering keeps deterministic
+  type-specific visual signatures across edits and reloads.
+- Upgraded celestial preview rendering quality with higher LOD texture
+  tiers, physically based body materials, and generated
+  normal/roughness/emissive maps for richer lighting detail on planets
+  and moons.
+- Migrated the System Poster to Three.js orthographic rendering
+  (`ui/systemPosterNativeThree.js`) with textured body spheres, star
+  glow, habitable-zone arc band, frost line, debris disk particles,
+  orbital guides, and starfield background. Removed ~430 lines of
+  Canvas2D poster drawing code from `ui/systemPage.js`.
+- Migrated the Apparent Sky angular-size comparison to Three.js
+  (`ui/apparentSkyNativeThree.js`) with textured body spheres,
+  Sol/Luna/Jupiter reference outlines, star glow, and day/night sky
+  backgrounds. Removed ~450 lines of Canvas2D sky drawing code from
+  `ui/apparentPage.js`.
+- Added Three.js native body mesh cache in the Visualiser system view
+  with LOD swapping, texture generation, atmosphere materials, and
+  spin animation. Moon labels fade in based on zoom level.
+- Replaced the canvas-drawn transition bar (`ui/vizTransition.js`)
+  with a native HTML transition overlay with progress bar. Added an
+  off-scale zone notice for bodies beyond the visible viewport.
+- Removed the Canvas2D body-rendering dispatch layer
+  (`ui/bodyRenderer.js`) — responsibilities absorbed by the Three.js
+  pipeline.
+- Removed 2D Canvas rendering functions from `gasGiantStyles.js`,
+  `moonStyles.js`, and `rockyPlanetStyles.js` (preview, visualiser,
+  and recipe-thumbnail renderers), replaced by Three.js native
+  preview calls.
+
+**Tests** (tests/celestialArtProfiles.test.js,
+tests/celestialComposer.test.js, tests/celestialVisual.test.js,
+tests/three.test.js, tests/visualHelpers.js)
+
+- Added visual regression test infrastructure
+  (`tests/visualHelpers.js`) with `@napi-rs/canvas` and `pixelmatch`
+  for pixel-perfect snapshot comparison. Reference snapshots stored
+  in `tests/snapshots/`.
+- Patched `tests/domHarness.js` to delegate `getContext("2d")` to
+  `@napi-rs/canvas` for real pixel-level rendering in headless tests.
+- New test file `tests/celestialArtProfiles.test.js`: art profile
+  resolution for every rocky/moon/gas recipe, layer verification,
+  noise parameter coverage, gas ring/atmosphere specs.
+- New test file `tests/celestialComposer.test.js`: descriptor
+  defaults, ring enabling, subsurface-ocean mapping, LOD fallback,
+  recipe-like model handling.
+- New test file `tests/celestialVisual.test.js`: deterministic
+  texture generation, pixel-perfect snapshot comparison, visual
+  differentiation between body types.
+- New test file `tests/three.test.js`: Three.js core constructors,
+  vector/matrix operations, colour parsing, geometry vertex counts,
+  colour space constants.
+- Removed `tests/bodyRenderer.test.js` (superseded by celestial
+  composer/art profile tests).
+
+### Cluster Visualiser
+
+**Pure 2D overlay rendering**
+(ui/visualizerPage.js, ui/vizClusterRenderer.js)
+
+Rewrote the cluster visualiser to render entirely on a single 2D
+canvas overlay, eliminating the hybrid WebGL + Canvas2D split that
+caused compositing judder during camera rotation. Three.js is used
+only for projection math (camera matrix); all visual elements —
+background gradient, starfield, grid rings, bearing labels, axes,
+boundary circle, vertical links, star dots with radial gradients,
+companion stars, system labels, and hover highlights — are drawn on
+one `<canvas>` surface.
+
+- Stars render as radial-gradient dots with bright cores and soft
+  glow, matching the v1.13.0 Canvas2D visual style, instead of flat
+  `SphereGeometry` meshes.
+- System labels use native `ctx.fillText` with collision detection
+  instead of Three.js `Sprite` objects, restoring readable text at
+  all zoom levels.
+- Boundary circle is drawn as a screen-facing 2D arc instead of a 3D
+  `RingGeometry` on the XZ plane that appeared as a tilted ellipse.
+- Home star remains pinned to the projected centre during rotation.
+- Added a toggleable starfield background (400 seeded random stars)
+  with a "Starfield" checkbox in the cluster controls panel.
+- Moved `vizClusterRenderer.js` to a data-only module
+  (`buildClusterSnapshot`); all rendering code now lives in
+  `visualizerPage.js`.
+
+### Stellar Activity
+
+**Structured activity model with split-rate CME channels**
+(engine/stellarActivity.js, ui/starPage.js,
+scripts/calibrate-stellar-activity.mjs)
+
+Added a structured three-tier stellar-activity model
+(`inputs` / `activity` / `display`) with activity-cycle-aware flare
+rate modulation, a comprehensive CME rate model, recalibrated CME
+association probabilities, smooth saturation curves replacing hard
+caps, and support for nested parameter shapes — while maintaining
+backward compatibility through the existing `computeFlareParams`
+entry point.
+
+- New primary entry point `computeStellarActivityModel(star)` returns
+  all numeric outputs and pre-formatted display strings in a
+  three-tier object.
+- Activity-cycle modulation: `flareCycleMultiplierFromCycle()` applies
+  spectral-bin-specific min/max multipliers (FGK 0.35–1.65, earlyM
+  0.6–1.4, lateM 0.75–1.25) from a new `FLARE_CYCLE_MULTIPLIER_TABLE`.
+- Comprehensive CME rate model via `computeCmeRateModel()`: associated
+  rate (power-law-weighted mean association probability × flare rate),
+  background rate (FGK: fills to cycle target; M-dwarf: activity-norm
+  scaled), and total rate.
+- Recalibrated `baseCmeProbability()` from a hardcoded if/else chain
+  to a data-driven `CME_PROBABILITY_BREAKS` table with updated values
+  (micro-flares 0.02→0.005, super-flares 0.5→0.75).
+- Replaced hard CME cutoff logic in `maybeSpawnCME()` with a smooth
+  `cmeSaturationFactor()` that gradually reduces probability as
+  recent count exceeds the target.
+- Added `scheduleNextCme()` Poisson-process CME scheduler.
+- Updated the visualiser flare/CME runtime to consume the v2 model:
+  flare cadence follows energetic flare rate, while CMEs are
+  scheduled from associated/background channels with separate queues
+  and backlog guards.
+- Updated Star page to show seven activity metrics: energetic flare
+  rate, energetic flare recurrence, total flare rate (>10³⁰ erg),
+  total flare recurrence, associated CME rate, background CME rate,
+  and total CME rate.
+- Added animated star visual preview on the Star page with real-time
+  flare bursts and CME events driven by the activity model, rotating
+  at 0.5 simulated days per second.
+- Added schema migration for `star.activityModelVersion` (`v1` legacy,
+  `v2` split-rate model) and persisted it through Star page
+  apply/preset/reset flows.
+- Added `data/stellarActivity/calibration.v2.json` as a v2
+  stellar-activity calibration anchor dataset.
+- Added `scripts/calibrate-stellar-activity.mjs` and
+  `npm run calibrate:activity` for calibration regression checks.
+
+**Tests** (tests/stellarActivity.test.js)
+
+- New test: `computeStellarActivityModel` returns correct structure
+  and rates for a Sun-like star (Teff 5770, age 4.6 Gyr).
+- Rewritten CME throttling test validates soft-suppression curve
+  instead of binary pass/fail.
+- New test: nested `{ inputs, activity, display }` params accepted
+  by `scheduleNextFlare`, `expectedRateAboveEnergyPerDay`, and
+  `maybeSpawnCME`.
+- New test: `flareCycleMultiplierFromCycle` returns 1.0 at midpoint
+  (cycle 0.5) for all spectral bins.
+- New test: `computeCmeRateModel` FGK associated + background matches
+  cycle target envelope.
+- New test: `scheduleNextCme` is deterministic with seeded RNG.
+
+### Gas Giant Styles
+
+**Fantastical styles removed, palette tuning**
+(ui/gasGiantStyles.js, ui/store.js, tests/gasGiantStyles.test.js)
+
+- Removed the 7 Fantastical gas giant styles; the style library now
+  contains 17 Realistic styles only.
+- Removed the `"exotic"→"crystal"` legacy alias from the store
+  migration.
+- Tuned colour palettes across all Realistic styles for higher
+  saturation and contrast (Jupiter, Saturn, Neptune, Uranus, Hot
+  Jupiter, etc.).
+- Added `inferGasStyleFamily()` and `enrichGasStyleDef()` helpers.
+
+### Splash Screen Toggle
+
+**Persistent splash-screen opt-out**
+(app.js, index.html, styles.css)
+
+Added a "Splash" checkbox in the header controls that persists to
+`localStorage`. When unchecked, the splash overlay is skipped
+entirely and the app starts directly. Defaults to enabled.
+
+### Initial State
+
+**Empty initial world** (ui/store.js)
+
+New worlds now start with no planets and no moons. The previous
+default (one Earth-like planet "New Planet" and one Luna-like moon)
+has been removed. Schema version advanced from 45 to 46.
+
+- `clearAllData()` now removes all `worldsmith.*` localStorage keys
+  (previously only removed backup keys), ensuring theme preferences,
+  splash state, and visualizer flags are also reset.
+
+### Internal
+
+**Refactoring and deduplication**
+
+- Extracted `eccentricityFactor(e)` (Wisdom 2004/2008 tidal heating
+  function) from `engine/moon.js` and `engine/planet.js` into
+  `engine/utils.js` as a single shared export.
+- Extracted `escapeHtml()` from five UI files into `ui/uiHelpers.js`.
+- Stellar population label shortened on the Star page: display value
+  uses `shortPopulationLabel()` (e.g. "Pop I"), full label moved to
+  meta text.
+- "Exotic" style alias removed from `gasGiantStyles.js`
+  `normalizeStyleId`; "storm" normalises to "neptune".
+- About page changelog wording updated: "many real and fantastical
+  types" changed to "many realistic types".
+
+**CSS** (styles.css)
+
+- Added `.header-controls` container and `.splash-toggle` component
+  for the header splash opt-out checkbox.
+- Added responsive `.top-nav__link` font scaling at 1640 px and
+  1505 px breakpoints.
+- Added `backdrop-filter: blur(8px)` to `button.small` and the
+  splash overlay.
+- Replaced `.brand__mark` gradient with `favicon.svg` background
+  image.
+- Added `.kpi--sun-preview` card styles with expandable animated
+  canvas.
+- Added `.rp-picker-progress` recipe-picker progress bar with
+  animated fill and fade-out.
+- Added `#viz-overlay` absolute-positioned overlay canvas for the
+  cluster visualiser.
+- Added `.viz-native-transition` progress bar and
+  `.viz-offscale-note` positioned note for the visualiser.
+- Added `.viz-help-overlay` modal with close button, two-column
+  grid, and `<kbd>` styled shortcut keys.
+- Added poster fullscreen layout improvements and disabled-state
+  styling for the collapse button.
+
+**New devDependencies**
+
+- `three` (^0.183.1) — Three.js 3D library
+- `@napi-rs/canvas` (^0.1.95) — native Node canvas for headless
+  rendering in tests
+- `pixelmatch` (^7.1.0) — pixel-level image comparison for visual
+  regression
+
+**New npm scripts**
+
+- `npm run assets:three` — generate Three.js SVG sprite assets
+- `npm run assets:celestial` — generate celestial preset manifest
+- `npm run calibrate:activity` — stellar activity calibration check
 
 ## 1.13.0 — 2026-02-24
 
@@ -30,7 +369,7 @@ ui/planetPage.js, ui/outerObjectsPage.js)
   `p.inputs` instead of slot-AU-corrected inputs, so climate and sky
   colours were computed at the stored semi-major axis rather than the
   assigned orbit slot. Applied the `{ ...p.inputs, semiMajorAxisAu:
-  slotAu }` override pattern already used by the Visualiser.
+slotAu }` override pattern already used by the Visualiser.
 - Moon parent planet inputs passed to `calcMoonExact` on the System
   page also lacked the slot-AU override. Added a
   `correctedInputsByPlanetId` lookup built from assigned slot positions,
@@ -42,7 +381,6 @@ ui/planetPage.js, ui/outerObjectsPage.js)
   override affects inner limit and density, both overrides together,
   invalid overrides (negative, zero, NaN) fall back to mass-derived
   values
-
 
 ### Planet Visualisation System
 

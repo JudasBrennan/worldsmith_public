@@ -51,7 +51,7 @@ if (failures.length > 0) {
   for (const failure of failures) {
     console.error(`\n- ${failure.file}\n${failure.error}`);
   }
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log(`Syntax check passed (${files.length} files).`);
 }
-
-console.log(`Syntax check passed (${files.length} files).`);

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="rgba(178, 118, 78, 0.98)"/>
+      <stop offset="55%" stop-color="rgba(118, 58, 32, 0.96)"/>
+      <stop offset="100%" stop-color="rgba(48, 18, 8, 0.96)"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><ellipse cx="128" cy="61.44" rx="105.47200000000001" ry="7.168000000000001" fill="rgba(145,72,38,0.48)"/><ellipse cx="128" cy="80.896" rx="105.47200000000001" ry="6.144" fill="rgba(168,98,55,0.35)"/><ellipse cx="128" cy="103.424" rx="105.47200000000001" ry="8.192" fill="rgba(110,48,22,0.55)"/><ellipse cx="128" cy="124.92800000000001" rx="105.47200000000001" ry="5.120000000000001" fill="rgba(158,88,50,0.3)"/><ellipse cx="128" cy="149.50400000000002" rx="105.47200000000001" ry="9.216" fill="rgba(100,38,15,0.55)"/><ellipse cx="128" cy="171.008" rx="105.47200000000001" ry="6.144" fill="rgba(148,78,42,0.42)"/><ellipse cx="128" cy="192.51200000000003" rx="105.47200000000001" ry="7.168000000000001" fill="rgba(120,55,28,0.48)"/><ellipse cx="128" cy="210.94400000000002" rx="105.47200000000001" ry="5.120000000000001" fill="rgba(138,68,38,0.35)"/><ellipse cx="128" cy="117.76" rx="28.672000000000004" ry="14.336000000000002" fill="rgba(85,28,10,0.58)"/><ellipse cx="97.27999999999999" cy="168.95999999999998" rx="12.288" ry="6.144" fill="rgba(98,38,18,0.42)"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

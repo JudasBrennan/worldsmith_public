@@ -18,21 +18,7 @@ import {
   evolvedLuminosity,
   evolvedRadius,
 } from "../engine/star.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} +/- ${tolerance}, got ${actual}`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
-
-function pctWithin(actual, expected, pct, label) {
-  const err = Math.abs(actual - expected) / expected;
-  assert.ok(
-    err <= pct / 100,
-    `${label}: expected ${expected} ±${pct}%, got ${actual} (${(err * 100).toFixed(1)}% off)`,
-  );
-}
+import { approxEqual, pctWithin } from "./testHelpers.js";
 
 test("sun-like star returns corrected habitable zone values", () => {
   const star = calcStar({ massMsol: 1, ageGyr: 4.6 });

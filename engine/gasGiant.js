@@ -225,6 +225,11 @@ export function estimateMetallicity(massMjup) {
   return clamp(round(10 ** logZ, 1), 1, 200);
 }
 
+function stellarMetallicityScaleFromFeH(feH) {
+  const dex = clamp(toFinite(feH, 0), -3, 1);
+  return 10 ** dex;
+}
+
 /* ── Atmospheric composition ─────────────────────────────────────── */
 
 // Solar-baseline trace-gas number fractions (%).
@@ -540,6 +545,7 @@ function calcTidalEffects(massMjup, radiusKm, orbitAu, starMassMsol, starAgeGyr)
  * @param {number} params.starLuminosityLsol  Host star luminosity (L☉)
  * @param {number} params.starAgeGyr       Host star age (Gyr)
  * @param {number} params.starRadiusRsol   Host star radius (R☉)
+ * @param {number} [params.stellarMetallicityFeH] Host star metallicity [Fe/H] (dex)
  * @returns {object} Comprehensive gas giant model
  */
 export function calcGasGiant({
@@ -552,6 +558,7 @@ export function calcGasGiant({
   starLuminosityLsol,
   starAgeGyr,
   starRadiusRsol,
+  stellarMetallicityFeH,
 }) {
   /* ── Resolve mass ↔ radius ─────────────────────────────────────── */
 
@@ -560,7 +567,7 @@ export function calcGasGiant({
   const sMass = clamp(toFinite(starMassMsol, 1), 0.075, 100);
   const sLum = Math.max(0.0001, toFinite(starLuminosityLsol, 1));
   const sAge = clamp(toFinite(starAgeGyr, 4.6), 0.01, 15);
-  void starRadiusRsol; // reserved for future use
+  void starRadiusRsol;
 
   let massMjup, radiusRj;
   let massSource, radiusSource;
@@ -610,8 +617,10 @@ export function calcGasGiant({
 
   // First-pass equilibrium temp (used for Sudarsky classification)
   const teqFirst = (279 * Math.sqrt(sLum)) / Math.sqrt(orbit);
-  const sud = classifySudarsky(teqFirst, massMjup);
-  const bondAlbedo = sud.bondAlbedo;
+  // Sudarsky class uses the zero-albedo temperature (teqFirst) since the
+  // classification itself determines the albedo — avoids iterative instability.
+  const sudFinal = classifySudarsky(teqFirst, massMjup);
+  const bondAlbedo = sudFinal.bondAlbedo;
 
   // Corrected equilibrium temperature with albedo
   const teqK = (279 * (1 - bondAlbedo) ** 0.25 * Math.sqrt(sLum)) / Math.sqrt(orbit);
@@ -621,9 +630,6 @@ export function calcGasGiant({
 
   /* ── Classification ───────────────────────────────────────────── */
 
-  // Sudarsky class uses the zero-albedo temperature (teqFirst) since the
-  // classification itself determines the albedo — avoids iterative instability.
-  const sudFinal = classifySudarsky(teqFirst, massMjup);
   const isIceGiant = massMjup < 0.15;
 
   /* ── Metallicity ──────────────────────────────────────────────── */
@@ -631,16 +637,19 @@ export function calcGasGiant({
   const hasMetallicity =
     rawMetallicity != null && Number.isFinite(Number(rawMetallicity)) && Number(rawMetallicity) > 0;
   const metallicitySource = hasMetallicity ? "user" : "derived";
+  const stellarFeH = clamp(toFinite(stellarMetallicityFeH, 0), -3, 1);
+  const stellarMetallicityScale = stellarMetallicityScaleFromFeH(stellarFeH);
 
   /* ── Atmosphere & clouds ───────────────────────────────────────── */
 
   // Use effective temperature (includes internal heating) for cloud/atmosphere
   // decisions — more physically realistic than equilibrium T alone.
-  // Resolve metallicity: use user value if provided, otherwise estimate from mass.
+  // Resolve metallicity: use user value if provided, otherwise estimate from mass
+  // and scale by host-star metallicity (10^[Fe/H]).
   // Cannot use toFinite(null, fallback) here — Number(null) === 0 is finite.
   const resolvedMetallicity = hasMetallicity
     ? clamp(Number(rawMetallicity), 0.1, 200)
-    : estimateMetallicity(massMjup);
+    : clamp(estimateMetallicity(massMjup) * stellarMetallicityScale, 0.1, 200);
 
   const atmosphere = getAtmosphere(massMjup, tEffK, resolvedMetallicity);
   const clouds = getClouds(tEffK, isIceGiant);
@@ -692,6 +701,7 @@ export function calcGasGiant({
       orbitAu: orbit,
       rotationPeriodHours: rot,
       metallicitySolar: atmosphere.metallicitySolar,
+      stellarMetallicityFeH: round(stellarFeH, 2),
       massSource,
       radiusSource,
       metallicitySource,

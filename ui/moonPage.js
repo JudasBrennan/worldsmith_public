@@ -2,12 +2,12 @@ import { calcMoon } from "../engine/moon.js";
 import { calcGasGiant } from "../engine/gasGiant.js";
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
+import { computeMoonVisualProfile, MOON_RECIPES } from "./moonStyles.js";
 import {
-  computeMoonVisualProfile,
-  drawMoonPreview,
-  MOON_RECIPES,
-  drawMoonRecipePreview,
-} from "./moonStyles.js";
+  createCelestialVisualPreviewController,
+  renderCelestialRecipeBatch,
+} from "./celestialVisualPreview.js";
+import { escapeHtml } from "./uiHelpers.js";
 import {
   loadWorld,
   updateWorld,
@@ -123,6 +123,9 @@ export function initMoonPage(mountEl) {
     planet: { ...world.planet },
     moon: { ...world.moon },
   };
+  const celestialPreviewController = createCelestialVisualPreviewController({
+    speedDaysPerSec: 0.5,
+  });
 
   const wrap = document.createElement("div");
   wrap.className = "page";
@@ -237,6 +240,13 @@ export function initMoonPage(mountEl) {
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+
+  const previewCleanupObserver = new MutationObserver(() => {
+    if (wrap.isConnected) return;
+    celestialPreviewController.dispose();
+    previewCleanupObserver.disconnect();
+  });
+  previewCleanupObserver.observe(document.body, { childList: true, subtree: true });
 
   const moonSelectEl = wrap.querySelector("#moonSelect");
   const moonNewEl = wrap.querySelector("#moonNew");
@@ -380,14 +390,6 @@ export function initMoonPage(mountEl) {
     moonSelectEl.value = w.moons.selectedId;
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
   function buildParentOverride(gg) {
     const starW = loadWorld().star;
     const ggModel = calcGasGiant({
@@ -400,6 +402,7 @@ export function initMoonPage(mountEl) {
       starLuminosityLsol: Number(starW.luminosityLsol) || 1,
       starAgeGyr: Number(starW.ageGyr) || 4.6,
       starRadiusRsol: Number(starW.radiusRsol) || 1,
+      stellarMetallicityFeH: Number(starW.metallicityFeH) || 0,
     });
     return {
       inputs: {
@@ -498,6 +501,7 @@ export function initMoonPage(mountEl) {
       { label: "Planet locked to Star?", value: model.display.planetLockedStar, meta: "" },
     ];
 
+    const prevMoonCanvas = kpisEl.querySelector(".moon-preview-canvas");
     kpisEl.innerHTML = items
       .map((x) => {
         if (x.isMoonPreview) {
@@ -505,6 +509,7 @@ export function initMoonPage(mountEl) {
       <div class="kpi-wrap"><div class="kpi kpi--preview">
         <div class="kpi__label">${x.label}
           <button type="button" class="small moon-recipe-btn">Recipes</button>
+          <button type="button" class="small moon-pause-btn">Pause</button>
         </div>
         <canvas class="moon-preview-canvas" width="180" height="180"></canvas>
         <div class="kpi__meta">${x.value} \u2014 ${x.meta || ""}</div>
@@ -522,20 +527,48 @@ export function initMoonPage(mountEl) {
       })
       .join("");
 
-    // Render moon preview canvas
-    const moonCvs = kpisEl.querySelector(".moon-preview-canvas");
+    // Render moon preview canvas (animated native celestial controller)
+    let moonCvs = kpisEl.querySelector(".moon-preview-canvas");
+    if (prevMoonCanvas && moonCvs && prevMoonCanvas !== moonCvs) {
+      moonCvs.replaceWith(prevMoonCanvas);
+      moonCvs = prevMoonCanvas;
+    }
     if (moonCvs && moonProfile) {
-      drawMoonPreview(moonCvs, moonProfile);
+      celestialPreviewController.attach(moonCvs, {
+        bodyType: "moon",
+        name: state.moonName || state.moon.name || "Moon",
+        recipeId: String(state.moon?.appearanceRecipeId || ""),
+        moonProfile,
+        moonCalc: model,
+        rotationPeriodDays:
+          Number(model?.orbit?.rotationPeriodDays) ||
+          Number(model?.orbit?.periodSiderealDays) ||
+          27.3,
+      });
+    } else {
+      celestialPreviewController.detach();
     }
 
     // Wire recipe picker button
     kpisEl.querySelector(".moon-recipe-btn")?.addEventListener("click", () => {
       openMoonRecipePicker((recipe) => {
         const selMoon = getSelectedMoon();
-        if (selMoon) updateMoon(selMoon.id, { inputs: recipe.apply });
+        if (selMoon) {
+          updateMoon(selMoon.id, { inputs: { ...recipe.apply, appearanceRecipeId: recipe.id } });
+        }
         render();
       });
     });
+
+    // Pause / resume rotation
+    const moonPauseBtn = kpisEl.querySelector(".moon-pause-btn");
+    if (moonPauseBtn) {
+      moonPauseBtn.addEventListener("click", () => {
+        const paused = moonPauseBtn.textContent === "Pause";
+        celestialPreviewController.setPaused(paused);
+        moonPauseBtn.textContent = paused ? "Play" : "Pause";
+      });
+    }
 
     limitsEl.textContent =
       `Moon Zone (Inner): ${model.display.zoneInner}
@@ -696,6 +729,7 @@ export function initMoonPage(mountEl) {
           <h2>Select Moon Recipe</h2>
           <button type="button" class="small rp-picker-close">Close</button>
         </div>
+        <div class="rp-picker-progress"><span></span></div>
         <div class="panel__body">
           ${categories
             .map(
@@ -719,10 +753,27 @@ export function initMoonPage(mountEl) {
 
     document.body.appendChild(overlay);
 
+    const progressBar = overlay.querySelector(".rp-picker-progress > span");
+    const progressTrack = overlay.querySelector(".rp-picker-progress");
+    const items = [];
     for (const card of overlay.querySelectorAll(".rp-picker-card")) {
       const recipe = MOON_RECIPES.find((r) => r.id === card.dataset.recipe);
-      if (recipe) drawMoonRecipePreview(card.querySelector("canvas"), recipe);
+      if (!recipe) continue;
+      items.push({
+        canvas: card.querySelector("canvas"),
+        model: {
+          bodyType: "moon",
+          name: recipe.label || "Moon",
+          recipeId: recipe.id,
+          moonCalc: recipe.preview,
+        },
+      });
     }
+    renderCelestialRecipeBatch(items, (done, total) => {
+      const pct = total ? (done / total) * 100 : 100;
+      if (progressBar) progressBar.style.width = `${pct}%`;
+      if (pct >= 100 && progressTrack) progressTrack.classList.add("is-done");
+    });
 
     function close() {
       overlay.remove();

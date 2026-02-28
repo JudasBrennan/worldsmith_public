@@ -24,7 +24,7 @@ export function calcLagrangePoints({ bodyAu, bodyMass, starMass, bodyAngleRad })
   if (a <= 0 || mb <= 0 || ms <= 0) return null;
 
   const massRatio = mb / ms;
-  const hillAu = a * Math.pow(massRatio / 3, 1 / 3);
+  const hillAu = a * (massRatio / 3) ** (1 / 3);
 
   return {
     hill: { au: hillAu },

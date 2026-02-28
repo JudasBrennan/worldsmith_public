@@ -4,6 +4,7 @@ import { attachTooltips, tipIcon } from "./tooltip.js";
 import { createSolPresetEnvelope } from "./solPreset.js";
 import { createRealmspacePresetEnvelope } from "./realmspacePreset.js";
 import { createArrakisPresetEnvelope } from "./arrakisPreset.js";
+import { escapeHtml } from "./uiHelpers.js";
 
 const { exportEnvelope, validateEnvelope, importWorld, createBackup, listBackups, restoreBackup } =
   store;
@@ -57,14 +58,6 @@ function setStatus(el, msg, kind = "info") {
   const normalizedKind = kind === "bad" ? "error" : kind;
   el.textContent = msg;
   el.dataset.kind = normalizedKind;
-}
-
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function summariseWorld(w) {
@@ -256,6 +249,20 @@ export function initImportExportPage(root) {
   const fileInput = root.querySelector("#file");
 
   const backupListEl = root.querySelector("#backupList");
+  if (backupListEl) {
+    backupListEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-restore]");
+      if (!btn) return;
+      const id = btn.getAttribute("data-restore");
+      const ok = restoreBackup(id);
+      setStatus(
+        statusImport,
+        ok ? "Restored backup." : "Could not restore backup.",
+        ok ? "ok" : "bad",
+      );
+      refreshExportView();
+    });
+  }
   const importPreviewEl = root.querySelector("#importPreview");
   const importActionsEl = root.querySelector("#importActions");
   const btnApplyImport = root.querySelector("#btn-apply-import");
@@ -303,19 +310,6 @@ export function initImportExportPage(root) {
       </div>`;
       })
       .join("");
-
-    backupListEl.querySelectorAll("button[data-restore]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-restore");
-        const ok = restoreBackup(id);
-        setStatus(
-          statusImport,
-          ok ? "Restored backup." : "Could not restore backup.",
-          ok ? "ok" : "bad",
-        );
-        refreshExportView();
-      });
-    });
   }
 
   function showImportPreview(world) {

@@ -9,7 +9,7 @@
     />
     <title>WorldSmith Web</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?release=1.13.0" />
+    <link rel="stylesheet" href="./styles.css?release=1.14.0" />
   </head>
   <body>
     <header class="app-header">
@@ -18,7 +18,7 @@
         <div class="brand__text">
           <div class="brand__title">WorldSmith Web</div>
           <div class="brand__subtitle">
-            Worldbuilding calculators <span id="versionTag" class="version-tag">1.13.0</span>
+            Worldbuilding calculators <span id="versionTag" class="version-tag">1.14.0</span>
           </div>
         </div>
       </div>
@@ -35,10 +35,21 @@
         <a class="top-nav__link" href="#/about">About WorldSmith</a>
         <a class="top-nav__link" href="#/science">Science &amp; Maths</a>
       </nav>
-      <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">
-        <span class="theme-toggle__sun">&#9788;</span>
-        <span class="theme-toggle__moon">&#9789;</span>
-      </button>
+      <div class="header-controls">
+        <label class="splash-toggle" for="splashToggle" title="Enable splash screen at startup">
+          <input
+            id="splashToggle"
+            class="splash-toggle__input"
+            type="checkbox"
+            aria-label="Enable splash screen at startup"
+          />
+          <span class="splash-toggle__label">Splash</span>
+        </label>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">
+          <span class="theme-toggle__sun">&#9788;</span>
+          <span class="theme-toggle__moon">&#9789;</span>
+        </button>
+      </div>
     </header>
 
     <main class="app-main">
@@ -114,6 +125,6 @@
       <footer class="app-footer">Judas Brennan &middot; 2026</footer>
     </main>
 
-    <script type="module" src="./app.js?release=1.13.0"></script>
+    <script type="module" src="./app.js?release=1.14.0"></script>
   </body>
 </html>

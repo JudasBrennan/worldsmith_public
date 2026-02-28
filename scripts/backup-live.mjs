@@ -9,7 +9,7 @@ const BACKUP_SUFFIX = ".zip";
 const MAX_BACKUPS = 3;
 
 // Files/folders required to run the live static product.
-const LIVE_PATHS = ["index.html", "app.js", "styles.css", "assets", "engine", "ui"];
+const LIVE_PATHS = ["index.html", "app.js", "styles.css", "favicon.svg", "assets", "engine", "ui"];
 
 function stamp() {
   // YYYYMMDD-HHMMSS
@@ -100,5 +100,5 @@ async function main() {
 
 main().catch((err) => {
   console.error(`backup:live failed: ${err?.message || err}`);
-  process.exit(1);
+  process.exitCode = 1;
 });

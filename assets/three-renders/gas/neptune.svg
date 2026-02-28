@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="rgba(175, 210, 240, 0.98)"/>
+      <stop offset="55%" stop-color="rgba(110, 165, 218, 0.96)"/>
+      <stop offset="100%" stop-color="rgba(55, 100, 160, 0.96)"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><ellipse cx="128" cy="75.77600000000001" rx="105.47200000000001" ry="5.120000000000001" fill="rgba(120,170,215,0.28)"/><ellipse cx="128" cy="113.66400000000002" rx="105.47200000000001" ry="6.144" fill="rgba(90,148,210,0.35)"/><ellipse cx="128" cy="149.504" rx="105.47200000000001" ry="5.120000000000001" fill="rgba(110,165,218,0.25)"/><ellipse cx="128" cy="177.152" rx="105.47200000000001" ry="4.096" fill="rgba(100,155,212,0.3)"/><ellipse cx="132.096" cy="115.712" rx="16.384" ry="8.192" fill="rgba(80,140,200,0.35)"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

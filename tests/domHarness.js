@@ -1,4 +1,5 @@
 import { JSDOM } from "jsdom";
+import { createCanvas as createNativeCanvas } from "@napi-rs/canvas";
 
 const GLOBAL_KEYS = [
   "window",
@@ -64,6 +65,20 @@ export function installDomHarness({
     "cancelAnimationFrame",
     dom.window.cancelAnimationFrame?.bind(dom.window) || ((id) => clearTimeout(id)),
   );
+
+  // Patch HTMLCanvasElement so getContext("2d") delegates to @napi-rs/canvas.
+  const CanvasProto = dom.window.HTMLCanvasElement.prototype;
+  const _origGetContext = CanvasProto.getContext;
+  CanvasProto.getContext = function (type, attrs) {
+    if (type === "2d") {
+      if (!this.__nativeCtx) {
+        const nc = createNativeCanvas(this.width || 1, this.height || 1);
+        this.__nativeCtx = nc.getContext("2d", attrs);
+      }
+      return this.__nativeCtx;
+    }
+    return _origGetContext?.call(this, type, attrs) ?? null;
+  };
 
   if (!window.matchMedia) {
     window.matchMedia = () => ({

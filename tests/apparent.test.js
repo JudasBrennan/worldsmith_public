@@ -15,13 +15,7 @@ import {
   SOL_REFERENCES,
   formatAngularLabel,
 } from "../engine/apparent.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} +/- ${tolerance}, got ${actual}`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 test("star absolute/app magnitude baseline is sun-like at 1 AU", () => {
   const abs = calcStarAbsoluteMagnitude(1);

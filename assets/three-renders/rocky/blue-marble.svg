@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#417b9b"/>
+      <stop offset="55%" stop-color="#255171"/>
+      <stop offset="100%" stop-color="#172e46"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><rect x="0" y="0" width="256" height="256" fill="#1a3a6a" opacity="0.52"/><ellipse cx="147.80" cy="143.67" rx="33.73" ry="19.28" transform="rotate(117.41 147.80 143.67)" fill="#ac9472" opacity="0.82"/><ellipse cx="93.52" cy="103.26" rx="26.48" ry="27.33" transform="rotate(133.90 93.52 103.26)" fill="#7a6145" opacity="0.82"/><ellipse cx="117.73" cy="153.01" rx="24.98" ry="20.54" transform="rotate(166.22 117.73 153.01)" fill="#ac9472" opacity="0.82"/><ellipse cx="161.14" cy="112.40" rx="22.45" ry="17.37" transform="rotate(63.35 161.14 112.40)" fill="#7a6145" opacity="0.82"/><ellipse cx="194.11" cy="140.06" rx="34.62" ry="19.60" transform="rotate(138.36 194.11 140.06)" fill="#ac9472" opacity="0.82"/><ellipse cx="61.05" cy="113.79" rx="19.28" ry="9.24" transform="rotate(176.99 61.05 113.79)" fill="#7a6145" opacity="0.82"/><ellipse cx="155.43" cy="165.60" rx="23.00" ry="14.25" transform="rotate(48.95 155.43 165.60)" fill="#ac9472" opacity="0.82"/><ellipse cx="128" cy="48.13" rx="38.81" ry="25.60" fill="#e8f0ff" opacity="0.30794237037037037"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

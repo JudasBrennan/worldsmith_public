@@ -42,6 +42,10 @@ const SILICATE_DENSITY_KGM3 = 2500; // typical grain density
 const AU_M = 1.496e11;
 const KG_PER_MEARTH = 5.972e24;
 const YEAR_S = 3.1557e7;
+const FEH_MIN = -3;
+const FEH_MAX = 1;
+const REFRACTORY_FEH_EXP = 0.25;
+const VOLATILE_FEH_EXP = -0.1;
 
 /* ── Condensation sequence (Lodders 2003, solar composition) ─────── */
 
@@ -154,8 +158,10 @@ export function calcDebrisDiskSuggestions({ gasGiants, starLuminosityLsol, count
     for (let i = 0; i < sorted.length - 1; i++) {
       const gInner = sorted[i];
       const gOuter = sorted[i + 1];
-      const gapInner = Number(gInner.au) * RES_2_1;
-      const gapOuter = Number(gOuter.au) * RES_1_2;
+      const auInner = Number(gInner.au);
+      const auOuter = Number(gOuter.au);
+      const gapInner = auInner * RES_2_1;
+      const gapOuter = auOuter * RES_1_2;
       if (gapOuter > gapInner * 1.05) {
         // Gap is at least 5% wider than its inner edge — viable zone
         const nameA = gInner.name || `Giant ${i + 1}`;
@@ -166,7 +172,7 @@ export function calcDebrisDiskSuggestions({ gasGiants, starLuminosityLsol, count
           resonanceInner: "2:1 ext",
           resonanceOuter: "2:1 int",
           sculptorName: `${nameA}–${nameB}`,
-          sculptorAu: (Number(gInner.au) + Number(gOuter.au)) / 2,
+          sculptorAu: (auInner + auOuter) / 2,
           label: `Gap disk (${nameA}–${nameB})`,
           priority: 3,
         });
@@ -214,37 +220,41 @@ export function calcDebrisDiskSuggestions({ gasGiants, starLuminosityLsol, count
 
 /* ── Composition classification ──────────────────────────────────── */
 
-function classifyComposition(tempInnerK, tempMidK, tempOuterK) {
+function classifyComposition(tempInnerK, tempMidK, tempOuterK, starMetallicityFeH = 0) {
   const tIn = toFinite(tempInnerK, 300);
   const tMid = toFinite(tempMidK, 100);
   const tOut = toFinite(tempOuterK, 50);
+  const feH = clamp(toFinite(starMetallicityFeH, 0), FEH_MIN, FEH_MAX);
+  const refractoryScale = 10 ** (REFRACTORY_FEH_EXP * feH);
+  const volatileScale = 10 ** (VOLATILE_FEH_EXP * feH);
 
   // Per-species presence at inner/mid/outer edges
   const species = CONDENSATION_TABLE.map((s) => ({
     name: s.name,
     condensationK: s.condensK,
     massFraction: s.massFraction,
+    weightedMassFraction: s.massFraction * (s.ice ? volatileScale : refractoryScale),
     ice: s.ice,
     presentAtInner: tIn <= s.condensK,
     presentAtMid: tMid <= s.condensK,
     presentAtOuter: tOut <= s.condensK,
   }));
 
-  // Ice-to-rock ratio at midpoint
+  // Ice-to-rock ratio and dominant species at midpoint (single pass)
   let iceSum = 0;
   let rockSum = 0;
+  const presentAtMid = [];
   for (const s of species) {
     if (s.presentAtMid) {
-      if (s.ice) iceSum += s.massFraction;
-      else rockSum += s.massFraction;
+      if (s.ice) iceSum += s.weightedMassFraction;
+      else rockSum += s.weightedMassFraction;
+      presentAtMid.push(s);
     }
   }
   const iceToRockRatio = rockSum > 0 ? iceSum / rockSum : iceSum > 0 ? Infinity : 0;
-
-  // Dominant species at midpoint by mass fraction
-  const dominantByMass = species
-    .filter((s) => s.presentAtMid)
-    .sort((a, b) => b.massFraction - a.massFraction);
+  const dominantByMass = presentAtMid.sort(
+    (a, b) => b.weightedMassFraction - a.weightedMassFraction,
+  );
 
   // Backward-compatible 4-class labels
   let className, dominantMaterials;
@@ -262,7 +272,16 @@ function classifyComposition(tempInnerK, tempMidK, tempOuterK) {
     dominantMaterials = dominantByMass.slice(0, 4).map((s) => s.name);
   }
 
-  return { className, dominantMaterials, species, iceToRockRatio, dominantByMass };
+  return {
+    className,
+    dominantMaterials,
+    species,
+    iceToRockRatio,
+    dominantByMass,
+    metallicityFeH: round(feH, 2),
+    refractoryScale: round(refractoryScale, 3),
+    volatileScale: round(volatileScale, 3),
+  };
 }
 
 /* ── Debris disk classification label ────────────────────────────── */
@@ -298,6 +317,7 @@ function classifyDisk(tempMidK, midAu, frostLineAu) {
  * @param {number} [params.totalMassMearth]   Total mass override (M⊕)
  * @param {Array}  [params.gasGiants]         Gas giants [{name, au, massMjup}]
  * @param {number} [params.starTeffK]         Star effective temperature (K)
+ * @param {number} [params.starMetallicityFeH] Host-star metallicity [Fe/H] (dex)
  * @returns {object} Comprehensive debris disk model
  */
 export function calcDebrisDisk({
@@ -311,6 +331,7 @@ export function calcDebrisDisk({
   totalMassMearth,
   gasGiants,
   starTeffK,
+  starMetallicityFeH,
 }) {
   const rIn = clamp(toFinite(innerAu, 2), 0.01, 1e6);
   const rOut = Math.max(rIn + 0.01, clamp(toFinite(outerAu, 5), 0.01, 1e6));
@@ -324,6 +345,7 @@ export function calcDebrisDisk({
       ? Number(totalMassMearth)
       : null;
   const teff = toFinite(starTeffK, 0);
+  const starFeH = clamp(toFinite(starMetallicityFeH, 0), FEH_MIN, FEH_MAX);
   const giants = Array.isArray(gasGiants) ? gasGiants : [];
 
   const midAu = (rIn + rOut) / 2;
@@ -332,20 +354,21 @@ export function calcDebrisDisk({
 
   /* ── Dust temperature (blackbody equilibrium) ──────────────────── */
 
-  const tempInnerK = (279 * Math.sqrt(sLum)) / Math.sqrt(rIn);
-  const tempOuterK = (279 * Math.sqrt(sLum)) / Math.sqrt(rOut);
-  const tempMidK = (279 * Math.sqrt(sLum)) / Math.sqrt(midAu);
+  const sqrtLum279 = 279 * Math.sqrt(sLum);
+  const tempInnerK = sqrtLum279 / Math.sqrt(rIn);
+  const tempOuterK = sqrtLum279 / Math.sqrt(rOut);
+  const tempMidK = sqrtLum279 / Math.sqrt(midAu);
 
   /* ── Pericenter / Apocenter ────────────────────────────────────── */
 
   const periAu = midAu * (1 - ecc);
   const apoAu = midAu * (1 + ecc);
-  const tempPeriK = (279 * Math.sqrt(sLum)) / Math.sqrt(periAu);
-  const tempApoK = (279 * Math.sqrt(sLum)) / Math.sqrt(apoAu);
+  const tempPeriK = sqrtLum279 / Math.sqrt(periAu);
+  const tempApoK = sqrtLum279 / Math.sqrt(apoAu);
 
   /* ── Composition (condensation sequence) ───────────────────────── */
 
-  const composition = classifyComposition(tempInnerK, tempMidK, tempOuterK);
+  const composition = classifyComposition(tempInnerK, tempMidK, tempOuterK, starFeH);
 
   /* ── Frost line comparison ─────────────────────────────────────── */
 
@@ -505,6 +528,7 @@ export function calcDebrisDisk({
       eccentricity: ecc,
       inclination: inc,
       totalMassMearth: userMass,
+      starMetallicityFeH: round(starFeH, 2),
     },
 
     placement: {

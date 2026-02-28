@@ -8,6 +8,7 @@
 let activeEl = null;
 let activeBubble = null;
 let hideTimer = null;
+let positionRafId = 0;
 
 export function tipIcon(text) {
   if (!text) return "";
@@ -71,8 +72,17 @@ function show(el) {
   document.body.appendChild(activeBubble);
 
   positionBubble();
-  window.addEventListener("scroll", positionBubble, true);
-  window.addEventListener("resize", positionBubble, true);
+  window.addEventListener("scroll", schedulePosition, true);
+  window.addEventListener("resize", schedulePosition, true);
+}
+
+function schedulePosition() {
+  if (!positionRafId) {
+    positionRafId = requestAnimationFrame(() => {
+      positionRafId = 0;
+      positionBubble();
+    });
+  }
 }
 
 function positionBubble() {
@@ -113,8 +123,10 @@ function destroy() {
     activeBubble = null;
   }
   activeEl = null;
-  window.removeEventListener("scroll", positionBubble, true);
-  window.removeEventListener("resize", positionBubble, true);
+  cancelAnimationFrame(positionRafId);
+  positionRafId = 0;
+  window.removeEventListener("scroll", schedulePosition, true);
+  window.removeEventListener("resize", schedulePosition, true);
 }
 
 function escapeAttr(s) {

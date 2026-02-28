@@ -25,7 +25,7 @@
 //          object, and moon parameters (mass, density, albedo, orbit).
 // Outputs: structured object with inputs, physical, orbit, tides, and
 //          display tiers (see STYLE_GUIDE.md § Return shape).
-import { clamp, fmt } from "./utils.js";
+import { clamp, eccentricityFactor, fmt, k2LoveNumber } from "./utils.js";
 import { calcPlanetExact } from "./planet.js";
 import { massToLuminosity, massToRadius } from "./star.js";
 
@@ -137,25 +137,6 @@ function compositionFromClass(className) {
   return MAP[className] || null;
 }
 
-/**
- * Wisdom (2004/2008) eccentricity function for tidal heating of a
- * synchronous rotator.  Replaces the simple e² truncation with a
- * series accurate to <0.1% for e < 0.8.
- *
- * N_a(e) / (1−e²)^(15/2)  where N_a = 1 + 15.5e² + 31.875e⁴ + …
- */
-function eccentricityFactor(e) {
-  if (e === 0) return 0;
-  const e2 = e * e;
-  const Na = 1 + 15.5 * e2 + 31.875 * e2 ** 2 + 11.5625 * e2 ** 3 + 0.390625 * e2 ** 4;
-  return (Na * e2) / (1 - e2) ** 7.5;
-}
-
-function k2LoveNumber(densityKgM3, gravityMs2, radiusM, rigidity) {
-  // 1.5/(1+(19*Rigidity)/(2*density*gravity*radius))
-  return 1.5 / (1 + (19 * rigidity) / (2 * densityKgM3 * gravityMs2 * radiusM));
-}
-
 function lockTimeSeconds(omega, aM, I, Q, mOtherKg, k2, radiusM) {
   // (omega * a^6 * I * Q) / (3*G*mOther^2*k2*R^5)
   return (omega * aM ** 6 * I * Q) / (3 * G * mOtherKg ** 2 * k2 * radiusM ** 5);
@@ -265,17 +246,16 @@ export function calcMoonExact({
   const periodPlanetDays = Math.sqrt(aPlanetAU ** 3 / mStarMsol) * 365.256; // MOON!C16
 
   // --- Moon physical (MOON!C23..C26)
-  const rMoonRM = Math.pow(mMoonMM / (rhoMoonGcm3 / 3.34), 1 / 3); // C23
+  const rMoonRM = (mMoonMM / (rhoMoonGcm3 / 3.34)) ** (1 / 3); // C23
   const gMoon_g = (mMoonMM / rMoonRM ** 2) * 0.1654; // C24
   const vEscKmS = Math.sqrt(mMoonMM / rMoonRM) * 2.38; // C25
 
   // --- Orbital characteristics (MOON!C30..C40)
-  const zoneInnerKm =
-    2.44 * rPlanetRE * KM_PER_REARTH * Math.pow(rhoPlanetGcm3 / rhoMoonGcm3, 1 / 3); // C30
+  const zoneInnerKm = 2.44 * rPlanetRE * KM_PER_REARTH * (rhoPlanetGcm3 / rhoMoonGcm3) ** (1 / 3); // C30
   const zoneOuterKm =
     aPlanetAU *
     KM_PER_AU_OUTER *
-    Math.pow((mPlanetME * KG_PER_MEARTH_OUTER) / (3 * mStarMsol * 1.99e30), 1 / 3);
+    ((mPlanetME * KG_PER_MEARTH_OUTER) / (3 * mStarMsol * 1.99e30)) ** (1 / 3);
   // C31: note the literal 1.99e30 is the value the spreadsheet cell uses for
   // kg/Msol in this formula, which differs slightly from KG_PER_MSOL (1.989e30)
   // used elsewhere.  Both literals are kept to preserve exact spreadsheet output.

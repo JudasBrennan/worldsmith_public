@@ -1,7 +1,8 @@
-import { calcStar } from "../engine/star.js";
-import { computeFlareParams } from "../engine/stellarActivity.js";
-import { clamp, fmt, relativeLuminance } from "../engine/utils.js";
+﻿import { calcStar } from "../engine/star.js";
+import { computeStellarActivityModel } from "../engine/stellarActivity.js";
+import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
+import { createCelestialVisualPreviewController } from "./celestialVisualPreview.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { loadWorld, updateWorld } from "./store.js";
 
@@ -23,13 +24,15 @@ const TIP_LABEL = {
   "Luminosity Override":
     "Optionally override the mass-derived luminosity in solar luminosities. Leave blank to use the Eker et al. (2018) scaling-law value derived from mass.\n\nUseful for modelling post-main-sequence stars or stars with a measured luminosity.\n\nOur sun = 1 Lsol = 3.846E26 watts",
   "Temperature Override":
-    "Optionally override the effective temperature in Kelvin. Used with one other override to resolve the third via Stefan-Boltzmann (L = R² × (T/5776)⁴).\n\nLeave blank to derive temperature from Radius and Luminosity (default).\n\nOur sun ≈ 5776 K.",
-  Density: "How dense your star is. Our sun = 1 Dsol = 1.41 g/cm³.",
+    "Optionally override the effective temperature in Kelvin. Used with one other override to resolve the third via Stefan-Boltzmann (L = RÂ² Ã— (T/5776)â´).\n\nLeave blank to derive temperature from Radius and Luminosity (default).\n\nOur sun â‰ˆ 5776 K.",
+  Density: "How dense your star is. Our sun = 1 Dsol = 1.41 g/cmÂ³.",
   Temperature: "The effective temperature of your star, in kelvin.",
   "Habitable Zone":
     "A planet orbiting within this region receives Earth-like stellar heating.\n\nWorldSmith Web uses an updated temperature-dependent habitable-zone model (S_in/S_out vary with effective temperature), based on Chromant's Desmos correction.\n\nThis intentionally deviates from the spreadsheet's fixed sqrt(L/1.1) and sqrt(L/0.53) approach, which generally places the outer edge too close in.\n\n1 AU = ~150,000,000 km.",
   "Star Colour":
-    "The displayed stellar colour is derived from effective temperature using Tanner Helland's empirical blackbody approximation (valid 1000–40000 K, R² > 0.987), which produces a smooth, continuous colour gradient.\n\nThis intentionally deviates from the WS8 spreadsheet, which used 7 fixed flat colour bands from Excel conditional formatting — producing hard colour jumps between spectral classes rather than a physical gradient.\n\nThe more precise Planckian locus method (CIE chromaticity → XYZ → sRGB matrix pipeline) was considered but not used, as it adds significant complexity for negligible visual improvement in a worldbuilding context.",
+    "The displayed stellar colour is derived from effective temperature using Tanner Helland's empirical blackbody approximation (valid 1000â€“40000 K, RÂ² > 0.987), which produces a smooth, continuous colour gradient.\n\nThis intentionally deviates from the WS8 spreadsheet, which used 7 fixed flat colour bands from Excel conditional formatting â€” producing hard colour jumps between spectral classes rather than a physical gradient.\n\nThe more precise Planckian locus method (CIE chromaticity â†’ XYZ â†’ sRGB matrix pipeline) was considered but not used, as it adds significant complexity for negligible visual improvement in a worldbuilding context.",
+  "Sun Visual":
+    "Animated stellar preview using the current star colour and the active flare/CME rates.\n\nThe preview runs at 0.5 simulated days per second and renders textured photosphere detail plus flare/CME activity.",
   "Earth-like Life?":
     "The spreadsheet checks to see if a planet comparable to modern-day Earth can orbit your star.\n\nYes: A planet with a biosphere comparable to modern-day Earth may, if you so desire, orbit this star.\n\nNo: A planet with a biosphere comparable to modern-day Earth CANNOT orbit this star.\n\nStar Too Young: A planet comparable to pre-Cambrian Earth may, if you so desire, orbit your star.",
   "Metallicity [Fe/H]":
@@ -46,6 +49,16 @@ const TIP_LABEL = {
     "Recurrence is computed from N32 as 1 / N32 days for flares above 10^32 erg.",
   "Solar CME Envelope (FGK)":
     "Solar observations show coronal mass ejection rates varying from about 0.5 to 6.0 per day across the solar cycle.\n\nThis envelope is shown only for FGK stars.",
+  "Total Flare Rate (>1e30 erg)":
+    "Expected flare rate above 10^30 erg, computed from the flare-frequency distribution (FFD) anchored to N32 and alpha.\n\nThis is a broader event count than the energetic >10^32 erg rate.",
+  "Total Flare Recurrence":
+    "Recurrence for flares above 10^30 erg, computed as 1 / rate and shown in hours or minutes when frequent.",
+  "Associated CME Rate":
+    "Expected CME rate linked to flare activity, using an energy-weighted flare-CME association probability and activity suppression at very high flare rates.",
+  "Background CME Rate":
+    "Expected CME rate not explicitly tied to an individual rendered flare. For FGK stars this fills the gap between the associated rate and the cycle envelope.",
+  "Total CME Rate":
+    "Total expected CME rate per day. For FGK stars, this follows the solar-cycle envelope and is split into associated and background channels.\n\nReference: Yashiro et al. (2006, JGR 111, A12S05).",
 };
 
 export function initStarPage(mountEl) {
@@ -83,6 +96,7 @@ export function initStarPage(mountEl) {
       ? world.star.advancedDerivationMode
       : "rl",
     evolutionMode: world?.star?.evolutionMode === "evolved" ? "evolved" : "zams",
+    activityModelVersion: world?.star?.activityModelVersion === "v1" ? "v1" : "v2",
   };
 
   const wrap = document.createElement("div");
@@ -148,7 +162,7 @@ export function initStarPage(mountEl) {
           <div class="form-row">
             <div>
               <div class="label">Metallicity [Fe/H] <span class="unit">dex</span> ${tipIcon(TIP_LABEL["Metallicity [Fe/H]"] || "")}</div>
-              <div class="hint">Sun = 0.0 · Metal-poor halo ≈ −2 · Metal-rich disk ≈ +0.3</div>
+              <div class="hint">Sun = 0.0 Â· Metal-poor halo â‰ˆ âˆ’2 Â· Metal-rich disk â‰ˆ +0.3</div>
             </div>
             <div class="input-pair">
             <input id="metallicity" type="number" step="0.01" min="-3" max="1" aria-label="Metallicity [Fe/H]" />
@@ -170,14 +184,14 @@ export function initStarPage(mountEl) {
             <div class="label" style="margin-bottom:6px">Derivation Mode</div>
             <div class="physics-trio-toggle">
               <input type="radio" name="physicsDerivMode" id="derivModeRl" value="rl" />
-              <label for="derivModeRl">R + L → T</label>
+              <label for="derivModeRl">R + L â†’ T</label>
               <input type="radio" name="physicsDerivMode" id="derivModeRt" value="rt" />
-              <label for="derivModeRt">R + T → L</label>
+              <label for="derivModeRt">R + T â†’ L</label>
               <input type="radio" name="physicsDerivMode" id="derivModeLt" value="lt" />
-              <label for="derivModeLt">L + T → R</label>
+              <label for="derivModeLt">L + T â†’ R</label>
               <span></span>
             </div>
-            <div class="hint" style="margin-top:5px">R = Radius (Rsol) · L = Luminosity (Lsol) · T = Temperature (K) · Arrow = computed value</div>
+            <div class="hint" style="margin-top:5px">R = Radius (Rsol) Â· L = Luminosity (Lsol) Â· T = Temperature (K) Â· Arrow = computed value</div>
           </div>
 
           <div class="form-row" id="radiusOverrideRow">
@@ -266,6 +280,16 @@ export function initStarPage(mountEl) {
   const physicsModeHintEl = wrap.querySelector("#physicsModeHint");
   const evolutionToggleEl = wrap.querySelector("#evolutionToggle");
   const evolutionHintEl = wrap.querySelector("#evolutionHint");
+  const sunPreviewController = createCelestialVisualPreviewController({ speedDaysPerSec: 0.5 });
+
+  // Dispose preview controller when page unmounts
+  const _starPageObserver = new MutationObserver(() => {
+    if (!document.contains(wrap)) {
+      sunPreviewController.dispose();
+      _starPageObserver.disconnect();
+    }
+  });
+  _starPageObserver.observe(document.body, { childList: true, subtree: true });
 
   // Bind number inputs to sliders
   const massSlider = wrap.querySelector("#mass_slider");
@@ -340,8 +364,28 @@ export function initStarPage(mountEl) {
       if (m === "lt") return { r: null, l, t };
       return { r, l, t: null }; // "rl" (default)
     }
-    // Simple mode: all values from mass — no overrides reach the engine
+    // Simple mode: all values from mass â€” no overrides reach the engine
     return { r: null, l: null, t: null };
+  }
+
+  function formatRecurrence(ratePerDay) {
+    const rate = Number(ratePerDay);
+    if (!(rate > 0)) return "Rare";
+    const days = 1 / rate;
+    if (days >= 365) return `~${fmt(days / 365, 2)} years`;
+    if (days >= 1) return `~${fmt(days, 2)} days`;
+    const hours = days * 24;
+    if (hours >= 1) return `~${fmt(hours, 2)} hours`;
+    return `~${fmt(hours * 60, 2)} minutes`;
+  }
+
+  function shortPopulationLabel(label) {
+    const txt = String(label || "").trim();
+    if (txt === "Population I (solar neighbourhood)") return "Pop I";
+    if (txt === "Intermediate (old thin disk)") return "Intermediate";
+    if (txt === "Population II (metal-poor)") return "Pop II";
+    if (txt === "Metal-rich (inner disk)") return "Metal-rich";
+    return txt;
   }
 
   function render() {
@@ -352,22 +396,31 @@ export function initStarPage(mountEl) {
       luminosityLsolOverride: ov.l,
       tempKOverride: ov.t,
     });
-    const activity = computeFlareParams({
-      massMsun: state.massMsol,
-      ageGyr: state.ageGyr,
-      teffK: model.tempK,
-      luminosityLsun: model.luminosityLsol,
-    });
-    const recurrenceDays = activity.N32 > 0 ? 1 / activity.N32 : Infinity;
-    const recurrenceText = Number.isFinite(recurrenceDays)
-      ? recurrenceDays >= 365
-        ? `~${fmt(recurrenceDays / 365, 2)} years`
-        : recurrenceDays >= 1
-          ? `~${fmt(recurrenceDays, 2)} days`
-          : `~${fmt(recurrenceDays * 24, 2)} hours`
-      : "Rare";
+    const activityModel = computeStellarActivityModel(
+      {
+        massMsun: state.massMsol,
+        ageGyr: state.ageGyr,
+        teffK: model.tempK,
+        luminosityLsun: model.luminosityLsol,
+      },
+      { activityCycle: 0.5 },
+    );
+    const activity = activityModel.activity;
+    const energeticRecurrenceText = formatRecurrence(activity.energeticFlareRatePerDay);
+    const totalRecurrenceText = formatRecurrence(activity.totalFlareRatePerDay);
+    const cmeTotalMeta =
+      activity.teffBin === "FGK"
+        ? "Solar-cycle envelope split into associated + background"
+        : "Empirical split model outside FGK solar envelope";
 
     const items = [
+      {
+        kind: "sunVisual",
+        label: "Star Visualiser",
+        tipLabel: "Star Colour",
+        value: `${model.starColourHex}`,
+        meta: "Hex (derived from temperature) - Animated at 0.5 d/s with flares + CMEs",
+      },
       { label: "Maximum Age", value: fmt(model.maxAgeGyr, 3), meta: "Gyr" },
       {
         label: "Radius",
@@ -387,16 +440,8 @@ export function initStarPage(mountEl) {
           " W" +
           (model.luminosityOverridden ? " (Override)" : ""),
       },
-      { label: "Density", value: fmt(model.densityGcm3, 3), meta: "g/cm³" },
+      { label: "Density", value: fmt(model.densityGcm3, 3), meta: "g/cmÂ³" },
       { label: "Temperature", value: fmt(model.tempK, 0), meta: "K" },
-      {
-        label: "Star Colour",
-        kpiClass: "kpi--colour",
-        kpiAttrs: `data-light="${relativeLuminance(model.starColourHex) > 0.18 ? 1 : 0}"`,
-        kpiStyle: `--kpi-colour: ${model.starColourHex};`,
-        value: `${model.starColourHex}`,
-        meta: "Hex (derived from temperature)",
-      },
       {
         label: "Habitable Zone",
         value: model.display.hzAu,
@@ -408,9 +453,10 @@ export function initStarPage(mountEl) {
         meta: "Fischer & Valenti (2005)",
       },
       {
-        label: "Stellar Population",
-        value: model.populationLabel,
-        meta: `[Fe/H] = ${fmt(model.inputs.metallicityFeH, 2)}`,
+        label: "Population",
+        tipLabel: "Stellar Population",
+        value: shortPopulationLabel(model.populationLabel),
+        meta: `${model.populationLabel} | [Fe/H] = ${fmt(model.inputs.metallicityFeH, 2)}`,
       },
       {
         label: "Activity Regime",
@@ -418,11 +464,41 @@ export function initStarPage(mountEl) {
         meta: "Teff + age bins",
       },
       {
-        label: "Energetic Flare Rate (>1e32 erg)",
-        value: fmt(activity.N32, 3),
+        label: "N32 Rate",
+        tipLabel: "Energetic Flare Rate (>1e32 erg)",
+        value: fmt(activity.energeticFlareRatePerDay, 3),
+        meta: "flares/day (>1e32 erg)",
+      },
+      {
+        label: "Energetic Flare Recurrence",
+        value: energeticRecurrenceText,
+        meta: "for >1e32 erg flares",
+      },
+      {
+        label: "Total Flare Rate (>1e30 erg)",
+        value: fmt(activity.totalFlareRatePerDay, 3),
         meta: "flares/day",
       },
-      { label: "Energetic Flare Recurrence", value: recurrenceText, meta: "for >1e32 erg flares" },
+      {
+        label: "Total Flare Recurrence",
+        value: totalRecurrenceText,
+        meta: "for >1e30 erg flares",
+      },
+      {
+        label: "Associated CME Rate",
+        value: fmt(activity.cmeAssociatedRatePerDay, 3),
+        meta: "CME/day",
+      },
+      {
+        label: "Background CME Rate",
+        value: fmt(activity.cmeBackgroundRatePerDay, 3),
+        meta: "CME/day",
+      },
+      {
+        label: "Total CME Rate",
+        value: fmt(activity.cmeTotalRatePerDay, 3),
+        meta: cmeTotalMeta,
+      },
       {
         label: "Solar CME Envelope (FGK)",
         value: activity.teffBin === "FGK" ? "0.5 to 6.0/day" : "n/a",
@@ -431,8 +507,20 @@ export function initStarPage(mountEl) {
     ];
 
     kpisEl.innerHTML = items
-      .map(
-        (x) => `
+      .map((x) => {
+        if (x.kind === "sunVisual") {
+          return `
+      <div class="kpi-wrap kpi-wrap--sun-preview">
+        <div class="kpi kpi--sun-preview">
+          <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.tipLabel] || TIP_LABEL[x.label] || "")}<span class="kpi__expand-indicator" aria-hidden="true">&#9662;</span></div>
+          <canvas class="sun-preview-canvas" width="180" height="180" aria-label="Star visual preview"></canvas>
+          <div class="kpi__value sun-preview-value">${x.value}</div>
+          <div class="sun-preview-caption">${x.meta}</div>
+        </div>
+      </div>
+    `;
+        }
+        return `
       <div class="kpi-wrap">
         <div class="kpi ${x.kpiClass || ""}" ${x.kpiAttrs || ""} style="${x.kpiStyle || ""}">
           <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.tipLabel] || TIP_LABEL[x.label] || "")}</div>
@@ -440,9 +528,18 @@ export function initStarPage(mountEl) {
           <div class="kpi__meta">${x.meta}</div>
         </div>
       </div>
-    `,
-      )
+    `;
+      })
       .join("");
+
+    sunPreviewController.attach(kpisEl.querySelector(".sun-preview-canvas"), {
+      starName: state.name,
+      starMassMsol: state.massMsol,
+      starAgeGyr: state.ageGyr,
+      starTempK: model.tempK,
+      starColourHex: model.starColourHex,
+      activity,
+    });
 
     const life = model.earthLikeLifePossible;
     lifeBadge.textContent = `Earth-like Life? ${life}`;
@@ -479,7 +576,7 @@ export function initStarPage(mountEl) {
     const isAdvanced = state.physicsMode === "advanced";
     advancedDerivRowEl.style.display = isAdvanced ? "" : "none";
     physicsModeHintEl.textContent = isAdvanced
-      ? "Specify any two of Radius, Luminosity, and Temperature; the third is computed via Stefan-Boltzmann (L = R² × (T/5776)⁴)."
+      ? "Specify any two of Radius, Luminosity, and Temperature; the third is computed via Stefan-Boltzmann (L = RÂ² Ã— (T/5776)â´)."
       : "All physical properties are derived from mass and age using stellar scaling laws. Toggle Advanced to override specific values.";
 
     if (isAdvanced) {
@@ -564,6 +661,7 @@ export function initStarPage(mountEl) {
         physicsMode: state.physicsMode,
         advancedDerivationMode: state.advancedDerivationMode,
         evolutionMode: state.evolutionMode,
+        activityModelVersion: state.activityModelVersion,
       },
     });
     render();
@@ -651,6 +749,7 @@ export function initStarPage(mountEl) {
         physicsMode: "simple",
         advancedDerivationMode: "rl",
         evolutionMode: "zams",
+        activityModelVersion: state.activityModelVersion,
       },
     });
     render();
@@ -690,6 +789,7 @@ export function initStarPage(mountEl) {
         physicsMode: "simple",
         advancedDerivationMode: "rl",
         evolutionMode: "zams",
+        activityModelVersion: state.activityModelVersion,
       },
     });
     render();

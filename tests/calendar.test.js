@@ -2,13 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { calcCalendarModel, continuedFractionApproximants } from "../engine/calendar.js";
-
-function approxEqual(actual, expected, tolerance, label) {
-  const msg = label
-    ? `${label}: expected ${expected} +/- ${tolerance}, got ${actual}`
-    : `${actual} not within ${tolerance} of ${expected}`;
-  assert.ok(Math.abs(actual - expected) <= tolerance, msg);
-}
+import { approxEqual } from "./testHelpers.js";
 
 test("continued fraction approximants include zero baseline and expected simple fraction", () => {
   const approximants = continuedFractionApproximants(0.25, 5);

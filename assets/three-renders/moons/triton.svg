@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#e9f6ff"/>
+      <stop offset="55%" stop-color="#b3cee4"/>
+      <stop offset="100%" stop-color="#6589a1"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><circle cx="191.92" cy="72.45" r="10.96" fill="rgba(0,0,0,0.18)"/><circle cx="188.85" cy="69.82" r="7.89" fill="rgba(255,255,255,0.08)"/><circle cx="154.60" cy="136.48" r="10.96" fill="rgba(0,0,0,0.18)"/><circle cx="151.53" cy="133.85" r="7.89" fill="rgba(255,255,255,0.08)"/><circle cx="67.71" cy="114.41" r="4.23" fill="rgba(0,0,0,0.18)"/><circle cx="66.52" cy="113.39" r="3.05" fill="rgba(255,255,255,0.08)"/><circle cx="96.88" cy="154.74" r="7.59" fill="rgba(0,0,0,0.18)"/><circle cx="94.75" cy="152.91" r="5.46" fill="rgba(255,255,255,0.08)"/><circle cx="163.21" cy="100.40" r="10.50" fill="rgba(0,0,0,0.18)"/><circle cx="160.27" cy="97.88" r="7.56" fill="rgba(255,255,255,0.08)"/><circle cx="88.46" cy="138.69" r="6.73" fill="rgba(0,0,0,0.18)"/><circle cx="86.58" cy="137.07" r="4.84" fill="rgba(255,255,255,0.08)"/><circle cx="164.58" cy="73.47" r="7.56" fill="rgba(0,0,0,0.18)"/><circle cx="162.46" cy="71.66" r="5.44" fill="rgba(255,255,255,0.08)"/><circle cx="68.06" cy="143.04" r="9.74" fill="rgba(0,0,0,0.18)"/><circle cx="65.34" cy="140.70" r="7.01" fill="rgba(255,255,255,0.08)"/><rect x="0" y="0" width="256" height="256" fill="#e8f0ff" opacity="0.405"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

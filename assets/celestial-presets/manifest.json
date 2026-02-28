@@ -1,0 +1,867 @@
+{
+  "generatedAtUtc": "2026-02-26T04:31:24.588Z",
+  "version": 1,
+  "rocky": [
+    {
+      "id": "blue-marble",
+      "label": "Blue Marble",
+      "category": "Terrestrial",
+      "artProfileId": "blue-marble",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "clouds"
+      ]
+    },
+    {
+      "id": "tropical-jungle",
+      "label": "Tropical Jungle",
+      "category": "Terrestrial",
+      "artProfileId": "tropical-jungle",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "molten-fissures",
+        "clouds"
+      ]
+    },
+    {
+      "id": "arid-steppe",
+      "label": "Arid Steppe",
+      "category": "Terrestrial",
+      "artProfileId": "arid-steppe",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "clouds"
+      ]
+    },
+    {
+      "id": "tidally-locked",
+      "label": "Tidally Locked",
+      "category": "Terrestrial",
+      "artProfileId": "tidally-locked",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "clouds"
+      ]
+    },
+    {
+      "id": "red-desert",
+      "label": "Red Desert",
+      "category": "Barren",
+      "artProfileId": "red-desert",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "craters"
+      ]
+    },
+    {
+      "id": "cratered-husk",
+      "label": "Cratered Husk",
+      "category": "Barren",
+      "artProfileId": "cratered-husk",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "craters"
+      ]
+    },
+    {
+      "id": "iron-fortress",
+      "label": "Iron Fortress",
+      "category": "Barren",
+      "artProfileId": "iron-fortress",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "clouds"
+      ]
+    },
+    {
+      "id": "pale-mantle",
+      "label": "Pale Mantle",
+      "category": "Barren",
+      "artProfileId": "pale-mantle",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "molten-fissures",
+        "clouds"
+      ]
+    },
+    {
+      "id": "lava-world",
+      "label": "Lava World",
+      "category": "Extreme",
+      "artProfileId": "lava-world",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "molten-fissures",
+        "clouds"
+      ]
+    },
+    {
+      "id": "venus-shroud",
+      "label": "Venus Shroud",
+      "category": "Extreme",
+      "artProfileId": "venus-shroud",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "molten-fissures",
+        "clouds"
+      ]
+    },
+    {
+      "id": "frozen-wasteland",
+      "label": "Frozen Wasteland",
+      "category": "Extreme",
+      "artProfileId": "frozen-wasteland",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "ice-caps",
+        "craters"
+      ]
+    },
+    {
+      "id": "snowball",
+      "label": "Snowball",
+      "category": "Extreme",
+      "artProfileId": "snowball",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "craters",
+        "clouds"
+      ]
+    },
+    {
+      "id": "water-world",
+      "label": "Water World",
+      "category": "Ocean",
+      "artProfileId": "water-world",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "clouds"
+      ]
+    },
+    {
+      "id": "archipelago",
+      "label": "Archipelago",
+      "category": "Ocean",
+      "artProfileId": "archipelago",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents",
+        "ocean-fill",
+        "molten-fissures",
+        "clouds"
+      ]
+    },
+    {
+      "id": "default",
+      "label": "default",
+      "category": "Fallback",
+      "artProfileId": "blue-marble",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents"
+      ]
+    },
+    {
+      "id": "oceanic",
+      "label": "oceanic",
+      "category": "Fallback",
+      "artProfileId": "blue-marble",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents"
+      ]
+    },
+    {
+      "id": "frozen",
+      "label": "frozen",
+      "category": "Fallback",
+      "artProfileId": "blue-marble",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents"
+      ]
+    },
+    {
+      "id": "volcanic",
+      "label": "volcanic",
+      "category": "Fallback",
+      "artProfileId": "blue-marble",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents"
+      ]
+    },
+    {
+      "id": "arid",
+      "label": "arid",
+      "category": "Fallback",
+      "artProfileId": "blue-marble",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "continents"
+      ]
+    }
+  ],
+  "gasStyles": [
+    {
+      "id": "jupiter",
+      "label": "Jupiter-like",
+      "category": "Realistic",
+      "artProfileId": "jupiter",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "saturn",
+      "label": "Saturn-like",
+      "category": "Realistic",
+      "artProfileId": "saturn",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "rings"
+      ]
+    },
+    {
+      "id": "neptune",
+      "label": "Neptune-like",
+      "category": "Realistic",
+      "artProfileId": "neptune",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots",
+        "rings"
+      ]
+    },
+    {
+      "id": "neptune-classic",
+      "label": "Classic Neptune-like",
+      "category": "Realistic",
+      "artProfileId": "neptune-classic",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots",
+        "rings"
+      ]
+    },
+    {
+      "id": "uranus",
+      "label": "Uranus-like",
+      "category": "Realistic",
+      "artProfileId": "uranus",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "rings"
+      ]
+    },
+    {
+      "id": "hot-jupiter",
+      "label": "Hot Jupiter",
+      "category": "Realistic",
+      "artProfileId": "hot-jupiter",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "warm-giant",
+      "label": "Warm Gas Giant",
+      "category": "Realistic",
+      "artProfileId": "warm-giant",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "cloudless",
+      "label": "Cloudless Giant",
+      "category": "Realistic",
+      "artProfileId": "cloudless",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "alkali",
+      "label": "Alkali-Metal Giant",
+      "category": "Realistic",
+      "artProfileId": "alkali",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "silicate",
+      "label": "Silicate-Cloud Giant",
+      "category": "Realistic",
+      "artProfileId": "silicate",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "super-jupiter",
+      "label": "Super-Jupiter",
+      "category": "Realistic",
+      "artProfileId": "super-jupiter",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "sub-neptune",
+      "label": "Sub-Neptune",
+      "category": "Realistic",
+      "artProfileId": "sub-neptune",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "haze"
+      ]
+    },
+    {
+      "id": "ringed-ice",
+      "label": "Ringed Ice Giant",
+      "category": "Realistic",
+      "artProfileId": "ringed-ice",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "rings"
+      ]
+    },
+    {
+      "id": "puffy",
+      "label": "Puffy Giant",
+      "category": "Realistic",
+      "artProfileId": "puffy",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "hazy",
+      "label": "Hazy Giant",
+      "category": "Realistic",
+      "artProfileId": "hazy",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "haze"
+      ]
+    },
+    {
+      "id": "water-cloud",
+      "label": "Water-Cloud Giant",
+      "category": "Realistic",
+      "artProfileId": "water-cloud",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "helium",
+      "label": "Helium Giant",
+      "category": "Realistic",
+      "artProfileId": "helium",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+  ],
+  "gasRecipes": [
+    {
+      "id": "jupiter",
+      "label": "Jupiter",
+      "category": "Cold Giants",
+      "styleId": "jupiter",
+      "artProfileId": "jupiter",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "saturn",
+      "label": "Saturn",
+      "category": "Cold Giants",
+      "styleId": "saturn",
+      "artProfileId": "saturn",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "rings"
+      ]
+    },
+    {
+      "id": "super-jupiter",
+      "label": "Super-Jupiter",
+      "category": "Cold Giants",
+      "styleId": "super-jupiter",
+      "artProfileId": "super-jupiter",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "hazy-giant",
+      "label": "Hazy Giant",
+      "category": "Cold Giants",
+      "styleId": "hazy",
+      "artProfileId": "hazy",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "haze"
+      ]
+    },
+    {
+      "id": "neptune",
+      "label": "Neptune",
+      "category": "Ice Giants",
+      "styleId": "neptune",
+      "artProfileId": "neptune",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots",
+        "rings"
+      ]
+    },
+    {
+      "id": "uranus",
+      "label": "Uranus",
+      "category": "Ice Giants",
+      "styleId": "uranus",
+      "artProfileId": "uranus",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "rings"
+      ]
+    },
+    {
+      "id": "sub-neptune",
+      "label": "Sub-Neptune",
+      "category": "Ice Giants",
+      "styleId": "sub-neptune",
+      "artProfileId": "sub-neptune",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "haze"
+      ]
+    },
+    {
+      "id": "ringed-ice",
+      "label": "Ringed Ice Giant",
+      "category": "Ice Giants",
+      "styleId": "ringed-ice",
+      "artProfileId": "ringed-ice",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "rings"
+      ]
+    },
+    {
+      "id": "water-cloud",
+      "label": "Water-Cloud Giant",
+      "category": "Warm Giants",
+      "styleId": "water-cloud",
+      "artProfileId": "water-cloud",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "warm-giant",
+      "label": "Warm Giant",
+      "category": "Warm Giants",
+      "styleId": "warm-giant",
+      "artProfileId": "warm-giant",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "cloudless",
+      "label": "Cloudless Giant",
+      "category": "Warm Giants",
+      "styleId": "cloudless",
+      "artProfileId": "cloudless",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "alkali",
+      "label": "Alkali Giant",
+      "category": "Hot Giants",
+      "styleId": "alkali",
+      "artProfileId": "alkali",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "hot-jupiter",
+      "label": "Hot Jupiter",
+      "category": "Hot Giants",
+      "styleId": "hot-jupiter",
+      "artProfileId": "hot-jupiter",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    },
+    {
+      "id": "silicate-cloud",
+      "label": "Silicate-Cloud Giant",
+      "category": "Hot Giants",
+      "styleId": "silicate",
+      "artProfileId": "silicate",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms",
+        "gas-spots"
+      ]
+    },
+    {
+      "id": "puffy",
+      "label": "Puffy Giant",
+      "category": "Hot Giants",
+      "styleId": "puffy",
+      "artProfileId": "puffy",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "gas-bands",
+        "storms"
+      ]
+    }
+  ],
+  "moons": [
+    {
+      "id": "luna",
+      "label": "Luna",
+      "category": "Major Rocky",
+      "artProfileId": "luna",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "callisto",
+      "label": "Callisto",
+      "category": "Major Rocky",
+      "artProfileId": "callisto",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "ganymede",
+      "label": "Ganymede",
+      "category": "Major Rocky",
+      "artProfileId": "ganymede",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "europa",
+      "label": "Europa",
+      "category": "Icy & Ocean",
+      "artProfileId": "europa",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters",
+        "ice-coverage",
+        "fractures"
+      ]
+    },
+    {
+      "id": "enceladus",
+      "label": "Enceladus",
+      "category": "Icy & Ocean",
+      "artProfileId": "enceladus",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters",
+        "ice-coverage",
+        "fractures"
+      ]
+    },
+    {
+      "id": "titan",
+      "label": "Titan",
+      "category": "Icy & Ocean",
+      "artProfileId": "titan",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "triton",
+      "label": "Triton",
+      "category": "Icy & Ocean",
+      "artProfileId": "triton",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "io",
+      "label": "Io",
+      "category": "Volcanic",
+      "artProfileId": "io",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters",
+        "molten-fissures"
+      ]
+    },
+    {
+      "id": "molten-companion",
+      "label": "Molten Companion",
+      "category": "Volcanic",
+      "artProfileId": "molten-companion",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters",
+        "molten-fissures"
+      ]
+    },
+    {
+      "id": "phobos",
+      "label": "Phobos",
+      "category": "Small & Captured",
+      "artProfileId": "phobos",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "deimos",
+      "label": "Deimos",
+      "category": "Small & Captured",
+      "artProfileId": "deimos",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "irregular-capture",
+      "label": "Irregular Capture",
+      "category": "Small & Captured",
+      "artProfileId": "irregular-capture",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "default",
+      "label": "default",
+      "category": "Fallback",
+      "artProfileId": "luna",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "icy",
+      "label": "icy",
+      "category": "Fallback",
+      "artProfileId": "luna",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "rocky",
+      "label": "rocky",
+      "category": "Fallback",
+      "artProfileId": "luna",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "dark-icy",
+      "label": "dark-icy",
+      "category": "Fallback",
+      "artProfileId": "luna",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    },
+    {
+      "id": "molten",
+      "label": "molten",
+      "category": "Fallback",
+      "artProfileId": "luna",
+      "layerHints": [
+        "base-gradient",
+        "grain",
+        "craters"
+      ]
+    }
+  ]
+}

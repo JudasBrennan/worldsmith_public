@@ -23,6 +23,9 @@ import { clamp, toFinite } from "./utils.js";
 export const FLARE_E0_ERG = 1e32;
 export const FLARE_EMIN_ERG = 1e30;
 export const FLARE_EMAX_ERG = 1e35;
+export const FLARE_TOTAL_THRESHOLD_ERG = FLARE_EMIN_ERG;
+export const FGK_CME_MIN_PER_DAY = 0.5;
+export const FGK_CME_MAX_PER_DAY = 6.0;
 
 const TEFF_BIN_FGK = "FGK";
 const TEFF_BIN_EARLY_M = "earlyM";
@@ -38,6 +41,18 @@ const ALPHA_TABLE = {
   [TEFF_BIN_FGK]: 1.8,
   [TEFF_BIN_EARLY_M]: 2.0,
   [TEFF_BIN_LATE_M]: 2.2,
+};
+
+const CME_PROBABILITY_BREAKS = [
+  { maxEnergyErg: 1e32, probability: 0.005 },
+  { maxEnergyErg: 1e33, probability: 0.12 },
+  { maxEnergyErg: 1e34, probability: 0.4 },
+  { maxEnergyErg: Infinity, probability: 0.75 },
+];
+const FLARE_CYCLE_MULTIPLIER_TABLE = {
+  [TEFF_BIN_FGK]: { min: 0.35, max: 1.65 },
+  [TEFF_BIN_EARLY_M]: { min: 0.6, max: 1.4 },
+  [TEFF_BIN_LATE_M]: { min: 0.75, max: 1.25 },
 };
 
 const EPS = 1e-9;
@@ -72,6 +87,264 @@ function uniform01(rngFn) {
   return clamp(u, EPS, 1 - EPS);
 }
 
+function resolveActivityParams(params) {
+  if (
+    params &&
+    typeof params === "object" &&
+    params.activity &&
+    typeof params.activity === "object"
+  ) {
+    return params.activity;
+  }
+  return params || {};
+}
+
+function intervalMassPowerLaw(alpha, lowErg, highErg, minErg, maxErg) {
+  const lo = Math.max(minErg, toFinite(lowErg, minErg));
+  const hi = Math.min(maxErg, toFinite(highErg, maxErg));
+  if (!(hi > lo)) return 0;
+  const normLo = minErg ** -alpha;
+  const normHi = maxErg ** -alpha;
+  const numLo = lo ** -alpha;
+  const numHi = hi ** -alpha;
+  const denom = normLo - normHi;
+  if (!(denom > 0)) return 0;
+  return clamp((numLo - numHi) / denom, 0, 1);
+}
+
+function meanCmeAssociationProbability(alpha, minErg, maxErg) {
+  let sum = 0;
+  let lo = minErg;
+  for (const band of CME_PROBABILITY_BREAKS) {
+    const hi = Math.min(maxErg, band.maxEnergyErg);
+    if (hi > lo) {
+      const mass = intervalMassPowerLaw(alpha, lo, hi, minErg, maxErg);
+      sum += mass * band.probability;
+      lo = hi;
+    }
+    if (lo >= maxErg) break;
+  }
+  return clamp(sum, 0, 1);
+}
+
+function cmeSuppressionFromN32(n32) {
+  const n = Math.max(EPS, toFinite(n32, 0.05));
+  return clamp((n / 5.0) ** -0.5, 0.2, 1.0);
+}
+
+function cmeSaturationFactor(recentCount24h, targetPerDay) {
+  const recent = Math.max(0, toFinite(recentCount24h, 0));
+  const target = Math.max(EPS, toFinite(targetPerDay, 1));
+  if (recent <= target) return 1;
+  const excess = (recent - target) / target;
+  return clamp(1 / (1 + excess * excess * 1.2), 0.08, 1);
+}
+
+/**
+ * Returns a cycle-dependent flare-rate multiplier by stellar regime.
+ *
+ * The midpoint (`activityCycle = 0.5`) is unity so legacy baseline N32
+ * values remain unchanged at default phase.
+ *
+ * @param {string} teffBin - FGK / earlyM / lateM
+ * @param {number} activityCycle - Cycle phase in [0, 1]
+ * @returns {number} Multiplicative flare-rate factor
+ */
+export function flareCycleMultiplierFromCycle(teffBin, activityCycle) {
+  const band = FLARE_CYCLE_MULTIPLIER_TABLE[teffBin] || FLARE_CYCLE_MULTIPLIER_TABLE[TEFF_BIN_FGK];
+  const t = clamp(toFinite(activityCycle, 0.5), 0, 1);
+  return band.min + (band.max - band.min) * t;
+}
+
+/**
+ * Computes expected associated/background/total CME rates per day from
+ * flare rates, flare-energy association probabilities, and cycle phase.
+ *
+ * @param {object} params - Activity parameter object (flat or nested)
+ * @param {object} [opts={}] - Cycle/override options
+ * @param {number} [opts.activityCycle=0.5] - Cycle phase in [0, 1]
+ * @returns {{
+ *   teffBin: string,
+ *   activityCycle: number,
+ *   meanAssociationProbability: number,
+ *   suppression: number,
+ *   associatedRawPerDay: number,
+ *   associatedRatePerDay: number,
+ *   backgroundRatePerDay: number,
+ *   totalRatePerDay: number,
+ *   fgkTargetPerDay: number|null
+ * }}
+ */
+export function computeCmeRateModel(params, opts = {}) {
+  const p = resolveActivityParams(params);
+  const teffBin = String(p?.teffBin || TEFF_BIN_FGK);
+  const activityCycle = clamp(toFinite(opts?.activityCycle, 0.5), 0, 1);
+  const alpha = Math.max(0.1, toFinite(p?.alpha, 2.0));
+  const eMin = Math.max(1, toFinite(p?.EminErg, FLARE_EMIN_ERG));
+  const eMax = Math.max(eMin * 1.0001, toFinite(p?.EmaxErg, FLARE_EMAX_ERG));
+  const totalFlareRatePerDay = Math.max(
+    0,
+    toFinite(
+      p?.totalFlareRatePerDay ??
+        p?.lambdaFlarePerDay ??
+        expectedRateAboveEnergyPerDay(p, FLARE_TOTAL_THRESHOLD_ERG),
+      0,
+    ),
+  );
+  const n32 = Math.max(0, toFinite(p?.N32, 0));
+  const activityNorm = clamp(Math.log10(1 + n32) / Math.log10(31), 0, 1);
+  const meanAssociationProbability = meanCmeAssociationProbability(alpha, eMin, eMax);
+  const suppression = cmeSuppressionFromN32(n32);
+  const associatedRawPerDay = totalFlareRatePerDay * meanAssociationProbability * suppression;
+
+  const fgkTargetPerDay = teffBin === TEFF_BIN_FGK ? cmeTargetPerDayFromCycle(activityCycle) : null;
+  const associatedRatePerDay =
+    fgkTargetPerDay != null
+      ? Math.min(fgkTargetPerDay, associatedRawPerDay)
+      : Math.max(0, associatedRawPerDay);
+  const backgroundRatePerDay =
+    fgkTargetPerDay != null
+      ? Math.max(0, fgkTargetPerDay - associatedRatePerDay)
+      : associatedRatePerDay * (0.22 + 0.35 * activityNorm);
+  const totalRatePerDay = associatedRatePerDay + backgroundRatePerDay;
+
+  return {
+    teffBin,
+    activityCycle,
+    meanAssociationProbability,
+    suppression,
+    associatedRawPerDay,
+    associatedRatePerDay,
+    backgroundRatePerDay,
+    totalRatePerDay,
+    fgkTargetPerDay,
+  };
+}
+
+/**
+ * Computes the structured stellar-activity model using flare-frequency
+ * distributions and cycle-aware CME envelope assumptions.
+ *
+ * Returns a three-tier object (`inputs`, `activity`, `display`) for
+ * style-guide alignment and UI-friendly output while keeping all values
+ * numeric in the `activity` tier.
+ *
+ * @param {object} star - Star properties
+ * @param {number} [star.teffK=5776] - Effective temperature in Kelvin
+ * @param {number} [star.ageGyr=4.6] - Stellar age in Gyr
+ * @param {number} [star.massMsun] - Stellar mass in solar masses
+ * @param {number} [star.massMsol=1.0] - Stellar mass alias in solar masses
+ * @param {number} [star.luminosityLsun] - Stellar luminosity in solar luminosities
+ * @param {number} [star.luminosityLsol=1.0] - Stellar luminosity alias in solar luminosities
+ * @param {object} [opts={}] - Optional model controls
+ * @param {number} [opts.activityCycle=0.5] - Activity-cycle phase in [0, 1]
+ * @returns {{
+ *   inputs: {teffK: number, ageGyr: number, massMsun: number, luminosityLsun: number, activityCycle: number},
+ *   activity: {
+ *     teffBin: string, ageBand: string, N32: number, alpha: number,
+ *     E0Erg: number, EminErg: number, EmaxErg: number,
+ *     flareCycleMultiplier: number, energeticFlareRatePerDay: number,
+ *     totalFlareRatePerDay: number, energeticFlareRecurrenceDays: number,
+ *     totalFlareRecurrenceHours: number, lambdaFlarePerDay: number,
+ *     cmeAssociatedRatePerDay: number, cmeBackgroundRatePerDay: number,
+ *     cmeTotalRatePerDay: number, cmeTargetPerDay: number|null,
+ *     cmeMeanAssociationProbability: number, cmeSuppression: number,
+ *     cmeEnvelopeMinPerDay: number, cmeEnvelopeMaxPerDay: number
+ *   },
+ *   display: {
+ *     activityRegime: string, energeticThresholdErg: string, totalThresholdErg: string,
+ *     energeticFlareRatePerDay: string, totalFlareRatePerDay: string,
+ *     energeticFlareRecurrenceDays: string, totalFlareRecurrenceHours: string,
+ *     cmeAssociatedRatePerDay: string, cmeBackgroundRatePerDay: string,
+ *     cmeTotalRatePerDay: string, cmeEnvelopeFgkPerDay: string
+ *   }
+ * }}
+ */
+export function computeStellarActivityModel(star, opts = {}) {
+  const teffK = toFinite(star?.teffK, 5776);
+  const ageGyr = Math.max(0, toFinite(star?.ageGyr, 4.6));
+  const massMsun = toFinite(star?.massMsun ?? star?.massMsol, 1.0);
+  const luminosityLsun = toFinite(star?.luminosityLsun ?? star?.luminosityLsol, 1.0);
+  const activityCycle = clamp(toFinite(opts?.activityCycle, 0.5), 0, 1);
+
+  const teffBin = pickTeffBin(teffK);
+  const ageBand = pickAgeBand(teffBin, ageGyr);
+  const N32 = N32_TABLE[teffBin][ageBand];
+  const alpha = ALPHA_TABLE[teffBin];
+  const flareCycleMultiplier = flareCycleMultiplierFromCycle(teffBin, activityCycle);
+  const energeticFlareRatePerDay = N32 * flareCycleMultiplier;
+  const totalFlareRatePerDay =
+    energeticFlareRatePerDay * (FLARE_TOTAL_THRESHOLD_ERG / FLARE_E0_ERG) ** -alpha;
+  const energeticFlareRecurrenceDays =
+    energeticFlareRatePerDay > 0 ? 1 / energeticFlareRatePerDay : Infinity;
+  const totalFlareRecurrenceHours = totalFlareRatePerDay > 0 ? 24 / totalFlareRatePerDay : Infinity;
+  const cme = computeCmeRateModel(
+    {
+      teffBin,
+      N32,
+      alpha,
+      EminErg: FLARE_TOTAL_THRESHOLD_ERG,
+      EmaxErg: FLARE_EMAX_ERG,
+      totalFlareRatePerDay,
+      energeticFlareRatePerDay,
+    },
+    { activityCycle },
+  );
+
+  const inputs = {
+    teffK,
+    ageGyr,
+    massMsun,
+    luminosityLsun,
+    activityCycle,
+  };
+
+  const activity = {
+    teffBin,
+    ageBand,
+    N32,
+    alpha,
+    E0Erg: FLARE_E0_ERG,
+    EminErg: FLARE_TOTAL_THRESHOLD_ERG,
+    EmaxErg: FLARE_EMAX_ERG,
+    flareCycleMultiplier,
+    energeticFlareRatePerDay,
+    totalFlareRatePerDay,
+    energeticFlareRecurrenceDays,
+    totalFlareRecurrenceHours,
+    // Backward-compat alias used by existing consumers/tests.
+    lambdaFlarePerDay: totalFlareRatePerDay,
+    cmeAssociatedRatePerDay: cme.associatedRatePerDay,
+    cmeBackgroundRatePerDay: cme.backgroundRatePerDay,
+    cmeTotalRatePerDay: cme.totalRatePerDay,
+    cmeTargetPerDay: cme.fgkTargetPerDay,
+    cmeMeanAssociationProbability: cme.meanAssociationProbability,
+    cmeSuppression: cme.suppression,
+    cmeEnvelopeMinPerDay: FGK_CME_MIN_PER_DAY,
+    cmeEnvelopeMaxPerDay: FGK_CME_MAX_PER_DAY,
+  };
+
+  const display = {
+    activityRegime: `${teffBin}/${ageBand}`,
+    energeticThresholdErg: `${FLARE_E0_ERG}`,
+    totalThresholdErg: `${FLARE_TOTAL_THRESHOLD_ERG}`,
+    energeticFlareRatePerDay: `${energeticFlareRatePerDay}`,
+    totalFlareRatePerDay: `${totalFlareRatePerDay}`,
+    energeticFlareRecurrenceDays: Number.isFinite(energeticFlareRecurrenceDays)
+      ? `${energeticFlareRecurrenceDays}`
+      : "Infinity",
+    totalFlareRecurrenceHours: Number.isFinite(totalFlareRecurrenceHours)
+      ? `${totalFlareRecurrenceHours}`
+      : "Infinity",
+    cmeAssociatedRatePerDay: `${cme.associatedRatePerDay}`,
+    cmeBackgroundRatePerDay: `${cme.backgroundRatePerDay}`,
+    cmeTotalRatePerDay: `${cme.totalRatePerDay}`,
+    cmeEnvelopeFgkPerDay: teffBin === TEFF_BIN_FGK ? "0.5 to 6.0/day" : "n/a",
+  };
+
+  return { inputs, activity, display };
+}
+
 /**
  * Creates a deterministic pseudo-random number generator from a seed
  * using a splitmix32-style hash. Produces values in [0, 1).
@@ -79,6 +352,8 @@ function uniform01(rngFn) {
  * @param {number|string} seed - Numeric or string seed value
  * @returns {function(): number} Stateful RNG function returning [0, 1)
  */
+const RNG_NORM = 1 / 4294967296;
+
 export function createSeededRng(seed) {
   let s = seedToUint32(seed);
   if (s === 0) s = 0x9e3779b9;
@@ -88,7 +363,7 @@ export function createSeededRng(seed) {
     let t = s;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return ((t ^ (t >>> 14)) >>> 0) * RNG_NORM;
   };
 }
 
@@ -102,34 +377,20 @@ export function createSeededRng(seed) {
  * @param {number} [star.ageGyr=4.6] - Stellar age in Gyr
  * @param {number} [star.massMsun=1.0] - Mass in solar masses
  * @param {number} [star.luminosityLsun=1.0] - Luminosity in solar luminosities
- * @returns {{teffBin: string, ageBand: string, N32: number, alpha: number,
- *   E0Erg: number, EminErg: number, EmaxErg: number,
- *   lambdaFlarePerDay: number, star: object}}
+ * @returns {object} Compatibility shape with flat activity fields plus
+ *   `inputs`, `activity`, and `display` tiers.
  */
 export function computeFlareParams(star) {
-  const teffK = toFinite(star?.teffK, 5776);
-  const ageGyr = Math.max(0, toFinite(star?.ageGyr, 4.6));
-  const massMsun = toFinite(star?.massMsun ?? star?.massMsol, 1.0);
-  const luminosityLsun = toFinite(star?.luminosityLsun ?? star?.luminosityLsol, 1.0);
-
-  const teffBin = pickTeffBin(teffK);
-  const ageBand = pickAgeBand(teffBin, ageGyr);
-  const N32 = N32_TABLE[teffBin][ageBand];
-  const alpha = ALPHA_TABLE[teffBin];
-
-  // N(>Emin) = N32 * (Emin/E0)^(-alpha)
-  const lambdaFlarePerDay = N32 * Math.pow(FLARE_EMIN_ERG / FLARE_E0_ERG, -alpha);
-
+  const model = computeStellarActivityModel(star);
+  const activity = model.activity;
   return {
-    teffBin,
-    ageBand,
-    N32,
-    alpha,
-    E0Erg: FLARE_E0_ERG,
-    EminErg: FLARE_EMIN_ERG,
-    EmaxErg: FLARE_EMAX_ERG,
-    lambdaFlarePerDay,
-    star: { teffK, ageGyr, massMsun, luminosityLsun },
+    ...activity,
+    // Legacy alias used by existing consumers/tests.
+    star: { ...model.inputs },
+    // New structured tiers (style-guide aligned).
+    inputs: model.inputs,
+    activity,
+    display: model.display,
   };
 }
 
@@ -162,15 +423,16 @@ export function flareClassFromEnergy(energyErg) {
  * @returns {number} Sampled flare energy in ergs
  */
 export function sampleFlareEnergyErg(params, rng) {
-  const alpha = Math.max(0.1, toFinite(params?.alpha, 2.0));
-  const Emin = Math.max(1, toFinite(params?.EminErg, FLARE_EMIN_ERG));
-  const Emax = Math.max(Emin * 1.0001, toFinite(params?.EmaxErg, FLARE_EMAX_ERG));
+  const p = resolveActivityParams(params);
+  const alpha = Math.max(0.1, toFinite(p?.alpha, 2.0));
+  const Emin = Math.max(1, toFinite(p?.EminErg, FLARE_EMIN_ERG));
+  const Emax = Math.max(Emin * 1.0001, toFinite(p?.EmaxErg, FLARE_EMAX_ERG));
   const u = uniform01(rng);
 
-  const lo = Math.pow(Emin, -alpha);
-  const hi = Math.pow(Emax, -alpha);
+  const lo = Emin ** -alpha;
+  const hi = Emax ** -alpha;
   const x = lo - u * (lo - hi);
-  return Math.pow(x, -1 / alpha);
+  return x ** (-1 / alpha);
 }
 
 /**
@@ -185,7 +447,8 @@ export function sampleFlareEnergyErg(params, rng) {
  */
 export function scheduleNextFlare(now, params, rng) {
   const nowSec = toFinite(now, 0);
-  const lambdaPerDay = Math.max(0, toFinite(params?.lambdaFlarePerDay, 0));
+  const p = resolveActivityParams(params);
+  const lambdaPerDay = Math.max(0, toFinite(p?.lambdaFlarePerDay, 0));
   const lambdaSec = lambdaPerDay / 86400;
   if (!(lambdaSec > 0)) {
     return { timeSec: Infinity, energyErg: null, flareClass: "micro" };
@@ -201,12 +464,30 @@ export function scheduleNextFlare(now, params, rng) {
   };
 }
 
+/**
+ * Schedules the next CME event from a Poisson process with the supplied
+ * mean CME rate (per day).
+ *
+ * @param {number} now - Current simulation time in seconds
+ * @param {number} ratePerDay - Mean CME rate per day
+ * @param {function} [rng=Math.random] - RNG function returning [0, 1)
+ * @returns {number} Absolute event time in seconds (or Infinity)
+ */
+export function scheduleNextCme(now, ratePerDay, rng) {
+  const nowSec = toFinite(now, 0);
+  const lambdaPerDay = Math.max(0, toFinite(ratePerDay, 0));
+  const lambdaSec = lambdaPerDay / 86400;
+  if (!(lambdaSec > 0)) return Infinity;
+  const u = uniform01(rng);
+  return nowSec + -Math.log(1 - u) / lambdaSec;
+}
+
 function baseCmeProbability(flareEnergyErg) {
   const e = toFinite(flareEnergyErg, 0);
-  if (e < 1e32) return 0.02;
-  if (e < 1e33) return 0.1;
-  if (e < 1e34) return 0.3;
-  return 0.5;
+  for (const band of CME_PROBABILITY_BREAKS) {
+    if (e < band.maxEnergyErg) return band.probability;
+  }
+  return 0.75;
 }
 
 /**
@@ -219,7 +500,7 @@ function baseCmeProbability(flareEnergyErg) {
  */
 export function cmeTargetPerDayFromCycle(activityCycle) {
   const t = clamp(toFinite(activityCycle, 0.5), 0, 1);
-  return 0.5 + (6.0 - 0.5) * t;
+  return FGK_CME_MIN_PER_DAY + (FGK_CME_MAX_PER_DAY - FGK_CME_MIN_PER_DAY) * t;
 }
 
 /**
@@ -238,18 +519,16 @@ export function cmeTargetPerDayFromCycle(activityCycle) {
  * @returns {boolean} True if a CME is spawned
  */
 export function maybeSpawnCME(flareEnergy, params, recentCMECount24h, star, opts = {}) {
-  const teffBin = String(params?.teffBin || pickTeffBin(star?.teffK));
+  const p = resolveActivityParams(params);
+  const teffBin = String(p?.teffBin || pickTeffBin(star?.teffK));
   const recent = Math.max(0, toFinite(recentCMECount24h, 0));
-  const n32 = Math.max(EPS, toFinite(params?.N32, 0.05));
-  const suppression = clamp(Math.pow(n32 / 5.0, -0.5), 0.2, 1.0);
-  const pCME = baseCmeProbability(flareEnergy) * suppression;
-
-  if (teffBin === TEFF_BIN_FGK) {
-    const target = cmeTargetPerDayFromCycle(opts.activityCycle);
-    if (recent >= target) return false;
-  } else if (recent >= 20) {
-    return false;
-  }
+  const n32 = Math.max(EPS, toFinite(p?.N32, 0.05));
+  const suppression = cmeSuppressionFromN32(n32);
+  const fgkTarget = teffBin === TEFF_BIN_FGK ? cmeTargetPerDayFromCycle(opts.activityCycle) : null;
+  const fallbackTarget = Math.max(1.0, Math.min(20.0, toFinite(p?.cmeTotalRatePerDay, 6.0)));
+  const target = fgkTarget ?? fallbackTarget;
+  const saturation = cmeSaturationFactor(recent, target);
+  const pCME = baseCmeProbability(flareEnergy) * suppression * saturation;
 
   const u = uniform01(opts.rng);
   return u < pCME;
@@ -266,10 +545,11 @@ export function maybeSpawnCME(flareEnergy, params, recentCMECount24h, star, opts
  * @returns {number} Expected flare rate per day above threshold
  */
 export function expectedRateAboveEnergyPerDay(params, thresholdEnergyErg) {
+  const p = resolveActivityParams(params);
   const e = Math.max(1, toFinite(thresholdEnergyErg, FLARE_E0_ERG));
-  const n32 = Math.max(0, toFinite(params?.N32, 0));
-  const alpha = Math.max(0.1, toFinite(params?.alpha, 2.0));
-  return n32 * Math.pow(e / FLARE_E0_ERG, -alpha);
+  const n32 = Math.max(0, toFinite(p?.N32, 0));
+  const alpha = Math.max(0.1, toFinite(p?.alpha, 2.0));
+  return n32 * (e / FLARE_E0_ERG) ** -alpha;
 }
 
 function seedToUint32(seed) {

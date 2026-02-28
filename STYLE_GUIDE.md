@@ -83,10 +83,18 @@ Avoid deep nesting. One level of `__` is the maximum. Use `--variant` for visual
 | Subsection      | `.subsection`, `.subsection__title`                         | Grouped block within a panel body                 |
 | Input pair      | `.input-pair`                                               | Number + range slider stack                       |
 | Tooltip         | `.tip-icon` + `.tooltip-bubble`                             | Info icon that shows a popup on hover             |
+| Header controls | `.header-controls`                                          | Flex row in page header for theme/splash toggles  |
+| Splash toggle   | `.splash-toggle`, `.splash-toggle__input`, `__label`        | Pill-shaped checkbox for splash opt-out           |
+| Recipe progress | `.rp-picker-progress`                                       | 2px progress bar in recipe picker overlay         |
+| Help overlay    | `.viz-help-overlay`, `__content`, `__close`                 | Centred glass-panel modal for visualiser controls |
 
 ### Responsive
 
-Single breakpoint: `@media (max-width: 980px)` switches `.grid-2` from 2-column to 1-column.
+| Breakpoint          | Effect                                                                        |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `max-width: 1640px` | `.top-nav__link` font-size shrinks to 14px                                    |
+| `max-width: 1505px` | `.top-nav__link` font-size shrinks to 12px                                    |
+| `max-width: 980px`  | `.grid-2` switches from 2-column to 1-column; `.header-controls` aligns right |
 
 ### KPI cards
 
@@ -129,14 +137,15 @@ The card itself grows as one unit — meta inherits the card's background, borde
 
 #### Variants
 
-| Modifier                 | Usage                                                                                        | Notes                                                                                                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.kpi--colour`           | Colour swatch cards (sky, vegetation, star colour).                                          | Sets `--kpi-colour`, `--kpi-colour-center`, `--kpi-colour-edge` via inline `style`. Border: `rgba(0,0,0,0.12)`.                                                                        |
-| `data-gradient="radial"` | Sky colour "dome" gradient (centre → edge).                                                  | Adds `::before`/`::after` pseudo-elements for specular highlight and vignette. `overflow: hidden` clips them.                                                                          |
-| `data-gradient="linear"` | Vegetation gradient (pale → deep, left to right).                                            | Simple `linear-gradient(to right, ...)`.                                                                                                                                               |
-| `data-horizon="1"`       | Low-sun sky variant.                                                                         | Overrides the radial gradient to use darker centre + warm rim. Disables `::before`/`::after` overlays.                                                                                 |
-| `data-light="0\|1"`      | Contrast-aware text. `0` = dark background (light text), `1` = light background (dark text). | Computed via `relativeLuminance(hex) > 0.18` threshold. Affects label, value, meta, tip-icon, chevron, and veg-details-btn colours.                                                    |
-| `.kpi--preview`          | Gas giant appearance card.                                                                   | Fixed `height: 68px; overflow: hidden` at rest (centre-crops the canvas). On hover: `height: auto; overflow: visible`. Label uses `text-shadow` for readability over the planet image. |
+| Modifier                 | Usage                                                                                        | Notes                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.kpi--colour`           | Colour swatch cards (sky, vegetation, star colour).                                          | Sets `--kpi-colour`, `--kpi-colour-center`, `--kpi-colour-edge` via inline `style`. Border: `rgba(0,0,0,0.12)`.                                                                                                                                                                                               |
+| `data-gradient="radial"` | Sky colour "dome" gradient (centre → edge).                                                  | Adds `::before`/`::after` pseudo-elements for specular highlight and vignette. `overflow: hidden` clips them.                                                                                                                                                                                                 |
+| `data-gradient="linear"` | Vegetation gradient (pale → deep, left to right).                                            | Simple `linear-gradient(to right, ...)`.                                                                                                                                                                                                                                                                      |
+| `data-horizon="1"`       | Low-sun sky variant.                                                                         | Overrides the radial gradient to use darker centre + warm rim. Disables `::before`/`::after` overlays.                                                                                                                                                                                                        |
+| `data-light="0\|1"`      | Contrast-aware text. `0` = dark background (light text), `1` = light background (dark text). | Computed via `relativeLuminance(hex) > 0.18` threshold. Affects label, value, meta, tip-icon, chevron, and veg-details-btn colours.                                                                                                                                                                           |
+| `.kpi--preview`          | Celestial body appearance card (rocky planets, gas giants, moons).                           | Fixed `height: 68px; overflow: hidden` at rest (centre-crops the canvas). On hover/focus-within: `height: auto; overflow: visible`. Label uses `text-shadow` for readability over the body image. Recipes/Pause buttons in the label are hidden at rest (`display: none`) and revealed on hover/focus-within. |
+| `.kpi--sun-preview`      | Star visual preview card.                                                                    | Same 68px collapse pattern as `--preview`. Contains an animated `<canvas>` showing real-time flare/CME events. Uses `--sun-kpi-text-shadow` custom property for label contrast. On hover: reveals canvas, value, and caption with smooth transitions.                                                         |
 
 #### Label length
 
@@ -349,6 +358,7 @@ return {
 - `toFinite(n, fallback)` — safe `Number()` with fallback for NaN/Infinity
 - `round(n, dp)` — round to `dp` decimal places (default 3)
 - `fmt(n, dp)` — locale-formatted string (`en-US`, dot decimal, comma thousands)
+- `eccentricityFactor(e)` — Wisdom (2004/2008) tidal heating eccentricity function N_a(e)/(1-e²)^(15/2)
 
 ### Magic numbers
 
@@ -441,12 +451,22 @@ export const GAS_GIANT_RADIUS_STEP_RJ = 0.01;
 
 Page controllers live in `ui/` (browser globals). Each file exports a single `init*Page(containerEl)` function that owns one page's lifecycle.
 
+### Shared UI utilities
+
+| Module            | Export                 | Purpose                                                 |
+| ----------------- | ---------------------- | ------------------------------------------------------- |
+| `ui/uiHelpers.js` | `escapeHtml(s)`        | HTML-escape `& < > "` — never duplicate locally         |
+| `ui/tooltip.js`   | `tipIcon(text)`        | Render `<span class="tip-icon" data-tip="...">i</span>` |
+| `ui/tooltip.js`   | `attachTooltips(root)` | Wire up tooltip hover delegation on a container         |
+
 ### File anatomy
 
 ```js
 import { loadWorld, updateWorld } from "./store.js";
 import { calcStar } from "../engine/star.js";
-import { tipIcon, attachTooltips, escapeHtml, fmt } from "./uiHelpers.js";
+import { fmt } from "../engine/utils.js";
+import { attachTooltips, tipIcon } from "./tooltip.js";
+import { escapeHtml } from "./uiHelpers.js";
 
 const TIP_LABEL = {
   // ── Inputs ──
@@ -544,6 +564,48 @@ containerEl.addEventListener("input", (e) => {
 
 For dynamically rendered collections (gas giants, debris disks, moons), re-attach listeners inside the render function after setting `innerHTML`, guarded by `hydrating`.
 
+### Celestial preview controllers
+
+Pages that show an animated celestial body preview (planets, moons, stars) create a preview controller at init time, then `attach` and `detach` it during render cycles:
+
+```js
+import {
+  createCelestialVisualPreviewController,
+  renderCelestialRecipeBatch,
+} from "./celestialVisualPreview.js";
+
+// Create once at init time (not inside render)
+const previewCtrl = createCelestialVisualPreviewController({
+  speedDaysPerSec: 0.5,
+});
+
+function render() {
+  const cvs = containerEl.querySelector(".preview-canvas");
+  previewCtrl.attach(cvs, { bodyType, descriptor, rotationPeriodH });
+}
+```
+
+**Lifecycle rules:**
+
+- Create the controller **once** in the `init*` function — not inside `render()`.
+- Call `previewCtrl.attach(canvas, model)` each render. Preserve the previous canvas element (`if (existingCvs) reuse it`) to avoid WebGL context loss.
+- Call `previewCtrl.detach()` when the preview is not visible (e.g. no planet selected).
+- Dispose on page unmount via a `MutationObserver` watching for the container's removal:
+
+```js
+const observer = new MutationObserver(() => {
+  if (!document.contains(containerEl)) {
+    previewCtrl.dispose();
+    observer.disconnect();
+  }
+});
+observer.observe(document.body, { childList: true, subtree: true });
+```
+
+### Recipe picker batch rendering
+
+Recipe thumbnails are rendered asynchronously via `renderCelestialRecipeBatch(items, onProgress)`, with a `.rp-picker-progress` progress bar showing completion. The progress bar fades out when done.
+
 ---
 
 ## 7. Testing Conventions
@@ -614,18 +676,70 @@ function approxEqual(actual, expected, tolerance = 0.05) {
 
 ### npm scripts
 
-| Script                | What it runs                                       |
-| --------------------- | -------------------------------------------------- |
-| `npm test`            | Full test suite (`node --test tests/**/*.test.js`) |
-| `npm run test:engine` | Engine tests only (explicit file list, no UI deps) |
-| `npm run check`       | Syntax check + ESLint + Prettier + full test suite |
-| `npm run format`      | Prettier `--write` on all files                    |
+| Script                       | What it runs                                                      |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `npm test`                   | Full test suite (`node --test tests/**/*.test.js`)                |
+| `npm run test:engine`        | Engine tests only (explicit file list, no UI deps)                |
+| `npm run check`              | Syntax check + ESLint + Prettier + full test suite                |
+| `npm run format`             | Prettier `--write` on all files                                   |
+| `npm run assets:three`       | Generate Three.js SVG sprite assets in `assets/three-renders/`    |
+| `npm run assets:celestial`   | Generate celestial preset manifest in `assets/celestial-presets/` |
+| `npm run calibrate:activity` | Stellar activity calibration regression check                     |
 
 Always run `npm run check` before considering work complete. All tests must pass, and there must be zero lint or formatting errors.
 
+### Visual regression tests
+
+Pixel-level snapshot tests use `@napi-rs/canvas` (real 2D rendering in Node) and `pixelmatch` for comparison. The `tests/domHarness.js` patches `HTMLCanvasElement.prototype.getContext("2d")` to delegate to `@napi-rs/canvas` so all Canvas2D calls in tests produce real pixels.
+
+Reference snapshots are stored as raw RGBA buffers in `tests/snapshots/`. The helper `tests/visualHelpers.js` provides:
+
+- `compareSnapshot(ctx, w, h, name)` — compare against stored reference; generates on first run
+- `assertSnapshot(ctx, w, h, name, { maxDiffPixels })` — assert wrapper that throws on drift
+
+On mismatch, `.diff.png` and `.actual.png` files are written for visual debugging.
+
 ---
 
-## 8. Release Announcement (Discord)
+## 8. Three.js Rendering Patterns
+
+The app uses Three.js (loaded lazily from CDN) as the primary render path for all major canvases. Canvas2D is retained as a runtime fallback.
+
+### CDN loading
+
+Three.js is loaded on demand via `ui/threeBridge2d.js`:
+
+```js
+import { loadThreeCore } from "./threeBridge2d.js";
+const THREE = await loadThreeCore(); // cached promise, retry on failure
+```
+
+Never bundle Three.js locally — it is fetched from jsDelivr. The bridge caches the module after first load.
+
+### Render surfaces
+
+| Surface            | Module                          | Camera        | Notes                                                                 |
+| ------------------ | ------------------------------- | ------------- | --------------------------------------------------------------------- |
+| System Visualiser  | `ui/visualizerPage.js`          | Perspective   | Body mesh cache with LOD swapping                                     |
+| Cluster Visualiser | `ui/visualizerPage.js`          | Perspective\* | Pure 2D overlay canvas; Three.js camera used only for projection math |
+| System Poster      | `ui/systemPosterNativeThree.js` | Orthographic  | Textured body spheres, starfield, zones                               |
+| Apparent Sky       | `ui/apparentSkyNativeThree.js`  | Orthographic  | Angular-size comparison with references                               |
+| Body previews      | `ui/threeNativePreview.js`      | Perspective   | Shared renderer per canvas, custom `ShaderMaterial`                   |
+| Celestial previews | `ui/celestialVisualPreview.js`  | Perspective   | Animated rotation, LOD tiers, texture cache                           |
+
+### Asset pipeline
+
+SVG sprite textures are generated by `scripts/generate-three-render-assets.mjs` into `assets/three-renders/` (stars, gas giants, rocky planets, moons, debris disks). Runtime lookup is via `ui/threeRenderAssetMap.js`.
+
+Procedural equirectangular textures are generated by `ui/celestialComposer.js` (3D noise, fBm, domain warping) and can be offloaded to a Web Worker via `ui/celestialTextureWorker.js`.
+
+### Disposal
+
+Always dispose Three.js resources (renderers, geometries, materials, textures) when a page unmounts. Use the `MutationObserver` pattern documented in Section 6 (Celestial preview controllers).
+
+---
+
+## 9. Release Announcement (Discord)
 
 When a new version ships, post a short announcement in Discord. Follow this format:
 
@@ -639,6 +753,8 @@ When a new version ships, post a short announcement in Discord. Follow this form
 **Feature Name** — 1–2 sentence summary.
 
 **Feature Name** — 1–2 sentence summary.
+
+**Remember to do a hard refresh (Ctrl+F5)**
 ```
 
 ### Rules

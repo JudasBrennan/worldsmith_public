@@ -1,11 +1,14 @@
 {
   "name": "worldsmith-web",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "private": true,
   "type": "module",
   "scripts": {
     "check:syntax": "node scripts/check-syntax.mjs",
     "backup:live": "node scripts/backup-live.mjs",
+    "assets:three": "node scripts/generate-three-render-assets.mjs",
+    "assets:celestial": "node scripts/generate-celestial-preset-assets.mjs",
+    "calibrate:activity": "node scripts/calibrate-stellar-activity.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -19,10 +22,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@napi-rs/canvas": "^0.1.95",
     "esbuild": "^0.27.3",
     "eslint": "^9.21.0",
     "globals": "^15.15.0",
     "jsdom": "^28.1.0",
-    "prettier": "^3.5.2"
+    "pixelmatch": "^7.1.0",
+    "prettier": "^3.5.2",
+    "three": "^0.183.1"
   }
 }

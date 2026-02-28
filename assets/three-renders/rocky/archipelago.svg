@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#417b9b"/>
+      <stop offset="55%" stop-color="#255171"/>
+      <stop offset="100%" stop-color="#172e46"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><rect x="0" y="0" width="256" height="256" fill="#1a3a6a" opacity="0.52"/><ellipse cx="123.71" cy="99.20" rx="19.17" ry="17.65" transform="rotate(19.54 123.71 99.20)" fill="#ac9472" opacity="0.82"/><ellipse cx="87.25" cy="124.31" rx="21.92" ry="15.00" transform="rotate(64.65 87.25 124.31)" fill="#7a6145" opacity="0.82"/><ellipse cx="118.82" cy="151.96" rx="24.83" ry="22.97" transform="rotate(14.98 118.82 151.96)" fill="#ac9472" opacity="0.82"/><ellipse cx="79.88" cy="85.35" rx="33.42" ry="28.46" transform="rotate(136.51 79.88 85.35)" fill="#7a6145" opacity="0.82"/><ellipse cx="137.70" cy="137.95" rx="34.25" ry="23.10" transform="rotate(138.95 137.70 137.95)" fill="#ac9472" opacity="0.82"/><ellipse cx="106.10" cy="150.98" rx="19.64" ry="11.51" transform="rotate(78.81 106.10 150.98)" fill="#7a6145" opacity="0.82"/><ellipse cx="133.59" cy="182.59" rx="17.40" ry="8.31" transform="rotate(115.79 133.59 182.59)" fill="#ac9472" opacity="0.82"/><ellipse cx="76.69" cy="72.34" rx="21.01" ry="6.74" fill="#ffffff" opacity="0.023400000000000004"/><ellipse cx="169.70" cy="92.82" rx="15.80" ry="3.36" fill="#ffffff" opacity="0.023400000000000004"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>

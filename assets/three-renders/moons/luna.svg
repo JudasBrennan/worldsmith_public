@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="base" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#8d8781"/>
+      <stop offset="55%" stop-color="#68625c"/>
+      <stop offset="100%" stop-color="#393531"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <mask id="planetMask">
+      <rect width="256" height="256" fill="black"/>
+      <circle cx="128" cy="128" r="102.4" fill="white"/>
+    </mask>
+  </defs>
+  <circle cx="128" cy="128" r="102.4" fill="url(#base)"/>
+  <g mask="url(#planetMask)"><circle cx="169.61" cy="105.09" r="8.75" fill="rgba(0,0,0,0.18)"/><circle cx="167.15" cy="102.99" r="6.30" fill="rgba(255,255,255,0.08)"/><circle cx="93.36" cy="100.55" r="6.08" fill="rgba(0,0,0,0.18)"/><circle cx="91.65" cy="99.09" r="4.38" fill="rgba(255,255,255,0.08)"/><circle cx="186.71" cy="143.97" r="4.09" fill="rgba(0,0,0,0.18)"/><circle cx="185.56" cy="142.99" r="2.94" fill="rgba(255,255,255,0.08)"/><circle cx="86.74" cy="136.15" r="4.89" fill="rgba(0,0,0,0.18)"/><circle cx="85.37" cy="134.97" r="3.52" fill="rgba(255,255,255,0.08)"/><circle cx="175.43" cy="79.53" r="5.77" fill="rgba(0,0,0,0.18)"/><circle cx="173.81" cy="78.15" r="4.16" fill="rgba(255,255,255,0.08)"/><circle cx="99.33" cy="183.48" r="9.51" fill="rgba(0,0,0,0.18)"/><circle cx="96.67" cy="181.20" r="6.84" fill="rgba(255,255,255,0.08)"/><circle cx="140.76" cy="141.66" r="4.15" fill="rgba(0,0,0,0.18)"/><circle cx="139.60" cy="140.67" r="2.99" fill="rgba(255,255,255,0.08)"/><circle cx="81.27" cy="137.64" r="5.38" fill="rgba(0,0,0,0.18)"/><circle cx="79.76" cy="136.34" r="3.87" fill="rgba(255,255,255,0.08)"/><circle cx="71.23" cy="56.58" r="9.22" fill="rgba(0,0,0,0.18)"/><circle cx="68.65" cy="54.37" r="6.64" fill="rgba(255,255,255,0.08)"/><circle cx="147.62" cy="88.49" r="6.54" fill="rgba(0,0,0,0.18)"/><circle cx="145.79" cy="86.92" r="4.71" fill="rgba(255,255,255,0.08)"/><circle cx="147.85" cy="79.31" r="4.60" fill="rgba(0,0,0,0.18)"/><circle cx="146.56" cy="78.20" r="3.31" fill="rgba(255,255,255,0.08)"/><circle cx="66.71" cy="105.38" r="3.25" fill="rgba(0,0,0,0.18)"/><circle cx="65.80" cy="104.60" r="2.34" fill="rgba(255,255,255,0.08)"/><circle cx="73.82" cy="154.27" r="8.90" fill="rgba(0,0,0,0.18)"/><circle cx="71.33" cy="152.13" r="6.41" fill="rgba(255,255,255,0.08)"/><circle cx="196.78" cy="109.15" r="3.80" fill="rgba(0,0,0,0.18)"/><circle cx="195.71" cy="108.24" r="2.74" fill="rgba(255,255,255,0.08)"/></g>
+  <circle cx="128" cy="128" r="102.4" fill="url(#glow)"/>
+  <circle cx="128" cy="128" r="102.4" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+</svg>
