@@ -1,13 +1,19 @@
-node_modules/
-npm-debug.log*
-Backup/
-dist/
-test-results.md
-Future Inspiration/
-.claude/
-.mcp.json
-planet.blend
-data/stellarActivity/calibration.v2.json
-references/
-scripts/
-tests/
+# Ignore everything by default
+*
+
+# Allow live server files
+!index.html
+!app.js
+!styles.css
+!favicon.svg
+!assets/
+!assets/**
+!engine/
+!engine/**
+!ui/
+!ui/**
+
+# Allow repo essentials
+!README.md
+!CHANGELOG.md
+!.gitignore
