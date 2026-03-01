@@ -68,7 +68,7 @@ beforeEach(() => {
 
 /* ── Migration v38 ──────────────────────────────────────────────── */
 
-test("migration v38 adds selectedBodyType and gas giant selectedId", () => {
+test("migration v38 → adds selectedBodyType and gas giant selectedId", () => {
   const legacy = {
     version: 37,
     star: { name: "Test", massMsol: 1, ageGyr: 4.6 },
@@ -90,7 +90,7 @@ test("migration v38 adds selectedBodyType and gas giant selectedId", () => {
   assert.equal(world.system.gasGiants.selectedId, "gg1");
 });
 
-test("migration v38 sets selectedId to null when no gas giants exist", () => {
+test("migration v38 → no gas giants → selectedId null", () => {
   const legacy = {
     version: 37,
     star: { name: "Empty", massMsol: 1, ageGyr: 4.6 },
@@ -107,7 +107,7 @@ test("migration v38 sets selectedId to null when no gas giants exist", () => {
 
 /* ── getSelectedGasGiant ────────────────────────────────────────── */
 
-test("getSelectedGasGiant returns the correct gas giant", () => {
+test("getSelectedGasGiant → Sol preset → returns Jupiter", () => {
   const solWorld = importWorld(createSolPresetEnvelope().world);
   const giant = getSelectedGasGiant(solWorld);
   assert.ok(giant, "should return a gas giant");
@@ -115,7 +115,7 @@ test("getSelectedGasGiant returns the correct gas giant", () => {
   assert.equal(giant.radiusRj, 1.0);
 });
 
-test("getSelectedGasGiant returns null when no gas giants exist", () => {
+test("getSelectedGasGiant → no gas giants → returns null", () => {
   importWorld({
     star: { name: "Empty", massMsol: 1, ageGyr: 4.6 },
     system: { spacingFactor: 0.3, orbit1Au: 0.39, gasGiants: { order: [], byId: {} } },
@@ -126,7 +126,7 @@ test("getSelectedGasGiant returns null when no gas giants exist", () => {
 
 /* ── selectGasGiant ─────────────────────────────────────────────── */
 
-test("selectGasGiant switches selection and sets body type to gasGiant", () => {
+test("selectGasGiant → valid id → switches selection and body type", () => {
   importWorld(createSolPresetEnvelope().world);
   const world = selectGasGiant("gg_saturn");
   assert.equal(world.system.gasGiants.selectedId, "gg_saturn");
@@ -136,7 +136,7 @@ test("selectGasGiant switches selection and sets body type to gasGiant", () => {
   assert.equal(giant.name, "Saturn");
 });
 
-test("selectGasGiant ignores invalid id", () => {
+test("selectGasGiant → invalid id → selection unchanged", () => {
   importWorld(createSolPresetEnvelope().world);
   const before = loadWorld();
   const prevId = before.system.gasGiants.selectedId;
@@ -147,7 +147,7 @@ test("selectGasGiant ignores invalid id", () => {
 
 /* ── selectBodyType ────────────────────────────────────────── */
 
-test("selectBodyType toggles between planet and gasGiant", () => {
+test("selectBodyType → planet/gasGiant → toggles correctly", () => {
   importWorld(createSolPresetEnvelope().world);
 
   selectBodyType("gasGiant");
@@ -157,7 +157,7 @@ test("selectBodyType toggles between planet and gasGiant", () => {
   assert.equal(loadWorld().selectedBodyType, "planet");
 });
 
-test("selectBodyType defaults invalid input to planet", () => {
+test("selectBodyType → invalid input → defaults to planet", () => {
   importWorld(createSolPresetEnvelope().world);
   selectBodyType("invalid");
   assert.equal(loadWorld().selectedBodyType, "planet");
@@ -165,7 +165,7 @@ test("selectBodyType defaults invalid input to planet", () => {
 
 /* ── Planet + gas giant coexistence ──────────────────────────────── */
 
-test("planets and gas giants coexist independently in a Sol-like world", () => {
+test("coexistence → Sol preset → planets and gas giants independent", () => {
   importWorld(createSolPresetEnvelope().world);
   const world = loadWorld();
 
@@ -190,7 +190,7 @@ test("planets and gas giants coexist independently in a Sol-like world", () => {
 
 /* ── Create and select gas giant ────────────────────────────────── */
 
-test("creating a gas giant and selecting it persists through save/load", () => {
+test("gas giant → create + select → persists through save/load", () => {
   importWorld(createSolPresetEnvelope().world);
   const existing = listSystemGasGiants(loadWorld());
   const newId = "gg_test_new";
@@ -224,7 +224,7 @@ test("creating a gas giant and selecting it persists through save/load", () => {
 
 /* ── Delete gas giant unassigns moons ───────────────────────────── */
 
-test("deleting a gas giant unassigns its moons", () => {
+test("gas giant → delete → unassigns its moons", () => {
   importWorld(createSolPresetEnvelope().world);
   const world = loadWorld();
 
@@ -262,7 +262,7 @@ test("deleting a gas giant unassigns its moons", () => {
 
 /* ── Body type switching preserves selections ───────────────────── */
 
-test("switching body type preserves both planet and gas giant selections", () => {
+test("selectBodyType → switch → preserves both selections", () => {
   importWorld(createSolPresetEnvelope().world);
 
   selectPlanet("p_mars");
@@ -285,7 +285,7 @@ test("switching body type preserves both planet and gas giant selections", () =>
 
 /* ── Planet CRUD with immediate-save ────────────────────────────── */
 
-test("updatePlanet immediately persists changes to store", () => {
+test("updatePlanet → change fields → persists immediately", () => {
   importWorld(createSolPresetEnvelope().world);
   const w = loadWorld();
   const earthId = w.planets.selectedId;
@@ -299,7 +299,7 @@ test("updatePlanet immediately persists changes to store", () => {
   assert.equal(earth.inputs.semiMajorAxisAu, 1.0);
 });
 
-test("createPlanetFromInputs adds a new planet and selects it", () => {
+test("createPlanetFromInputs → new planet → added and selected", () => {
   importWorld(createSolPresetEnvelope().world);
   const before = listPlanets(loadWorld());
 
@@ -317,7 +317,7 @@ test("createPlanetFromInputs adds a new planet and selects it", () => {
   assert.equal(newPlanet.inputs.massEarth, 0.8);
 });
 
-test("deletePlanet removes planet and selects another", () => {
+test("deletePlanet → remove Mars → selects another", () => {
   importWorld(createSolPresetEnvelope().world);
   selectPlanet("p_mars");
   const before = listPlanets(loadWorld()).length;
@@ -332,7 +332,7 @@ test("deletePlanet removes planet and selects another", () => {
 
 /* ── Gas giant selectedId survives canonicalize ──────────────────── */
 
-test("gas giant selectedId survives collection rebuild via saveSystemGasGiants", () => {
+test("saveSystemGasGiants → rebuild collection → selectedId survives", () => {
   importWorld(createSolPresetEnvelope().world);
   selectGasGiant("gg_saturn");
 
@@ -344,7 +344,7 @@ test("gas giant selectedId survives collection rebuild via saveSystemGasGiants",
   assert.equal(world.system.gasGiants.selectedId, "gg_saturn");
 });
 
-test("gas giant selectedId falls back to first when selected is deleted", () => {
+test("saveSystemGasGiants → selected deleted → falls back to first", () => {
   importWorld(createSolPresetEnvelope().world);
   selectGasGiant("gg_saturn");
 
@@ -359,7 +359,7 @@ test("gas giant selectedId falls back to first when selected is deleted", () => 
 
 /* ── Preset new fields ──────────────────────────────────────────── */
 
-test("Realmspace preset includes selectedBodyType and gas giant selectedId", () => {
+test("Realmspace preset → includes selectedBodyType and gas giant selectedId", () => {
   const world = importWorld(createRealmspacePresetEnvelope().world);
   assert.equal(world.selectedBodyType, "planet");
   assert.equal(world.system.gasGiants.selectedId, "gg_coliar");
@@ -367,7 +367,7 @@ test("Realmspace preset includes selectedBodyType and gas giant selectedId", () 
 
 /* ── Round-trip preserves new fields ────────────────────────────── */
 
-test("export/import round-trip preserves selectedBodyType and gas giant selectedId", () => {
+test("round-trip → export/import → preserves body type and gas giant selectedId", () => {
   importWorld(createSolPresetEnvelope().world);
   selectGasGiant("gg_neptune");
   selectBodyType("gasGiant");
@@ -385,7 +385,7 @@ test("export/import round-trip preserves selectedBodyType and gas giant selected
 
 /* ── Moon assignment to gas giants ──────────────────────────────── */
 
-test("moons can be assigned to gas giants and listed correctly", () => {
+test("moons → Sol preset gas giants → assigned and listed correctly", () => {
   importWorld(createSolPresetEnvelope().world);
   const world = loadWorld();
 
@@ -403,7 +403,7 @@ test("moons can be assigned to gas giants and listed correctly", () => {
   assert.ok(saturnMoons.some((m) => m.name === "Titan"));
 });
 
-test("createMoonFromInputs assigns moon to gas giant", () => {
+test("createMoonFromInputs → gas giant target → moon assigned", () => {
   importWorld(createSolPresetEnvelope().world);
   const before = listMoons(loadWorld()).filter((m) => m.planetId === "gg_neptune").length;
 

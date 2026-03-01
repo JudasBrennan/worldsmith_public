@@ -25,47 +25,47 @@ import {
 import { attachTooltips, tipIcon } from "./tooltip.js";
 
 const TIP_LABEL = {
-  "Star Mass": "The star's mass in solar masses.\n\nSol = 1 Msol.",
-  "Star Radius": "The star's radius in solar radii.\n\nSol = 1 Rsol.",
-  "Star Luminosity": "The luminosity of the star in solar luminosities.\n\nSol = 1 Lsol.",
-  "Star Age": "The age of the star in billions of years.",
-  "Planet Mass": "The planet's mass in Earth masses.\n\nEarth = 1 MEarth.",
-  "Planet CMF": "The planet's Core Mass Fraction.",
-  "Planet Density": "The density of the planet in g/cm3.\n\nEarth = 5.51 g/cm3.",
-  "Planet Radius": "The radius of the planet in Earth radii.\n\nEarth = 1 REarth = 6,371 km.",
-  "Planet Gravity": "The surface gravity at sea level on the planet.\n\nEarth = 1 g = 9.8 m/s2.",
+  "Star Mass": "Host star mass in solar masses.\n\nSun = 1 Msol.",
+  "Star Radius": "Host star radius in solar radii.\n\nSun = 1 Rsol.",
+  "Star Luminosity": "Host star luminosity in solar luminosities.\n\nSun = 1 Lsol.",
+  "Star Age": "Age of the host star in billions of years.",
+  "Planet Mass": "Parent planet mass in Earth masses.\n\nEarth = 1 MEarth.",
+  "Planet CMF": "Parent planet core mass fraction.",
+  "Planet Density": "Parent planet bulk density in g/cm\u00B3.\n\nEarth = 5.51 g/cm\u00B3.",
+  "Planet Radius": "Parent planet radius in Earth radii.\n\nEarth = 1 REarth = 6,371 km.",
+  "Planet Gravity":
+    "Surface gravity at sea level on the parent planet.\n\nEarth = 1 g = 9.8 m/s\u00B2.",
   "Planet Semi-Major Axis":
-    "The distance from the star at which the planet orbits, in AU.\n\nEarth = 1 AU.",
-  "Planet Eccentricity":
-    "The planet's orbital eccentricity.\n\nEarth's orbital eccentricity = 0.0167.",
-  "Planet Periapsis": "The closest the planet gets to its star during orbit.",
-  "Planet Orbital Period": "The length of a year on the planet, in Earth days.",
-  "Planet Rotation Period": "The length of a day on the planet in Earth hours.",
-  Mass: "The moon's mass in Moon masses. Moons should be less massive than their parent planet.\n\nOur Moon = 1 MMoon = 7.342E22 kg.",
+    "Orbital distance of the parent planet from the host star in AU.\n\nEarth = 1 AU.",
+  "Planet Eccentricity": "Orbital eccentricity of the parent planet.\n\nEarth = 0.0167.",
+  "Planet Periapsis": "Closest approach of the parent planet to the host star during orbit.",
+  "Planet Orbital Period": "Orbital period (year length) of the parent planet in Earth days.",
+  "Planet Rotation Period": "Rotation period (day length) of the parent planet in Earth hours.",
+  Mass: "Moon mass in lunar masses. Moons should be less massive than their parent planet.\n\nMoon = 1 MMoon = 7.342E22 kg.",
   Density:
-    "The density of the moon in g/cm3. Rocky moons should have densities greater than 3 g/cm3.\n\nOur Moon = 3.34 g/cm3.",
+    "Bulk density of the moon in g/cm\u00B3. Rocky moons typically exceed 3 g/cm\u00B3.\n\nMoon = 3.34 g/cm\u00B3.",
   Radius:
-    "The moon's radius in Moon radii. Major moons, like our Moon, should have radii greater than 0.173 RMoon.\n\nOur Moon = 1 RMoon = 1,736.4 km.",
+    "Moon radius in lunar radii. Major moons typically exceed 0.173 RMoon.\n\nMoon = 1 RMoon = 1,736.4 km.",
   Gravity:
-    "The surface gravity on the moon relative to Earth.\n\nEarth = 1 g = 9.8 m/s2.\nOur Moon = 0.17 g = 1.62 m/s2.",
+    "Surface gravity on the moon relative to Earth.\n\nEarth = 1 g = 9.8 m/s\u00B2.\nMoon = 0.17 g = 1.62 m/s\u00B2.",
   "Escape Velocity":
-    "The speed required to escape the gravitational pull of the moon.\n\nOur Moon's escape velocity is about 2.38 km/s. Earth's escape velocity is 11.2 km/s.",
+    "Speed required to escape the gravitational pull of the moon.\n\nMoon = 2.38 km/s. Earth = 11.2 km/s.",
   Albedo:
-    "The moon's bond albedo. Albedo measures how reflective a body is, on a scale of 0 to 1.\n\n0 = a perfect absorber (absorbs 100% of incoming radiation).\n1 = a perfect reflector (reflects 100% of incoming radiation).\n\nMercury = 0.068\nVenus = 0.77\nEarth = 0.306\nMoon = 0.11\nJupiter = 0.343\nSaturn = 0.342\nUranus = 0.30\nNeptune = 0.29\nPluto = 0.49",
+    "Bond albedo of the moon, measuring reflectivity on a scale of 0 to 1.\n\n0 = perfect absorber. 1 = perfect reflector.\n\nMercury = 0.068\nVenus = 0.77\nEarth = 0.306\nMoon = 0.11\nJupiter = 0.343\nSaturn = 0.342\nUranus = 0.30\nNeptune = 0.29\nPluto = 0.49",
   "Moon Zone (Inner)":
-    "The closest a moon can orbit the planet. Any closer and tidal forces will tear it apart (the Roche limit).",
+    "Closest stable orbit for the moon. Any closer and tidal forces tear it apart (the Roche limit).",
   "Moon Zone (Outer)":
-    "The furthest a moon can orbit the planet. Beyond this distance the moon is no longer gravitationally bound.",
+    "Farthest stable orbit for the moon. Beyond this distance the moon is no longer gravitationally bound.",
   "Semi-Major Axis":
-    "The distance from the planet at which the moon orbits, in km.\n\nFor moons of habitable Earth-like planets, the semi-major axis should fall between Moon Zone (Inner) and half of Moon Zone (Outer). If the planet has multiple major moons, they should be spaced at least 10 planetary radii apart.\n\nWorldSmith Web guards this value on Apply to keep the orbit inside the Moon Zone. Values that are too small are raised to avoid collision/disruption, and values that are too large are lowered to avoid escape.\n\nOur Moon orbits Earth at a distance of 384,748 km.",
+    "Orbital distance from the planet in km.\n\nFor moons of habitable Earth-like planets, the semi-major axis should fall between Moon Zone (Inner) and half of Moon Zone (Outer). Multiple major moons should be spaced at least 10 planetary radii apart.\n\nThe app clamps this value on Apply to keep the orbit inside the Moon Zone.\n\nMoon = 384,748 km.",
   Eccentricity:
-    "The moon's orbital eccentricity, a measure of how elliptical the orbit is. The scale goes from 0 to 1.\n\n0 = orbit is a perfect circle.\n1 = orbit is a parabola.\n\nMajor moons should have very low eccentricities.\n\nOur Moon's orbital eccentricity = 0.055.",
+    "Orbital eccentricity of the moon (0\u20131).\n\n0 = perfect circle. 1 = parabola.\n\nMajor moons should have very low eccentricities.\n\nMoon = 0.055.",
   Periapsis:
-    "The closest the moon gets to the planet during orbit.\n\nFor moons of habitable Earth-like planets, this distance should fall between Moon Zone (Inner) and Moon Zone (Outer).",
+    "Closest approach of the moon to the planet during orbit.\n\nShould fall between Moon Zone (Inner) and Moon Zone (Outer).",
   Apoapsis:
-    "The furthest the moon gets from the planet during orbit.\n\nFor moons of habitable Earth-like planets, this distance should fall between Moon Zone (Inner) and Moon Zone (Outer).",
+    "Farthest point of the moon from the planet during orbit.\n\nShould fall between Moon Zone (Inner) and Moon Zone (Outer).",
   Inclination:
-    "The inclination of the moon's orbit relative to the planet's orbital plane.\n\nInclinations range from 0\u2013180\u00ba. Major moons should have very low inclinations.\n\nOur Moon = 5.15\u00ba (with respect to the ecliptic).",
+    "Inclination of the moon's orbit relative to the planet's orbital plane.\n\nRange: 0\u2013180\u00b0. Major moons should have very low inclinations.\n\nMoon = 5.15\u00b0 (with respect to the ecliptic).",
   "Orbital Direction":
     "Prograde = the moon orbits the planet in the same direction as the planet's spin.\n\nRetrograde = the moon orbits the planet in the opposite direction of the planet's spin.\n\nUndefined = the orbital inclination is exactly 90\u00ba, so the orbit is classed as neither prograde nor retrograde.\n\nMajor moons of habitable Earth-like planets should be on prograde orbits.",
   "Orbital Period (sidereal)":
@@ -75,11 +75,11 @@ const TIP_LABEL = {
   "Rotation Period":
     'The time it takes the moon to complete one full rotation about its axis.\n\nIf this shows "Not tidally locked", the moon is not tidally locked to the planet, so this model does not calculate a fixed rotation period.',
   "Total Tidal Force":
-    "The total tidal force exerted on the planet by the moon and the star, relative to the tidal forces exerted on Earth.\n\n<1 = tides less extreme than Earth.\n~1 = tides comparable to Earth.\n>1 = tides more extreme than Earth.",
+    "Total tidal force exerted on the planet by the moon and the star, relative to the tidal forces exerted on Earth.\n\n<1 = tides less extreme than Earth.\n~1 = tides comparable to Earth.\n>1 = tides more extreme than Earth.",
   "Moon Contribution":
-    "The fraction of the total tidal force contributed by the moon.\n\nEarth's Moon \u2248 66%.",
+    "Fraction of the total tidal force contributed by the moon.\n\nMoon \u2248 66% (Earth\u2013Moon system).",
   "Star Contribution":
-    "The fraction of the total tidal force contributed by the star.\n\nSol \u2248 33%.",
+    "Fraction of the total tidal force contributed by the host star.\n\nSun \u2248 33% (Earth\u2013Moon system).",
   "Moon locked to Planet?":
     'Checks whether the moon is tidally locked to the planet.\n\nA body is tidally locked when it takes the same amount of time to spin about its axis as it does to orbit its companion. Tidally locked objects always present the same face to their companion.\n\nMajor moons should always be tidally locked to the planet, i.e., the expected output is "Yes".',
   "Planet locked to Moon?":
@@ -87,11 +87,11 @@ const TIP_LABEL = {
   "Planet locked to Star?":
     'Checks whether the planet is expected to be tidally locked to its star.\n\nWorldSmith Web uses a user-friendly rule: this shows "Yes" when the computed Planet\u2192Star lock time is less than or equal to the current star age.\n\nFor an Earth-like setup, this should usually remain "No".',
   "Derived Data": "Read-only star and planet context used for moon calculations.",
-  "Moon selection": "Choose which saved moon you are editing.",
-  "Editing moon": "Select a moon, create a new one, or delete the current one.",
-  "Belongs to planet": "Set the parent planet this moon orbits, or leave it unassigned.",
+  "Moon selection": "Saved moon currently being edited.",
+  "Editing moon": "Moon selector with create and delete controls.",
+  "Belongs to planet": "Parent planet this moon orbits. May be left unassigned.",
   Identity: "Identity fields for the currently selected moon.",
-  Name: "Set the moon's display name used across tabs and exports.",
+  Name: "Display name for the moon, used across tabs and exports.",
   Orbit: "Orbital inputs that determine moon distance, periods, and lock behaviour.",
   Physical: "Physical inputs used to derive radius, gravity, and escape velocity.",
   Composition:

@@ -36,6 +36,8 @@ const PI = Math.PI;
 const STAR_MASS_TO_KG = 1.989e30;
 
 const EARTH_RADIUS_KM = 6371;
+const EARTH_DENSITY_GCM3 = 5.51; // Earth mean bulk density (g/cm³)
+const DAYS_PER_YEAR = 365.256; // Julian year (IAU)
 
 const VELOCITY_EARTH_KMS = 11.186;
 const GRAVITY_EARTH_MS2 = 9.81;
@@ -93,9 +95,9 @@ function atmosphereTideRatio(pressureAtm, insolationEarth, gravityMs2, tEqK) {
 // rotationFactor = 1/p (multiply orbital period to get rotation period).
 function spinOrbitResonance(eccentricity) {
   const e = eccentricity;
-  const H_52 = (845 / 48) * e ** 3;
-  const H_21 = (17 / 2) * e ** 2;
-  const H_32 = (7 / 2) * e;
+  const H_52 = (845 / 48) * e ** 3; // Goldreich & Peale (1966) Table 1
+  const H_21 = (17 / 2) * e ** 2; // Goldreich & Peale (1966) Table 1
+  const H_32 = (7 / 2) * e; // Goldreich & Peale (1966) Table 1
   if (H_52 > 0.5) return { ratio: "5:2", p: 2.5 };
   if (H_21 > 0.5) return { ratio: "2:1", p: 2.0 };
   if (H_32 > 0.25) return { ratio: "3:2", p: 1.5 };
@@ -119,7 +121,7 @@ function planetTidalHeatingFromMoon(
   if (semiMajorAxisM <= 0 || orbitalPeriodS <= 0 || ecc <= 0) return 0;
   const n = (2 * PI) / orbitalPeriodS; // mean motion (rad/s)
   return (
-    (21 / 2) *
+    (21 / 2) * // Peale, Cassen & Reynolds (1979) tidal dissipation coefficient
     (k2Planet / qualityFactor) *
     ((G * moonMassKg ** 2 * radiusM ** 5 * n) / semiMajorAxisM ** 6) *
     eccentricityFactor(ecc)
@@ -242,10 +244,10 @@ const EARTH_SOLID_FRAC = Math.max(0, Math.min(1, 4.6 / EARTH_TAU_CORE));
 //   0.5–0.85:  plateau — peak compositional convection from inner core growth
 //   > 0.85:    thin-shell suppression — liquid shell narrows, dynamo weakens
 function coreConvBoost(sf) {
-  if (sf < 0.5) return 1 + 0.4 * sf;
-  if (sf < 0.85) return 1.2;
+  if (sf < 0.5) return 1 + 0.4 * sf; // ramp: thermal convection onset
+  if (sf < 0.85) return 1.2; // plateau: peak compositional convection
   const x = (sf - 0.85) / 0.15; // 0 at threshold, 1 at sf=1
-  return 1.2 * Math.exp(-2.5 * x);
+  return 1.2 * Math.exp(-2.5 * x); // thin-shell suppression decay rate
 }
 const EARTH_CONV_BOOST = coreConvBoost(EARTH_SOLID_FRAC);
 const EARTH_RAW_FIELD = rawFieldStrength(EARTH_CMF, EARTH_DENSITY, 1.0, 1.0, EARTH_CONV_BOOST);
@@ -314,11 +316,11 @@ function magneticFieldModel({
   // (Ro_l < 0.12) or breaks into multipolar geometry.
   // Proxy: P_rot threshold scaled by core size and mass.
   // Earth (24h) is well inside the dipolar regime.
-  const dipolarLimit = 96 * Math.sqrt(massEarth) * Math.sqrt(cmf / 0.33);
+  const dipolarLimit = 96 * Math.sqrt(massEarth) * Math.sqrt(cmf / 0.33); // hours — Ro_l < 0.12 dipolar threshold (Christensen & Aubert 2006)
   // Rm cutoff: larger cores sustain convection at slower rotation.
   // 50× base ensures Mercury (P=1408h, CMF=70%) keeps its weak dynamo
   // while Venus (P=5832h, CMF=32%) correctly shows no field.
-  const multipolarLimit = dipolarLimit * 50;
+  const multipolarLimit = dipolarLimit * 50; // Rm below critical threshold
   const isDipolar = rotationPeriodHours <= dipolarLimit;
 
   if (rotationPeriodHours > multipolarLimit) {
@@ -390,11 +392,14 @@ function mantleOutgassing(oxidationState) {
   const entry = MANTLE_OXIDATION_MAP[oxidationState] || MANTLE_OXIDATION_MAP.earth;
   let hint;
   if (entry.deltaIW <= -3) {
+    // ΔIW ≤ −3: strongly reducing (e.g. enstatite chondrite mantle)
     hint =
       "Reducing mantle produces H\u2082-rich atmospheres with low molecular weight and large scale height.";
   } else if (entry.deltaIW <= -1) {
+    // ΔIW −3 to −1: moderately reducing
     hint = "Moderately reducing mantle produces a mix of H\u2082, CO, and CO\u2082.";
   } else if (entry.deltaIW <= 2) {
+    // ΔIW −1 to +2: Earth-like oxidizing (IW+1 to IW+3 range)
     hint =
       "Oxidizing mantle produces CO\u2082 and H\u2082O, creating denser, opaque atmospheres typical of Earth/Venus.";
   } else {
@@ -476,6 +481,10 @@ function gauss(x, mu, sigma) {
  */
 export function tectonicProbabilities(massEarth, ageGyr, wmf, cmf, tidalFraction) {
   const lnM = Math.log(Math.max(massEarth, 0.01));
+
+  // Tectonic regime probability model — calibrated Gaussian mass/age/composition
+  // preferences. Each regime has mass-factor (log-normal), age-factor, water-factor,
+  // CMF-factor, and tidal-factor tuning. Values are empirical fits.
 
   // --- Factor 1: Mass (log-Gaussian preference curves) ---
   const massFactor = {
@@ -687,6 +696,10 @@ function linearToSrgb(c) {
   return v <= 0.0031308 ? v * 12.92 * 255 : (1.055 * v ** (1 / 2.4) - 0.055) * 255;
 }
 
+// sRGB ↔ OKLab conversion matrices (Björn Ottosson, 2020).
+// First matrix: sRGB linear → LMS cone response (M1).
+// Second matrix: LMS cube-root → OKLab perceptual (M2).
+// oklabToRgb uses the inverse matrices (M2⁻¹ then M1⁻¹).
 function rgbToOklab(r, g, b) {
   const lr = srgbToLinear(r);
   const lg = srgbToLinear(g);
@@ -1180,7 +1193,7 @@ function vegetationColours({ starTempK, pressureAtm, insolationEarth, tidallyLoc
 const STEFAN_BOLTZ_ERG = 0.000056703; // erg*cm^-2*s^-1*K^-4
 const L_SOL_ERG_S = 3.846e33;
 const AU_CM = 14960000000000; // cm
-const GREENHOUSE_SCALE = 0.5841;
+const GREENHOUSE_SCALE = 0.5841; // calibrated to reproduce Earth T_surf (288 K) from T_eff (255 K)
 // Surface divisor: accounts for the temperature difference between the
 // atmospheric effective-emission level and the actual surface in the
 // presence of convective transport.  Only physically meaningful when an
@@ -1362,13 +1375,13 @@ export function calcPlanetExact({
   const wmfPct = clamp(planet.wmfPct ?? 0, 0, 50); // water mass fraction %
   const axialTiltDeg = clamp(planet.axialTiltDeg, 0, 180);
 
-  const albedoBond = clamp(planet.albedoBond, 0, 0.95);
+  const albedoBond = clamp(planet.albedoBond, 0, 0.95); // ≤0.95: prevents runaway cooling
   const greenhouseMode = planet.greenhouseMode || "manual";
-  const greenhouseEffectManual = clamp(planet.greenhouseEffect, 0, 500);
+  const greenhouseEffectManual = clamp(planet.greenhouseEffect, 0, 500); // 500 K max — Venus-like upper bound
 
-  const observerHeightM = clamp(planet.observerHeightM, 0, 10000);
+  const observerHeightM = clamp(planet.observerHeightM, 0, 10000); // 10 km — above tropopause
 
-  const rotationPeriodHours = clamp(planet.rotationPeriodHours, 0.1, 1e6);
+  const rotationPeriodHours = clamp(planet.rotationPeriodHours, 0.1, 1e6); // 0.1 h = breakup speed for rocky body
   const semiMajorAxisAu = clamp(planet.semiMajorAxisAu, 0.01, 1e6);
   const eccentricity = clamp(planet.eccentricity, 0, 0.99);
   const inclinationDeg = clamp(planet.inclinationDeg, 0, 180);
@@ -1414,9 +1427,9 @@ export function calcPlanetExact({
   // Mars 0.5%. Replaces the WS8 density-floor formula (16-21% off for
   // sub-Earth iron-rich bodies).
   const lnM = Math.log(Math.max(massEarth, 1e-6));
-  const alpha = Math.min(1 / 3, 0.257 - 0.0161 * lnM);
-  const radiusDry = (1.07 - 0.21 * cmf) * massEarth ** alpha;
-  const densityDryGcm3 = (massEarth * 5.51) / radiusDry ** 3;
+  const alpha = Math.min(1 / 3, 0.257 - 0.0161 * lnM); // Zeng+2016 compression exponent fit
+  const radiusDry = (1.07 - 0.21 * cmf) * massEarth ** alpha; // Zeng+2016 CMF-scaled radius
+  const densityDryGcm3 = (massEarth * EARTH_DENSITY_GCM3) / radiusDry ** 3;
 
   // Water-layer radius inflation (Zeng+Sasselov 2016 interpolation)
   const waterInflation = waterRadiusInflation(massEarth, wmf);
@@ -1424,7 +1437,8 @@ export function calcPlanetExact({
   const radiusKm = radiusEarth * EARTH_RADIUS_KM;
 
   // Effective bulk density (recomputed from inflated radius)
-  const densityGcm3 = wmf > 0 ? (massEarth * 5.51) / radiusEarth ** 3 : densityDryGcm3;
+  const densityGcm3 =
+    wmf > 0 ? (massEarth * EARTH_DENSITY_GCM3) / radiusEarth ** 3 : densityDryGcm3;
 
   const gravityG = massEarth / radiusEarth ** 2;
   const gravityMs2 = gravityG * GRAVITY_EARTH_MS2;
@@ -1470,7 +1484,7 @@ export function calcPlanetExact({
   // Atmospheric thermal-tide resistance (Leconte+ 2015).
   // Thick atmospheres generate a pressure-asymmetry torque opposing synchronisation.
   const tEqK =
-    (278 * star.luminosityLsol ** 0.25 * (1 - albedoBond) ** 0.25) / Math.sqrt(semiMajorAxisAu);
+    (278 * star.luminosityLsol ** 0.25 * (1 - albedoBond) ** 0.25) / Math.sqrt(semiMajorAxisAu); // 278 K = (L_sun / (16πσ))^(1/4) — equilibrium temp at 1 AU for a blackbody
   const bAtm = atmosphereTideRatio(pressureAtm, insolationEarth, gravityMs2, tEqK);
   const atmospherePreventsLocking = bAtm >= 1;
 
@@ -1493,7 +1507,9 @@ export function calcPlanetExact({
   // Orbital period in hours (for resonance rotation period)
   // Kepler's third law: P² = a³/M → P = √(a³/M) years
   const orbPeriodYears = Math.sqrt(semiMajorAxisAu ** 3 / starMassMsol);
-  const resonanceRotationHours = resonance ? (orbPeriodYears * 365.256 * 24) / resonance.p : null;
+  const resonanceRotationHours = resonance
+    ? (orbPeriodYears * DAYS_PER_YEAR * 24) / resonance.p
+    : null;
 
   // Only true for 1:1 synchronous lock — higher resonances still illuminate all sides
   const tidallyLockedToStar = tidallyEvolved && resonance.ratio === "1:1";
@@ -1620,14 +1636,15 @@ export function calcPlanetExact({
 
   // Horizon distance (PLANET C27)
   const horizonKm =
-    Math.sqrt(2 * radiusEarth * 6371000 * observerHeightM + observerHeightM ** 2) / 1000;
+    Math.sqrt(2 * radiusEarth * (EARTH_RADIUS_KM * 1000) * observerHeightM + observerHeightM ** 2) /
+    1000;
 
   // Orbit characteristics (PLANET C34..C37, F36..F37)
   const periapsisAu = semiMajorAxisAu * (1 - eccentricity);
   const apoapsisAu = semiMajorAxisAu * (1 + eccentricity);
 
   const orbitalPeriodEarthYears = Math.sqrt(semiMajorAxisAu ** 3 / starMassMsol); // F36
-  const orbitalPeriodEarthDays = orbitalPeriodEarthYears * 365.256; // F37
+  const orbitalPeriodEarthDays = orbitalPeriodEarthYears * DAYS_PER_YEAR; // F37
 
   const localDaysPerYear = (orbitalPeriodEarthDays * 24) / rotationPeriodHours; // C37
 

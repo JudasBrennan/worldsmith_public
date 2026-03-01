@@ -7,34 +7,35 @@ import { attachTooltips, tipIcon } from "./tooltip.js";
 import { loadWorld, updateWorld } from "./store.js";
 
 const TIP_LABEL = {
-  Name: "Give your star a unique name for use in exports and the visualiser.",
+  Name: "Display name used in exports, the visualiser, and linked pages.",
   Class:
-    'All stars are categorised by spectral type. From most to least massive & luminous the scale goes as follows: O, B, A, F, G, K, M.\n\nSpectral classes are further subdivide by a number between 0 and 9. 0 means most massive/luminous, 9 means least massive/luminous.\n\n"V" indicates that the star is on the main sequence, i.e, it\'s a sun-like star undergoing hydrogen burning in its core.',
-  Mass: "Input your stars mass, in solar masses, here. Our sun = 1 Msol = \n1.989E30 kg\n\nThe approximate mass ranges for main sequence stars are as follows:\n\nO Star: ~16+ Msol\t\nB Star: ~2.19 - 16 Msol\t\nA Star: ~1.44 - 2.19 Msol\t\nF Star: ~1.06 - 1.44 Msol\t\nG Star: ~0.84 - 1.06 Msol\t\nK Star: ~0.47 - 0.84 Msol\t\nM Star: ~0.075 - 0.47 Msol\t\n\nStars between 0.5 Msol and 1.4 Msol are considered habitable, i.e, the most suitable for earth-like life.",
+    'Spectral type classification (O, B, A, F, G, K, M from most to least massive/luminous).\n\nEach class is subdivided 0\u20139 (0 = hottest within class). "V" denotes a main-sequence star undergoing core hydrogen fusion.',
+  Mass: "Star mass in solar masses.\n\nApproximate main-sequence ranges:\nO: ~16+ Msol\nB: ~2.19\u201316 Msol\nA: ~1.44\u20132.19 Msol\nF: ~1.06\u20131.44 Msol\nG: ~0.84\u20131.06 Msol\nK: ~0.47\u20130.84 Msol\nM: ~0.075\u20130.47 Msol\n\nStars between 0.5 and 1.4 Msol are considered most suitable for Earth-like life.\n\nSun = 1 Msol = 1.989E30 kg",
   "Current Age":
-    "Input the age of your star, in billions of earth years, here.\n\nThe value chosen must be less than the Maximum Age shown in outputs.",
+    "Star age in billions of years (Gyr). Must be less than the Maximum Age shown in outputs.",
   "Maximum Age":
     "How long your star will remain on the main sequence, in billions of earth years.\n\nComputed as (M / L) \u00d7 10 Gyr \u2014 nuclear fuel supply divided by luminous burn rate.",
   Radius:
-    "How big your star is in solar radii.\n\nFor M \u2264 1 Msol: Eker et al. (2018, MNRAS 479, 5491) quadratic mass\u2013radius relation from eclipsing binaries.\nFor M > 1 Msol: power-law scaling (Demircan & Kahraman 1991).\n\nOur sun = 1 Rsol = 695,700 km",
+    "Stellar radius in solar radii.\n\nFor M \u2264 1 Msol: Eker et al. (2018, MNRAS 479, 5491) quadratic mass\u2013radius relation from eclipsing binaries.\nFor M > 1 Msol: power-law scaling (Demircan & Kahraman 1991).\n\nSun = 1 Rsol = 695,700 km",
   Luminosity:
-    "The amount of light your star emits in solar luminosities.\n\nZAMS mode: Eker et al. (2018, MNRAS 479, 5491) six-piece empirical relation from 509 eclipsing binaries. Replaces the classical L = M\u2074 approximation, which overestimated K-dwarf luminosities by 30\u201385%.\n\nEvolved mode: Hurley, Pols & Tout (2000) analytical stellar evolution. Radius and temperature are accurate to ~1\u20132%, but luminosity carries ~10% mean error inherent to the Tout (1996) polynomial ZAMS baseline and Hurley evolution-rate fits. This is the practical accuracy ceiling of analytical single-star evolution; sub-2% luminosity would require tabulated MESA/MIST isochrone grids.\n\nOur sun = 1 Lsol = 3.846E26 watts",
+    "Stellar luminosity in solar luminosities.\n\nZAMS mode: Eker et al. (2018, MNRAS 479, 5491) six-piece empirical relation from 509 eclipsing binaries. Replaces the classical L = M\u2074 approximation, which overestimated K-dwarf luminosities by 30\u201385%.\n\nEvolved mode: Hurley, Pols & Tout (2000) analytical stellar evolution. Radius and temperature are accurate to ~1\u20132%, but luminosity carries ~10% mean error inherent to the Tout (1996) polynomial ZAMS baseline and Hurley evolution-rate fits. This is the practical accuracy ceiling of analytical single-star evolution; sub-2% luminosity would require tabulated MESA/MIST isochrone grids.\n\nSun = 1 Lsol = 3.846E26 watts",
   "Radius Override":
-    "Optionally override the mass-derived stellar radius in solar radii. Leave blank to use the Eker et al. (2018) scaling-law value derived from mass.\n\nUseful for modelling subgiants, evolved stars, or stars with a measured radius.\n\nOur sun = 1 Rsol = 695,700 km",
+    "Optionally override the mass-derived stellar radius in solar radii. Leave blank to use the Eker et al. (2018) scaling-law value derived from mass.\n\nUseful for modelling subgiants, evolved stars, or stars with a measured radius.\n\nSun = 1 Rsol = 695,700 km",
   "Luminosity Override":
-    "Optionally override the mass-derived luminosity in solar luminosities. Leave blank to use the Eker et al. (2018) scaling-law value derived from mass.\n\nUseful for modelling post-main-sequence stars or stars with a measured luminosity.\n\nOur sun = 1 Lsol = 3.846E26 watts",
+    "Optionally override the mass-derived luminosity in solar luminosities. Leave blank to use the Eker et al. (2018) scaling-law value derived from mass.\n\nUseful for modelling post-main-sequence stars or stars with a measured luminosity.\n\nSun = 1 Lsol = 3.846E26 watts",
   "Temperature Override":
-    "Optionally override the effective temperature in Kelvin. Used with one other override to resolve the third via Stefan-Boltzmann (L = RÂ² Ã— (T/5776)â´).\n\nLeave blank to derive temperature from Radius and Luminosity (default).\n\nOur sun â‰ˆ 5776 K.",
-  Density: "How dense your star is. Our sun = 1 Dsol = 1.41 g/cmÂ³.",
-  Temperature: "The effective temperature of your star, in kelvin.",
+    "Optionally override the effective temperature in kelvin. Used with one other override to resolve the third via Stefan-Boltzmann (L = R\u00b2 \u00d7 (T/5776)\u2074).\n\nLeave blank to derive temperature from Radius and Luminosity (default).\n\nSun \u2248 5,776 K.",
+  Density: "Mean stellar density in solar densities.\n\nSun = 1 Dsol = 1.41 g/cm\u00b3.",
+  Temperature:
+    "Effective photospheric temperature in kelvin, derived from luminosity and radius via Stefan-Boltzmann.",
   "Habitable Zone":
-    "A planet orbiting within this region receives Earth-like stellar heating.\n\nWorldSmith Web uses an updated temperature-dependent habitable-zone model (S_in/S_out vary with effective temperature), based on Chromant's Desmos correction.\n\nThis intentionally deviates from the spreadsheet's fixed sqrt(L/1.1) and sqrt(L/0.53) approach, which generally places the outer edge too close in.\n\n1 AU = ~150,000,000 km.",
+    "A planet orbiting within this region receives Earth-like stellar heating.\n\nUses a temperature-dependent model where the inner/outer flux thresholds (S_in/S_out) vary with stellar effective temperature, based on Chromant's Desmos correction.\n\n1 AU = ~150,000,000 km.",
   "Star Colour":
-    "The displayed stellar colour is derived from effective temperature using Tanner Helland's empirical blackbody approximation (valid 1000â€“40000 K, RÂ² > 0.987), which produces a smooth, continuous colour gradient.\n\nThis intentionally deviates from the WS8 spreadsheet, which used 7 fixed flat colour bands from Excel conditional formatting â€” producing hard colour jumps between spectral classes rather than a physical gradient.\n\nThe more precise Planckian locus method (CIE chromaticity â†’ XYZ â†’ sRGB matrix pipeline) was considered but not used, as it adds significant complexity for negligible visual improvement in a worldbuilding context.",
+    "Stellar colour derived from effective temperature using Tanner Helland\u2019s empirical blackbody approximation (valid 1000\u201340,000 K, R\u00b2 > 0.987), producing a smooth, continuous colour gradient across spectral classes.",
   "Sun Visual":
     "Animated stellar preview using the current star colour and the active flare/CME rates.\n\nThe preview runs at 0.5 simulated days per second and renders textured photosphere detail plus flare/CME activity.",
   "Earth-like Life?":
-    "The spreadsheet checks to see if a planet comparable to modern-day Earth can orbit your star.\n\nYes: A planet with a biosphere comparable to modern-day Earth may, if you so desire, orbit this star.\n\nNo: A planet with a biosphere comparable to modern-day Earth CANNOT orbit this star.\n\nStar Too Young: A planet comparable to pre-Cambrian Earth may, if you so desire, orbit your star.",
+    "Whether a planet comparable to modern-day Earth could orbit this star.\n\nYes: the star\u2019s mass and age permit an Earth-like biosphere.\nNo: conditions preclude an Earth-like biosphere.\nStar Too Young: a pre-Cambrian-level biosphere is possible, but complex life has not had time to develop.",
   "Metallicity [Fe/H]":
     "Stellar metallicity measures heavy-element abundance relative to the Sun.\n\n[Fe/H] = log\u2081\u2080(Fe/H)_star \u2212 log\u2081\u2080(Fe/H)_sun\n\nSun = 0.0 by definition. Positive = metal-rich, negative = metal-poor.\n\nTypical range:\n\u2022 Metal-rich inner disk: +0.1 to +0.5\n\u2022 Solar neighbourhood: \u22120.2 to +0.1\n\u2022 Old thin disk: \u22120.7 to \u22120.3\n\u2022 Halo / globular clusters: \u22122.5 to \u22121.0\n\nMetallicity does not modify the Eker mass\u2013luminosity or mass\u2013radius relations (their empirical scatter already includes metallicity variation). Instead it drives downstream effects like giant planet probability.",
   "Giant Planet Probability":
@@ -162,7 +163,7 @@ export function initStarPage(mountEl) {
           <div class="form-row">
             <div>
               <div class="label">Metallicity [Fe/H] <span class="unit">dex</span> ${tipIcon(TIP_LABEL["Metallicity [Fe/H]"] || "")}</div>
-              <div class="hint">Sun = 0.0 Â· Metal-poor halo â‰ˆ âˆ’2 Â· Metal-rich disk â‰ˆ +0.3</div>
+              <div class="hint">Sun = 0.0 Â· Metal-poor halo â‰ˆ âˆ'2 Â· Metal-rich disk â‰ˆ +0.3</div>
             </div>
             <div class="input-pair">
             <input id="metallicity" type="number" step="0.01" min="-3" max="1" aria-label="Metallicity [Fe/H]" />
@@ -184,11 +185,11 @@ export function initStarPage(mountEl) {
             <div class="label" style="margin-bottom:6px">Derivation Mode</div>
             <div class="physics-trio-toggle">
               <input type="radio" name="physicsDerivMode" id="derivModeRl" value="rl" />
-              <label for="derivModeRl">R + L â†’ T</label>
+              <label for="derivModeRl">R + L â†' T</label>
               <input type="radio" name="physicsDerivMode" id="derivModeRt" value="rt" />
-              <label for="derivModeRt">R + T â†’ L</label>
+              <label for="derivModeRt">R + T â†' L</label>
               <input type="radio" name="physicsDerivMode" id="derivModeLt" value="lt" />
-              <label for="derivModeLt">L + T â†’ R</label>
+              <label for="derivModeLt">L + T â†' R</label>
               <span></span>
             </div>
             <div class="hint" style="margin-top:5px">R = Radius (Rsol) Â· L = Luminosity (Lsol) Â· T = Temperature (K) Â· Arrow = computed value</div>
@@ -364,7 +365,7 @@ export function initStarPage(mountEl) {
       if (m === "lt") return { r: null, l, t };
       return { r, l, t: null }; // "rl" (default)
     }
-    // Simple mode: all values from mass â€” no overrides reach the engine
+    // Simple mode: all values from mass â€" no overrides reach the engine
     return { r: null, l: null, t: null };
   }
 

@@ -5,7 +5,7 @@ import { approxEqual } from "./testHelpers.js";
 
 // ── Earth-Sun system ──────────────────────────────────────────────
 
-test("Earth-Sun L1/L2 distance ≈ 0.01 AU (Hill radius)", () => {
+test("calcLagrangePoints → Earth-Sun → L1/L2 ≈ 0.01 AU Hill radius", () => {
   const lp = calcLagrangePoints({
     bodyAu: 1.0,
     bodyMass: 1, // Earth masses
@@ -19,7 +19,7 @@ test("Earth-Sun L1/L2 distance ≈ 0.01 AU (Hill radius)", () => {
   approxEqual(lp.points.L2.au, 1.0 + lp.hill.au, 1e-10, "L2 AU");
 });
 
-test("Earth-Sun L4/L5 at ±60° and same AU as body", () => {
+test("calcLagrangePoints → Earth-Sun → L4/L5 at ±60° same AU", () => {
   const angle = 1.2; // arbitrary
   const lp = calcLagrangePoints({
     bodyAu: 1.0,
@@ -34,7 +34,7 @@ test("Earth-Sun L4/L5 at ±60° and same AU as body", () => {
   approxEqual(lp.points.L5.angleRad, angle - Math.PI / 3, 1e-12, "L5 angle");
 });
 
-test("Earth-Sun L3 on opposite side with tiny mass correction", () => {
+test("calcLagrangePoints → Earth-Sun → L3 opposite side tiny correction", () => {
   const lp = calcLagrangePoints({
     bodyAu: 1.0,
     bodyMass: 1,
@@ -50,7 +50,7 @@ test("Earth-Sun L3 on opposite side with tiny mass correction", () => {
 
 // ── Jupiter-Sun system ────────────────────────────────────────────
 
-test("Jupiter-Sun Hill radius ≈ 0.35 AU", () => {
+test("calcLagrangePoints → Jupiter-Sun → Hill radius ≈ 0.35 AU", () => {
   const lp = calcLagrangePoints({
     bodyAu: 5.2,
     bodyMass: 1, // Jupiter masses
@@ -64,7 +64,7 @@ test("Jupiter-Sun Hill radius ≈ 0.35 AU", () => {
   approxEqual(lp.points.L2.au, 5.2 + lp.hill.au, 1e-10, "Jupiter L2");
 });
 
-test("Jupiter-Sun L3 mass correction is larger than Earth", () => {
+test("calcLagrangePoints → Jupiter-Sun → L3 correction larger than Earth", () => {
   const lpJ = calcLagrangePoints({
     bodyAu: 5.2,
     bodyMass: 1,
@@ -86,7 +86,7 @@ test("Jupiter-Sun L3 mass correction is larger than Earth", () => {
 
 // ── L4/L5 symmetry ───────────────────────────────────────────────
 
-test("L4 and L5 are symmetric about body angle", () => {
+test("calcLagrangePoints → arbitrary angle → L4/L5 symmetric at ±60°", () => {
   const angle = 2.5;
   const lp = calcLagrangePoints({
     bodyAu: 3.0,
@@ -103,7 +103,7 @@ test("L4 and L5 are symmetric about body angle", () => {
 
 // ── Monotonicity ──────────────────────────────────────────────────
 
-test("larger body mass → larger Hill radius → wider L1/L2 spread", () => {
+test("calcLagrangePoints → larger body mass → wider L1/L2 spread", () => {
   const small = calcLagrangePoints({
     bodyAu: 1.0,
     bodyMass: 1,
@@ -125,7 +125,7 @@ test("larger body mass → larger Hill radius → wider L1/L2 spread", () => {
 
 // ── Invalid inputs ────────────────────────────────────────────────
 
-test("returns null for zero or negative inputs", () => {
+test("calcLagrangePoints → zero or negative inputs → returns null", () => {
   assert.strictEqual(
     calcLagrangePoints({ bodyAu: 0, bodyMass: 1, starMass: 1, bodyAngleRad: 0 }),
     null,
@@ -144,7 +144,7 @@ test("returns null for zero or negative inputs", () => {
   );
 });
 
-test("returns null for NaN inputs", () => {
+test("calcLagrangePoints → NaN inputs → returns null", () => {
   assert.strictEqual(
     calcLagrangePoints({ bodyAu: NaN, bodyMass: 1, starMass: 1, bodyAngleRad: 0 }),
     null,

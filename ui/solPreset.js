@@ -395,7 +395,7 @@ const UK_HOLIDAY_RULES = [
 ];
 
 const SOL_PRESET_WORLD = {
-  version: 44,
+  version: 51,
   selectedBodyType: "planet",
   star: {
     name: "Sol",
@@ -407,6 +407,8 @@ const SOL_PRESET_WORLD = {
     metallicityFeH: 0.0,
     physicsMode: "simple",
     advancedDerivationMode: "rl",
+    evolutionMode: "zams",
+    activityModelVersion: "v2",
   },
   system: {
     spacingFactor: 0.3,
@@ -420,6 +422,8 @@ const SOL_PRESET_WORLD = {
           name: "Jupiter",
           au: 5.2026,
           slotIndex: 6,
+          style: "jupiter",
+          rings: false,
           radiusRj: 1.0,
           massMjup: 1.0,
           rotationPeriodHours: 9.925,
@@ -430,6 +434,8 @@ const SOL_PRESET_WORLD = {
           name: "Saturn",
           au: 9.5549,
           slotIndex: 7,
+          style: "jupiter",
+          rings: true,
           radiusRj: 0.862,
           massMjup: 0.299,
           rotationPeriodHours: 10.656,
@@ -440,6 +446,8 @@ const SOL_PRESET_WORLD = {
           name: "Uranus",
           au: 19.218,
           slotIndex: 8,
+          style: "neptune",
+          rings: false,
           radiusRj: 0.366,
           massMjup: 0.0457,
           rotationPeriodHours: 17.24,
@@ -450,6 +458,8 @@ const SOL_PRESET_WORLD = {
           name: "Neptune",
           au: 30.11,
           slotIndex: 9,
+          style: "neptune",
+          rings: false,
           radiusRj: 0.354,
           massMjup: 0.054,
           rotationPeriodHours: 16.11,
@@ -503,6 +513,7 @@ const SOL_PRESET_WORLD = {
           axialTiltDeg: 0.034,
           massEarth: 0.0553,
           cmfPct: 70.0,
+          wmfPct: 0,
           albedoBond: 0.068,
           greenhouseEffect: 0.0,
           greenhouseMode: "core",
@@ -517,6 +528,8 @@ const SOL_PRESET_WORLD = {
           hePct: 0,
           so2Pct: 0,
           nh3Pct: 0,
+          tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
       p_venus: {
@@ -534,7 +547,8 @@ const SOL_PRESET_WORLD = {
           rotationPeriodHours: 5832.6,
           axialTiltDeg: 177.36,
           massEarth: 0.815,
-          cmfPct: 32.0,
+          cmfPct: 31.17,
+          wmfPct: 0,
           albedoBond: 0.77,
           greenhouseEffect: 217.0,
           greenhouseMode: "core",
@@ -549,6 +563,8 @@ const SOL_PRESET_WORLD = {
           hePct: 0.0012,
           so2Pct: 0.015,
           nh3Pct: 0,
+          tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
       p_earth: {
@@ -582,6 +598,8 @@ const SOL_PRESET_WORLD = {
           hePct: 0,
           so2Pct: 0,
           nh3Pct: 0,
+          tectonicRegime: "auto",
+          mantleOxidation: "earth",
         },
       },
       p_mars: {
@@ -600,6 +618,7 @@ const SOL_PRESET_WORLD = {
           axialTiltDeg: 25.19,
           massEarth: 0.107,
           cmfPct: 24.0,
+          wmfPct: 0,
           albedoBond: 0.25,
           greenhouseEffect: 0.05,
           greenhouseMode: "core",
@@ -614,6 +633,8 @@ const SOL_PRESET_WORLD = {
           hePct: 0,
           so2Pct: 0,
           nh3Pct: 0,
+          tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
     },
@@ -659,6 +680,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 1.0,
           densityGcm3: 3.34,
           albedo: 0.11,
+          compositionOverride: null,
         },
       },
       /* ── Mars ────────────────────────────────────────── */
@@ -675,6 +697,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.000000145,
           densityGcm3: 1.876,
           albedo: 0.071,
+          compositionOverride: null,
         },
       },
       m_deimos: {
@@ -690,6 +713,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.00000002,
           densityGcm3: 1.47,
           albedo: 0.068,
+          compositionOverride: null,
         },
       },
       /* ── Jupiter (Galilean moons) ────────────────────── */
@@ -706,6 +730,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 1.215,
           densityGcm3: 3.528,
           albedo: 0.63,
+          compositionOverride: null,
         },
       },
       m_europa: {
@@ -721,6 +746,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.654,
           densityGcm3: 3.013,
           albedo: 0.67,
+          compositionOverride: null,
         },
       },
       m_ganymede: {
@@ -736,6 +762,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 2.017,
           densityGcm3: 1.942,
           albedo: 0.43,
+          compositionOverride: null,
         },
       },
       m_callisto: {
@@ -751,6 +778,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 1.466,
           densityGcm3: 1.834,
           albedo: 0.17,
+          compositionOverride: null,
         },
       },
       /* ── Saturn ──────────────────────────────────────── */
@@ -767,6 +795,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.000511,
           densityGcm3: 1.149,
           albedo: 0.962,
+          compositionOverride: null,
         },
       },
       m_enceladus: {
@@ -782,6 +811,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.001471,
           densityGcm3: 1.61,
           albedo: 1.375,
+          compositionOverride: null,
         },
       },
       m_tethys: {
@@ -797,6 +827,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.008411,
           densityGcm3: 0.984,
           albedo: 1.229,
+          compositionOverride: null,
         },
       },
       m_dione: {
@@ -812,6 +843,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.01492,
           densityGcm3: 1.476,
           albedo: 0.998,
+          compositionOverride: null,
         },
       },
       m_rhea: {
@@ -827,6 +859,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.03142,
           densityGcm3: 1.233,
           albedo: 0.949,
+          compositionOverride: null,
         },
       },
       m_titan: {
@@ -842,6 +875,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 1.8324,
           densityGcm3: 1.882,
           albedo: 0.21,
+          compositionOverride: null,
         },
       },
       m_iapetus: {
@@ -857,6 +891,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.02459,
           densityGcm3: 1.088,
           albedo: 0.22,
+          compositionOverride: null,
         },
       },
       /* ── Uranus ──────────────────────────────────────── */
@@ -873,6 +908,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.0009,
           densityGcm3: 1.2,
           albedo: 0.32,
+          compositionOverride: null,
         },
       },
       m_ariel: {
@@ -888,6 +924,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.0184,
           densityGcm3: 1.66,
           albedo: 0.39,
+          compositionOverride: null,
         },
       },
       m_umbriel: {
@@ -903,6 +940,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.0162,
           densityGcm3: 1.39,
           albedo: 0.21,
+          compositionOverride: null,
         },
       },
       m_titania: {
@@ -918,6 +956,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.048,
           densityGcm3: 1.71,
           albedo: 0.35,
+          compositionOverride: null,
         },
       },
       m_oberon: {
@@ -933,6 +972,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.0411,
           densityGcm3: 1.63,
           albedo: 0.31,
+          compositionOverride: null,
         },
       },
       /* ── Neptune ─────────────────────────────────────── */
@@ -949,6 +989,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.2913,
           densityGcm3: 2.065,
           albedo: 0.7,
+          compositionOverride: null,
         },
       },
       m_proteus: {
@@ -964,6 +1005,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.0006,
           densityGcm3: 1.3,
           albedo: 0.096,
+          compositionOverride: null,
         },
       },
       m_nereid: {
@@ -979,6 +1021,7 @@ const SOL_PRESET_WORLD = {
           massMoon: 0.00042,
           densityGcm3: 1.5,
           albedo: 0.155,
+          compositionOverride: null,
         },
       },
     },
@@ -1068,6 +1111,11 @@ const SOL_PRESET_WORLD = {
     randomSeed: 1,
   },
   clusterSystemNames: {},
+  clusterAdjustments: {
+    addedSystems: [],
+    removedSystemIds: [],
+    componentOverrides: {},
+  },
 };
 
 function deepClone(value) {

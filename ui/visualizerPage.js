@@ -185,7 +185,7 @@ const TIP_LABEL = {
   Moons: "Show or hide moon markers around planets and gas giants.",
   Orbits: "Show or hide orbital rings for planets, moons, gas giants, and the H2O frost line.",
   "Logarithmic scale":
-    "Use logarithmic AU spacing. Turn off to view orbital distances on linear scale.",
+    "Logarithmic AU spacing for orbital distances. When disabled, distances are shown on a linear scale.",
   "Physical size scale":
     "Representative keeps bodies easy to read. 1:1 scales body radii against the star radius while keeping the star's on-screen size fixed.",
   "Habitable zone": "Show or hide the habitable-zone band (between HZ inner and HZ outer limits).",
@@ -207,15 +207,15 @@ const TIP_LABEL = {
   "Axial tilt helpers":
     "Show or hide projected spin-axis helper overlays on planets and moons (based on axial tilt).",
   "Click zoom bodies":
-    "Enable click interaction for planets and gas giants. Single-click centers the body; double-click zooms to fit.",
+    "Click interaction for planets and gas giants. Single-click centres the body; double-click zooms to fit.",
   "Click zoom star":
-    "Enable click interaction for the system's star. Single-click centers; double-click zooms in.",
+    "Click interaction for the host star. Single-click centres; double-click zooms in.",
   Debug: "Enable console debug logging for visualiser internals.",
   Speed: "Animation speed in simulated Earth-days per second.",
-  Centre: "Reset camera orientation and zoom to the default centered view.",
-  Refresh: "Redraw the visualiser using the latest saved world data.",
-  Play: "Toggle orbital animation on or off.",
-  "Reset view": "Reset zoom and pan back to the default overview.",
+  Centre: "Resets camera orientation and zoom to the default centred view.",
+  Refresh: "Redraws the visualiser using the latest saved world data.",
+  Play: "Toggles orbital animation on or off.",
+  "Reset view": "Resets zoom and pan back to the default overview.",
   Controls: "Toggle the controls panel for display options, animation, and scale settings.",
   Fullscreen: "Enter browser fullscreen mode for an immersive view.",
   "Download image": "Save a static PNG snapshot of the current canvas view.",
@@ -242,8 +242,8 @@ export function initVisualiserPage(root, options = {}) {
               <button id="btn-controls" type="button" class="small">${tipIcon(TIP_LABEL["Controls"] || "")} Controls &#x25BE;</button>
               <button id="btn-reset-view" type="button" class="small" disabled>${tipIcon(TIP_LABEL["Reset view"] || "")} Reset view</button>
               <button id="btn-fullscreen" type="button" class="small">${tipIcon(TIP_LABEL["Fullscreen"] || "")} Fullscreen</button>
-              <button id="btn-export-image" type="button" class="small">Download image</button>
-              <button id="btn-export-gif" type="button" class="small" disabled>Download GIF</button>
+              <button id="btn-export-image" type="button" class="small">${tipIcon(TIP_LABEL["Download image"] || "")} Download image</button>
+              <button id="btn-export-gif" type="button" class="small" disabled>${tipIcon(TIP_LABEL["Download GIF"] || "")} Download GIF</button>
               <button id="btn-help-overlay" type="button" class="small" aria-label="Controls help">?</button>
             </div>
           </div>

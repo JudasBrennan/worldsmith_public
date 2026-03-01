@@ -10,18 +10,18 @@ const SOLAR_SYSTEM = {
   orbit1Au: 0.39,
 };
 
-test("calcSystem returns correct orbit count", () => {
+test("calcSystem → solar inputs → 20 orbits returned", () => {
   const model = calcSystem(SOLAR_SYSTEM);
   assert.equal(model.orbitsAu.length, 20);
   assert.equal(model.orbitsMillionKm.length, 20);
 });
 
-test("first orbit matches orbit1Au input", () => {
+test("calcSystem → first orbit → matches orbit1Au input", () => {
   const model = calcSystem(SOLAR_SYSTEM);
   approxEqual(model.orbitsAu[0], 0.39, 1e-12, "orbit1");
 });
 
-test("orbit spacing grows exponentially", () => {
+test("calcSystem → spacing factor 1 → exponential growth", () => {
   const model = calcSystem({
     starMassMsol: 1,
     spacingFactor: 1,
@@ -33,7 +33,7 @@ test("orbit spacing grows exponentially", () => {
   approxEqual(model.orbitsAu[2], 3, 1e-12, "orbit3");
 });
 
-test("zero spacing factor produces identical orbits", () => {
+test("calcSystem → zero spacing → identical orbits", () => {
   const model = calcSystem({
     starMassMsol: 1,
     spacingFactor: 0,
@@ -44,14 +44,14 @@ test("zero spacing factor produces identical orbits", () => {
   }
 });
 
-test("habitable zone is physically plausible for solar-mass star", () => {
+test("calcSystem → solar-mass star → plausible habitable zone", () => {
   const model = calcSystem(SOLAR_SYSTEM);
   assert.ok(model.habitableZoneAu.inner > 0.5, "HZ inner should be > 0.5 AU for G star");
   assert.ok(model.habitableZoneAu.outer > model.habitableZoneAu.inner, "HZ outer > inner");
   assert.ok(model.habitableZoneAu.outer < 2.5, "HZ outer should be < 2.5 AU for G star");
 });
 
-test("frost line scales with luminosity", () => {
+test("calcSystem → brighter star → farther frost line", () => {
   const low = calcSystem({
     starMassMsol: 0.5,
     spacingFactor: 0,
@@ -65,7 +65,7 @@ test("frost line scales with luminosity", () => {
   assert.ok(high.frostLineAu > low.frostLineAu, "brighter stars have farther frost lines");
 });
 
-test("million-km values match AU * 149.6", () => {
+test("calcSystem → Mkm values → match AU * 149.6", () => {
   const model = calcSystem(SOLAR_SYSTEM);
   approxEqual(
     model.habitableZoneMillionKm.inner,
@@ -76,7 +76,7 @@ test("million-km values match AU * 149.6", () => {
   approxEqual(model.frostLineMillionKm, model.frostLineAu * 149.6, 1e-6, "frost Mkm");
 });
 
-test("input star mass is clamped to valid range", () => {
+test("calcSystem → extreme star mass → clamped to valid range", () => {
   const zero = calcSystem({
     starMassMsol: 0,
     spacingFactor: 0,
@@ -94,7 +94,7 @@ test("input star mass is clamped to valid range", () => {
 
 // ── Override tests ──────────────────────────────
 
-test("luminosity override changes frost line and HZ", () => {
+test("calcSystem → luminosity override → changes frost line and HZ", () => {
   const base = calcSystem({ ...SOLAR_SYSTEM });
   const bright = calcSystem({ ...SOLAR_SYSTEM, luminosityLsolOverride: 4 });
   // frost line = 4.85 * sqrt(L); L=4 → frost ~2× base
@@ -104,7 +104,7 @@ test("luminosity override changes frost line and HZ", () => {
   assert.ok(bright.habitableZoneAu.outer > base.habitableZoneAu.outer, "HZ widens with higher L");
 });
 
-test("radius override changes inner limit and density", () => {
+test("calcSystem → radius override → changes inner limit and density", () => {
   const base = calcSystem({ ...SOLAR_SYSTEM });
   const big = calcSystem({ ...SOLAR_SYSTEM, radiusRsolOverride: 3 });
   assert.ok(big.systemInnerLimitAu > base.systemInnerLimitAu, "larger star → farther inner limit");
@@ -112,7 +112,7 @@ test("radius override changes inner limit and density", () => {
   assert.ok(big.star.densityDsol < base.star.densityDsol, "larger radius → lower density");
 });
 
-test("both overrides applied together", () => {
+test("calcSystem → both overrides → applied together", () => {
   const model = calcSystem({
     ...SOLAR_SYSTEM,
     luminosityLsolOverride: 10,
@@ -123,7 +123,7 @@ test("both overrides applied together", () => {
   approxEqual(model.frostLineAu, 4.85 * Math.sqrt(10), 1e-6, "frost line with L=10");
 });
 
-test("invalid overrides are ignored", () => {
+test("calcSystem → invalid overrides → ignored", () => {
   const base = calcSystem({ ...SOLAR_SYSTEM });
   const neg = calcSystem({ ...SOLAR_SYSTEM, luminosityLsolOverride: -1, radiusRsolOverride: 0 });
   assert.equal(neg.star.luminosityLsol, base.star.luminosityLsol);

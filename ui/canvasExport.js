@@ -1,5 +1,5 @@
-const GIF_JS_URL = new URL("../assets/vendor/gif.js", import.meta.url).href;
-const GIF_WORKER_URL = new URL("../assets/vendor/gif.worker.js", import.meta.url).href;
+const GIF_JS_URL = "./assets/vendor/gif.js";
+const GIF_WORKER_URL = "./assets/vendor/gif.worker.js";
 const GIF_JS_CDN_FALLBACK = "https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js";
 
 let gifJsLoadPromise = null;

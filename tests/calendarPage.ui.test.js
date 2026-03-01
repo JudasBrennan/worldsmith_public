@@ -37,7 +37,7 @@ function getMonthLengthFromTitle() {
   return match ? Number(match[1]) : 30;
 }
 
-test("calendar page renders with collapsible sections defaulted to collapsed", () => {
+test("calendarPage → initial render → all sections collapsed", () => {
   const { cleanup } = setupCalendarPage();
   try {
     const title = document.querySelector(".panel__title")?.textContent || "";
@@ -59,7 +59,7 @@ test("calendar page renders with collapsible sections defaulted to collapsed", (
   }
 });
 
-test("calendar section toggle expands and collapses the target panel", () => {
+test("calendarPage → click section toggle → expands and collapses panel", () => {
   const { click, cleanup } = setupCalendarPage();
   try {
     const specialToggle = getSectionToggle("special");
@@ -80,7 +80,7 @@ test("calendar section toggle expands and collapses the target panel", () => {
   }
 });
 
-test("relative holiday controls enable/disable correctly by trigger type", () => {
+test("calendarPage → relative holiday trigger type → controls enable/disable correctly", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -135,7 +135,7 @@ test("relative holiday controls enable/disable correctly by trigger type", () =>
   }
 });
 
-test("detailed calendar overlay opens and closes via button and Escape key", () => {
+test("calendarPage → detail overlay → opens/closes via button and Escape", () => {
   const { click, cleanup } = setupCalendarPage();
   try {
     const openDetail = document.querySelector("#calOpenDetail");
@@ -159,7 +159,7 @@ test("detailed calendar overlay opens and closes via button and Escape key", () 
   }
 });
 
-test("multi-day holiday crossing month boundary shows continuation marker and detail text", () => {
+test("calendarPage → multi-day holiday at month end → shows continuation markers", () => {
   const { click, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -196,7 +196,7 @@ test("multi-day holiday crossing month boundary shows continuation marker and de
   }
 });
 
-test("season band visibility follows astronomy controls", () => {
+test("calendarPage → astronomy marker toggles → season band visibility follows", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("output"));
@@ -232,7 +232,7 @@ test("season band visibility follows astronomy controls", () => {
   }
 });
 
-test("selected-day astronomy detail includes source label text", () => {
+test("calendarPage → astronomy enabled → selected day shows source label", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("output"));
@@ -250,7 +250,7 @@ test("selected-day astronomy detail includes source label text", () => {
   }
 });
 
-test("work/rest cycle rules render markers in simple and detailed calendar views", () => {
+test("calendarPage → work/rest cycle saved → markers render in calendar views", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("cycles"));
@@ -302,7 +302,7 @@ test("work/rest cycle rules render markers in simple and detailed calendar views
   }
 });
 
-test("pre-calendar year schema renders BCE/CE style labels", () => {
+test("calendarPage → pre-calendar year mode → renders BCE/CE labels", () => {
   const { change, cleanup } = setupCalendarPage();
   try {
     const mode = document.querySelector("#calYearDisplayMode");
@@ -340,7 +340,7 @@ test("pre-calendar year schema renders BCE/CE style labels", () => {
   }
 });
 
-test("relative holiday trigger resolves against another holiday with offset", () => {
+test("calendarPage → relative holiday anchored to another → resolves with offset", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -394,7 +394,7 @@ test("relative holiday trigger resolves against another holiday with offset", ()
   }
 });
 
-test("algorithmic holiday anchor places Gregorian Easter on correct month/day", () => {
+test("calendarPage → algorithmic Easter anchor → lands on correct date", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -433,7 +433,7 @@ test("algorithmic holiday anchor places Gregorian Easter on correct month/day", 
   }
 });
 
-test("Sol preset UK Easter holidays land on expected 2027 dates", () => {
+test("calendarPage → Sol preset 2027 → UK Easter holidays on expected dates", () => {
   const harness = installDomHarness();
   localStorage.clear();
   importWorld(createSolPresetEnvelope().world);
@@ -471,7 +471,7 @@ test("Sol preset UK Easter holidays land on expected 2027 dates", () => {
 
 /* ── QA: Phase 9 tests ──────────────────────────────────────────── */
 
-test("festival with outsideWeekFlow renders in summary, not in grid cells", () => {
+test("calendarPage → outside-week-flow festival → appears in summary not grid", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("festival"));
@@ -507,7 +507,7 @@ test("festival with outsideWeekFlow renders in summary, not in grid cells", () =
   }
 });
 
-test("holiday conflict shift-forward moves second holiday to next day", () => {
+test("calendarPage → holiday conflict shift-forward → lower priority moves to next day", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -554,7 +554,7 @@ test("holiday conflict shift-forward moves second holiday to next day", () => {
   }
 });
 
-test("work cycle duty mode shows correct active/rest labels on sequential days", () => {
+test("calendarPage → duty cycle 2-on/1-off → shows active and rest labels", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("cycles"));
@@ -595,7 +595,7 @@ test("work cycle duty mode shows correct active/rest labels on sequential days",
   }
 });
 
-test("rule debugger trace panel renders with copy button for selected day with holiday", () => {
+test("calendarPage → holiday on day 5 → rule trace panel with copy button renders", () => {
   const { click, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("special"));
@@ -636,7 +636,7 @@ test("rule debugger trace panel renders with copy button for selected day with h
   }
 });
 
-test("global weekend rule and weekend day checkboxes wire up correctly", () => {
+test("calendarPage → weekend rule + day checkboxes → wired up correctly", () => {
   const { click, change, cleanup } = setupCalendarPage();
   try {
     click(getSectionToggle("cycles"));

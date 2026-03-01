@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.14.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.15.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -43,6 +43,9 @@ export function initAboutPage(mountEl) {
           <li><b>Planets</b>: create and edit rocky planets and gas giants, then assign them to system slots. Each body shows a live 3D preview driven by its physics.</li>
           <li><b>Other Objects</b>: configure debris disks and other non-planetary components.</li>
           <li><b>Moons</b>: create moons and assign them to parent planets.</li>
+          <li><b>Tectonics</b>: model mountain ranges, shield volcanoes, rift valleys, ocean spreading, and continental margins. Add a plate canvas with Voronoi tessellation and boundary classification.</li>
+          <li><b>Climate Zones</b>: generate latitude-based K&ouml;ppen climate bands, aridity profiles, and tidally-locked substellar/terminator zones.</li>
+          <li><b>Population</b>: estimate carrying capacity, logistic growth curves, land-use cascades, and regional population distribution for any tech era.</li>
           <li><b>Apparent Size</b>: compare apparent magnitude, angular size, and visibility for star/object/moon setups.</li>
           <li><b>Calendar</b>: build a world-linked calendar from orbital periods, then define holidays, festivals, leap rules, and work/rest cycles.</li>
           <li><b>Visualiser</b>: left-drag to pan, right-drag to rotate, scroll to zoom. Click a body to center it; double-click to zoom in. Press <b>Esc</b> to release focus. Press <b>?</b> for full controls including touch gestures. Zoom out past the outermost object to transition into the local cluster view.</li>
@@ -52,15 +55,29 @@ export function initAboutPage(mountEl) {
 
         <div class="page-title" style="margin-top:18px">Tips</div>
         <ul>
+          <li>Hover over any <b>(i)</b> icon next to a label to see a tooltip explaining what the field does, valid ranges, and real-world context.</li>
           <li>If something looks wrong, use <b>Refresh</b> on the visualiser to redraw from latest data.</li>
           <li>Most inputs support both a <b>slider</b> and a <b>text box</b> for precision.</li>
+          <li>Use <b>Import/Export</b> to save your world as JSON and reload it later, or import a WorldSmith 8.x spreadsheet directly.</li>
+          <li>Try the <b>Sol</b>, <b>Arrakis</b>, or <b>Realmspace</b> presets on the Import/Export page to explore a fully configured system.</li>
           <li>Use the <b>Splash</b> toggle in the header to skip the loading screen on startup.</li>
           <li>Switch between <b>light</b> and <b>dark</b> themes with the toggle in the header.</li>
-          <li>Your work is stored locally in your browser (LocalStorage). Clearing site data will reset the tool.</li>
+          <li>Your work is stored locally in your browser (localStorage). Use <b>Export</b> regularly to back up your world. Clearing site data will reset the tool.</li>
         </ul>
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.15.0</b> (from 1.14.0)</p>
+        <ul>
+          <li><b>Tectonics</b> &mdash; New interactive tectonics page with mountain ranges, shield volcanoes, rift valleys, seafloor spreading, isostasy modes, continental margins, and a full plate canvas with Voronoi tessellation, Euler pole rotation, and boundary classification.</li>
+          <li><b>Climate Zones</b> &mdash; Latitude-based K&ouml;ppen climate classification with aridity indices, tidally-locked zone modelling, and colour-coded zone cards.</li>
+          <li><b>Population</b> &mdash; Carrying capacity, logistic growth curves, land-use cascades, and Zipf rank-size regional distribution across configurable tech eras.</li>
+          <li><b>Science &amp; Maths Expansion</b> &mdash; Six new formula sections (Stellar Evolution, Gas Giant Physics, Lagrange Points, Climate, Population, Debris Disks) and four expanded sections, bringing coverage to ~160 equations across 18 sections.</li>
+          <li><b>Tooltip Audit</b> &mdash; Added ~80 new tooltips across Tectonics, Climate, and Population pages. Rewrote existing tooltips for style guide compliance with declarative tone, Unicode units, and correct naming.</li>
+          <li><b>Preset Updates</b> &mdash; Sol, Realmspace, and Arrakis presets updated to the current schema with all new planet, moon, and gas giant fields. Fixed a data corruption bug affecting Venus and Toril preset values.</li>
+          <li><b>Import/Export</b> &mdash; Import preview now shows all nine world sections including tectonics, population, climate, and calendar summaries.</li>
+        </ul>
 
         <p><b>Version 1.14.0</b> (from 1.13.0)</p>
         <ul>

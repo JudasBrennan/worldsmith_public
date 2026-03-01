@@ -169,17 +169,18 @@ Separate conceptual blocks with `\n\n` inside the string.
 
 ### Rules
 
-| Rule                 | Do                                                                       | Don't                                |
-| -------------------- | ------------------------------------------------------------------------ | ------------------------------------ |
-| **Units**            | Always explicit, space before unit: `1 Msol`, `5,776 K`                  | `1Msol`, `5776K`                     |
-| **Unit conversions** | Include on the reference line: `"Our sun = 1 Lsol = 3.846E26 watts"`     | Omit conversions for common units    |
-| **Notation**         | Plain-text exponents: `L = M^4`, `10^(2*[Fe/H])`                         | Unicode superscripts (`M⁴`) or LaTeX |
-| **Abbreviations**    | Spell out on first use: `"mean-motion resonance (MMR)"`                  | Abbreviation without expansion       |
-| **Ranges**           | Use en-dash `\u2013` for numeric ranges: `0.1\u20133.5 MEarth`           | Hyphen for ranges                    |
-| **Arrows**           | Use `\u2192` for resonance transitions: `3:2 \u2192 2:1`                 | `->` or `→` literal in source        |
-| **Tone**             | Technical, pedagogical, declarative                                      | Casual, first-person, speculative    |
-| **Citations**        | `"Author et al. (Year, Journal Vol, Page)"` for key algorithms           | Bare URLs or no attribution          |
-| **Length**           | 1–4 sentences for simple fields; up to ~150 words for complex algorithms | Single-word tooltips or essay-length |
+| Rule                      | Do                                                                       | Don't                                |
+| ------------------------- | ------------------------------------------------------------------------ | ------------------------------------ |
+| **Units**                 | Always explicit, space before unit: `1 Msol`, `5,776 K`                  | `1Msol`, `5776K`                     |
+| **Unit conversions**      | Include on the reference line: `"Our sun = 1 Lsol = 3.846E26 watts"`     | Omit conversions for common units    |
+| **Notation (formulas)**   | Plain-text exponents in equations: `L = M^4`, `10^(2*[Fe/H])`            | Unicode superscripts (`M⁴`) or LaTeX |
+| **Notation (units/chem)** | Unicode for units and chemical formulas: `m/s²`, `H₂O`, `×`              | Plain-text `m/s^2`, `H2O`, `*`       |
+| **Abbreviations**         | Spell out on first use: `"mean-motion resonance (MMR)"`                  | Abbreviation without expansion       |
+| **Ranges**                | Use en-dash `\u2013` for numeric ranges: `0.1\u20133.5 MEarth`           | Hyphen for ranges                    |
+| **Arrows**                | Use `\u2192` for resonance transitions: `3:2 \u2192 2:1`                 | `->` or `→` literal in source        |
+| **Tone**                  | Technical, pedagogical, declarative                                      | Casual, first-person, speculative    |
+| **Citations**             | `"Author et al. (Year, Journal Vol, Page)"` for key algorithms           | Bare URLs or no attribution          |
+| **Length**                | 1–4 sentences for simple fields; up to ~150 words for complex algorithms | Single-word tooltips or essay-length |
 
 ### Template
 
@@ -563,6 +564,75 @@ containerEl.addEventListener("input", (e) => {
 ```
 
 For dynamically rendered collections (gas giants, debris disks, moons), re-attach listeners inside the render function after setting `innerHTML`, guarded by `hydrating`.
+
+### Live input updates (render / update split)
+
+Sliders and text inputs must update outputs in real time without losing focus or deselecting. A full `render()` call rebuilds the entire `innerHTML`, destroying the active input element and breaking the user's interaction. To fix this, split rendering into two functions:
+
+| Function   | Rebuilds           | When to call                                                      |
+| ---------- | ------------------ | ----------------------------------------------------------------- |
+| `render()` | Entire page DOM    | Initial load, planet selector change, add/remove items, dropdowns |
+| `update()` | Outputs panel only | Any `input` event (slider drag, number typing)                    |
+
+**Pattern:**
+
+1. Extract output HTML into a helper (e.g. `outputsHTML(model, ...)`) shared by both `render()` and `update()`.
+2. Wrap outputs in a container with a stable ID (e.g. `#tecOutputs`, `#climDynamic`).
+3. `update()` recomputes the model, replaces only that container's `innerHTML`, re-attaches tooltips, and redraws canvases.
+4. `input` event handlers call `update()`; `change` and `click` handlers call `render()`.
+
+```js
+function update() {
+  const model = recomputeModel();
+  const el = containerEl.querySelector("#pageOutputs");
+  if (!el) return;
+  el.innerHTML = outputsHTML(model);
+  attachTooltips(el);
+  // redraw canvases in rAF
+}
+```
+
+**Paired number + slider sync:**
+
+All number/slider pairs live inside `.input-pair`. Use a generic sync at the top of the `input` handler to keep them in lockstep without a full re-render:
+
+```js
+containerEl.addEventListener("input", (e) => {
+  const t = e.target;
+  const pair = t.closest(".input-pair");
+  if (pair) {
+    const sibling = pair.querySelector(
+      t.type === "range" ? 'input[type="number"]' : 'input[type="range"]',
+    );
+    if (sibling && sibling !== t) sibling.value = t.value;
+  }
+  // ... update state, save(), update()
+});
+```
+
+Exclude special cases where the slider and number represent different scales (e.g. a 0–100 slider mapping to a computed mm/yr display).
+
+**`bindNumberAndSlider` guard:**
+
+When using `bindNumberAndSlider` from `ui/bind.js`, wrap in a `ready` flag to prevent infinite recursion — the helper calls `syncFromNumber()` during init, which fires `onChange`:
+
+```js
+let ready = false;
+bindNumberAndSlider({
+  numberEl,
+  sliderEl,
+  min: 0,
+  max: 10000,
+  step: 100,
+  onChange(v) {
+    state.value = v;
+    if (!ready) return;
+    save();
+    update();
+  },
+});
+ready = true;
+```
 
 ### Celestial preview controllers
 

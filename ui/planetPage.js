@@ -59,13 +59,13 @@ const TIP_LABEL = {
   "Orbital slot": "Assign this body to an available system slot. One body per slot.",
   Name: "Set the body's display name used across tabs and exports.",
   Physical: "Core physical inputs that control the planet's bulk properties.",
-  Mass: "Input your planet's mass, in Earth masses, here. Earth = 1 MEarth = 5.972E24 kg\n\nTerrestrial planets should have masses between 0.1 and 10 Earth masses.\n\nHabitable Earth-like planets should have masses between 0.1 and 3.5 Earth masses.",
-  CMF: "Core Mass Fraction\u2014the percentage of your planet's mass contained within its iron core.\n\nBy default, CMF is auto-derived from the host star's metallicity [Fe/H] (Schulze et al. 2021). Click the 'auto' button to reset to the star-derived value, or enter a manual value to override.\n\nMercury = ~70%\nVenus = ~32%\nEarth = ~32.5%\nMars = ~22%\nMoon = ~2%",
-  WMF: "Water Mass Fraction\u2014the percentage of your planet's total mass that is water or ice.\n\nEarth's WMF is only ~0.02% (oceans + ice)\u2014water is a tiny fraction of planetary mass but pools into a thin surface layer covering 71% of the surface. Higher WMF means deeper oceans, less exposed land, and eventually no land at all.\n\nWMF inflates the planet's radius and reduces bulk density. Based on Zeng & Sasselov (2016, ApJ 819, 127) three-layer interior model.\n\nDry: < 0.01%\nShallow oceans: 0.01\u20130.1% (Earth ~0.02%)\nExtensive oceans: 0.1\u20131% (deeper, less land)\nGlobal ocean: 1\u201310% (no exposed land)\nDeep ocean: 10\u201330% (high-pressure ice at seafloor)\nIce world: > 30%",
+  Mass: "Planet mass in Earth masses.\n\nTerrestrial planets: 0.1\u201310 MEarth.\nHabitable Earth-like planets: 0.1\u20133.5 MEarth.\n\nEarth = 1 MEarth = 5.972E24 kg",
+  CMF: "Core Mass Fraction (CMF) \u2014 percentage of planetary mass in the iron core.\n\nBy default, auto-derived from the host star\u2019s metallicity [Fe/H] (Schulze et al. 2021, PSJ 2, 113). Use the \u2018auto\u2019 button to reset, or enter a manual value.\n\nMercury \u2248 70%\nVenus \u2248 32%\nEarth \u2248 32.5%\nMars \u2248 22%\nMoon \u2248 2%",
+  WMF: "Water Mass Fraction (WMF) \u2014 percentage of planetary mass that is water or ice.\n\nHigher WMF inflates the radius, reduces bulk density, and deepens oceans.\n\nDry: < 0.01%\nShallow oceans: 0.01\u20130.1% (Earth ~0.02%)\nExtensive oceans: 0.1\u20131%\nGlobal ocean: 1\u201310% (no exposed land)\nDeep ocean: 10\u201330% (high-pressure ice at seafloor)\nIce world: > 30%\n\nReference: Zeng & Sasselov (2016, ApJ 819, 127) three-layer interior model.",
   "Axial Tilt":
-    "Input your planets axial tilt, in degrees, here. \n\nAxial tilt is a measure of how tilted a planet's rotational axis is with respect to the orbital plane. Values range from 0 to 180\u00b0. \n\nPlanets with axial tilts between 0 and 90\u00b0 spin in a prograde manner, i.e., in the same direction as their parent star.\n\nPlanets with axial tilts between 90 and 180\u00b0 spin in a retrograde manner, i.e., in the opposite direction to their parent star.\n\nPlanets with tilts exactly equal to 90\u00b0 are said to have undefined spins, they spin in neither a prograde nor a retrograde manner with respect to their parent star.\n\nThe higher the axial tilt, the more severe seasonality on your planet will be. Planets with axial tilts of 0\u00b0/180\u00b0 will not experience any seasons.\n\nHabitable earth-like planets should have axial tilts between 0 and 90\u00b0. Ideally, between 0 and 45\u00b0\n\nEarth = 23.5\u00b0",
+    "Obliquity of the planet\u2019s rotational axis relative to the orbital plane (0\u2013180\u00b0).\n\n0\u201390\u00b0 = prograde spin. 90\u2013180\u00b0 = retrograde spin. Higher tilt produces more extreme seasons; 0\u00b0/180\u00b0 = no seasons.\n\nHabitable range: 0\u201345\u00b0.\n\nEarth = 23.5\u00b0",
   "Albedo (Bond)":
-    "Input your planet's albedo here. Albedo is a measure of how reflective a planet is, on a scale of 0 to 1.\n\n0 = a perfect absorber, i.e, the planet absorbs 100% of the radiation it receives.\n\n1 = a perfect reflector, i.,e the planet reflects 100% of the radiation it receives.\n\nMercury = 0.068\nVenus = 0.77\nEarth = 0.306\nMoon = 0.11\nMars = 0.25",
+    "Fraction of incident stellar energy reflected by the planet (0\u20131).\n\n0 = perfect absorber. 1 = perfect reflector.\n\nMercury = 0.068\nVenus = 0.77\nEarth = 0.306\nMoon = 0.11\nMars = 0.25",
   "Greenhouse Effect":
     "Manual dimensionless greenhouse multiplier (Manual mode only). 0 = no atmosphere. ~1.2 = Earth-equivalent. ~217 = Venus-equivalent.\n\nIn Core and Full modes this is computed from atmospheric gases automatically.",
   "Greenhouse Mode":
@@ -83,29 +83,30 @@ const TIP_LABEL = {
   "Ammonia (NH\u2083)":
     "Atmospheric ammonia fraction (Full mode). Potent greenhouse gas absorbing at 10.5 Âµm (atmospheric window). Rapidly photodissociated by UV, so sustained levels require an active source.",
   "Height of Observer":
-    "Input the height from which the horizon is to be observed, in metres, here.",
+    "Observer elevation above sea level in metres, used to compute horizon distance.",
   "Orbit & Rotation":
     "Orbital and rotational inputs used for year length, seasons, and climate-related outputs.",
   "Rotation Period":
-    "Input how fast your planet spins about it's axis, in Earth hours, here. Aka input your planet's day length.\n\nHabitable Earth-like planets should have days between about 6 and 48 hours.",
+    "Sidereal rotation period (day length) in Earth hours.\n\nHabitable range: ~6\u201348 hours.\n\nEarth = 23.93 hours.",
   "Semi-Major axis":
-    "Input how far out from your star, in AU, your planet orbits. Earth = 1 AU = ~150,000,000 km\n\nHabitable Earth-like planets should orbit within the Habitable Zone, between Habitable Zone (Inner) and Habitable Zone (Outer).",
+    "Orbital distance from the host star in AU. Habitable planets should lie within the habitable zone.\n\nEarth = 1 AU = ~150,000,000 km",
   Eccentricity:
-    "Input your planet's orbital eccentricity here. This is a measure of how elliptical your planets orbit is. The scale goes from 0 to 1.\n\n0 = orbit is a perfect circle\n1 = orbit is a parabola\n\nHabitable Earth-like planets should have very low eccentricities to ensure that they orbit within the habitable zone at all times.\n\nEarth's orbital eccentricity = 0.0167",
+    "Orbital eccentricity (0\u20131). 0 = circular, 1 = parabolic.\n\nLow eccentricities keep the planet within the habitable zone year-round.\n\nEarth = 0.0167",
   Inclination:
-    "How inclined your planets orbit is respect to your primary habitable world's orbital plane.\n\nPrimary habitable world = 0\u00b0\nAll other worlds = 0 - 180\u00b0 (the lower the inclination value the better)",
+    "Orbital inclination relative to the primary habitable world\u2019s orbital plane.\n\nPrimary habitable world = 0\u00b0. Other worlds: 0\u2013180\u00b0 (lower values indicate a flatter system).",
   "Longitude of Periapsis":
-    "Input your geocentric longitude of periapsis, in degrees, here. The range here is between 0 and 360 degrees.\n\nEarth = ~283\u00b0",
+    "Geocentric longitude of periapsis in degrees (0\u2013360\u00b0).\n\nEarth \u2248 283\u00b0.",
   "Subsolar Longitude":
-    "Input your longitude of the subsolar point at the vernal equinox, in degrees, here. The range here is between 0 and 360 degrees.",
+    "Longitude of the subsolar point at the vernal equinox in degrees (0\u2013360\u00b0). Controls the phase offset of the seasonal cycle.",
   Atmosphere:
     "Atmospheric composition and pressure inputs for derived climate and density outputs.\n\nNâ‚‚ is derived: 100% minus all other gases. If the sum exceeds 100%, Nâ‚‚ is clamped to 0%.",
   "Atmospheric Pressure":
-    "Input your planets atmospheric pressure at sea level, in standard atmospheres, here. Earth = 1 atm",
-  "Oxygen (O2)": "The partial pressure of Oxygen gas should be between 0.16 and 0.5 atm.",
+    "Sea-level atmospheric pressure in standard atmospheres.\n\nEarth = 1 atm.",
+  "Oxygen (O2)":
+    "Oxygen partial pressure. Habitable range: 0.16\u20130.5 atm.\n\nEarth \u2248 0.21 atm.",
   "Carbon Dioxide (CO2)":
-    "The partial pressure of Carbon Dioxide gas should be less than 0.02 atm, though <0.005 atm is optimal.",
-  "Argon (Ar)": "The partial pressure of Argon gas should be less than 1.6 atm.",
+    "Carbon dioxide partial pressure. Habitable limit: < 0.02 atm (optimal < 0.005 atm).\n\nEarth \u2248 0.0004 atm (420 ppm).",
+  "Argon (Ar)": "Argon partial pressure. Habitable limit: < 1.6 atm.\n\nEarth \u2248 0.0094 atm.",
   "Vegetation override":
     "Override the auto-calculated vegetation colours with manually chosen pale and deep hex values. In Auto mode, colours are derived from the star's spectrum, atmospheric pressure, insolation, and tidal lock status.",
   Moons: "Major moons currently assigned to this body.",

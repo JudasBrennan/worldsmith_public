@@ -16,7 +16,7 @@
 // Ven (rocky), plus gas giants Extaris and Revona.
 
 const ARRAKIS_PRESET_WORLD = {
-  version: 44,
+  version: 51,
   selectedBodyType: "planet",
 
   // ── Star: Canopus ──────────────────────────────────────────────────
@@ -30,6 +30,8 @@ const ARRAKIS_PRESET_WORLD = {
     metallicityFeH: -0.05,
     physicsMode: "simple",
     advancedDerivationMode: "rl",
+    evolutionMode: "zams",
+    activityModelVersion: "v2",
   },
 
   // ── Planetary system ───────────────────────────────────────────────
@@ -46,6 +48,8 @@ const ARRAKIS_PRESET_WORLD = {
           name: "Extaris",
           au: 5.8,
           slotIndex: 6,
+          style: "jupiter",
+          rings: false,
           radiusRj: 0.75,
           massMjup: 0.6,
           rotationPeriodHours: 11.0,
@@ -56,6 +60,8 @@ const ARRAKIS_PRESET_WORLD = {
           name: "Revona",
           au: 13.5,
           slotIndex: 8,
+          style: "neptune",
+          rings: false,
           radiusRj: 0.38,
           massMjup: 0.06,
           rotationPeriodHours: 14.0,
@@ -103,6 +109,7 @@ const ARRAKIS_PRESET_WORLD = {
           axialTiltDeg: 0.5,
           massEarth: 0.06,
           cmfPct: 65.0,
+          wmfPct: 0,
           albedoBond: 0.07,
           greenhouseEffect: 0.0,
           greenhouseMode: "core",
@@ -117,6 +124,8 @@ const ARRAKIS_PRESET_WORLD = {
           hePct: 0,
           so2Pct: 0,
           nh3Pct: 0,
+          tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
 
@@ -137,6 +146,7 @@ const ARRAKIS_PRESET_WORLD = {
           axialTiltDeg: 175.0,
           massEarth: 0.72,
           cmfPct: 30.0,
+          wmfPct: 0,
           albedoBond: 0.72,
           greenhouseEffect: 180.0,
           greenhouseMode: "core",
@@ -151,6 +161,8 @@ const ARRAKIS_PRESET_WORLD = {
           hePct: 0.001,
           so2Pct: 0.02,
           nh3Pct: 0,
+          tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
 
@@ -171,6 +183,7 @@ const ARRAKIS_PRESET_WORLD = {
           axialTiltDeg: 5.0, // near-zero; minimal seasons
           massEarth: 0.8, // DE: density 4.95 g/cm³, r = 0.962 Re
           cmfPct: 25.0, // DE: 21.4% metallics + sulfides
+          wmfPct: 0, // desert world, negligible surface water
           albedoBond: 0.3, // desert sand + dark rock
           greenhouseEffect: 0.25, // very dry; ozone-dominated, weak
           greenhouseMode: "core",
@@ -186,6 +199,8 @@ const ARRAKIS_PRESET_WORLD = {
           hePct: 0,
           so2Pct: 0,
           nh3Pct: 0,
+          tectonicRegime: "auto",
+          mantleOxidation: "earth",
         },
       },
 
@@ -206,6 +221,7 @@ const ARRAKIS_PRESET_WORLD = {
           axialTiltDeg: 22.0,
           massEarth: 0.12,
           cmfPct: 22.0,
+          wmfPct: 0,
           albedoBond: 0.22,
           greenhouseEffect: 0.04,
           greenhouseMode: "core",
@@ -220,6 +236,8 @@ const ARRAKIS_PRESET_WORLD = {
           hePct: 0,
           so2Pct: 0,
           nh3Pct: 0,
+          tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
     },
@@ -245,6 +263,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 0.0263, // r=488 km, ρ=3.97 g/cm³
           densityGcm3: 3.97, // titanium-rich silicates (DE)
           albedo: 0.1, // dark rocky surface
+          compositionOverride: null,
         },
       },
       // Arvon ("Second Moon" / "Muad'Dib") — inner, icy
@@ -261,6 +280,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 0.00094, // r=201 km, ρ=2.02 g/cm³
           densityGcm3: 2.02, // water ice + frozen CO₂ (DE)
           albedo: 0.4, // bright icy surface
+          compositionOverride: null,
         },
       },
 
@@ -279,6 +299,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 1.1,
           densityGcm3: 3.4,
           albedo: 0.55,
+          compositionOverride: null,
         },
       },
       m_tarim: {
@@ -294,6 +315,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 0.58,
           densityGcm3: 2.9,
           albedo: 0.6,
+          compositionOverride: null,
         },
       },
       m_koris: {
@@ -309,6 +331,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 1.8,
           densityGcm3: 1.95,
           albedo: 0.38,
+          compositionOverride: null,
         },
       },
       m_bela: {
@@ -324,6 +347,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 1.3,
           densityGcm3: 1.85,
           albedo: 0.15,
+          compositionOverride: null,
         },
       },
       m_halleck: {
@@ -339,6 +363,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 0.0005,
           densityGcm3: 1.2,
           albedo: 0.85,
+          compositionOverride: null,
         },
       },
 
@@ -356,6 +381,7 @@ const ARRAKIS_PRESET_WORLD = {
           massMoon: 0.25,
           densityGcm3: 2.1,
           albedo: 0.65,
+          compositionOverride: null,
         },
       },
     },
@@ -470,6 +496,11 @@ const ARRAKIS_PRESET_WORLD = {
     randomSeed: 42,
   },
   clusterSystemNames: {},
+  clusterAdjustments: {
+    addedSystems: [],
+    removedSystemIds: [],
+    componentOverrides: {},
+  },
 };
 
 function deepClone(value) {

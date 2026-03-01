@@ -8,6 +8,7 @@ import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { getClusterObjectVisual, normalizeClusterObjectKey } from "./clusterObjectVisuals.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { escapeHtml } from "./uiHelpers.js";
 import {
   getClusterAdjustments,
   getClusterInputs,
@@ -20,33 +21,33 @@ import {
 
 const TIP_LABEL = {
   "Galactic Radius":
-    "Radius of the galaxy in light-years. The Galactic Habitable Zone scales from this value (47%–60% of radius), matching the WS8 Galaxy tab formula.",
-  Location: "Your neighbourhood's galactocentric distance in light-years.",
+    "Radius of the galaxy in light-years. The Galactic Habitable Zone (GHZ) scales from this value (47%\u201360% of radius).",
+  Location: "Galactocentric distance of the local neighbourhood in light-years.",
   "Neighbourhood Radius": "Radius of the local stellar neighbourhood sphere in light-years.",
   "Stellar Density":
     "Total density of all stellar-mass objects per cubic light-year (stars + white dwarfs + brown dwarfs + other).\n\nThe default 0.004/ly^3 matches the HIPPARCOS-calibrated solar-neighbourhood stellar density (~0.14 stars/pc^3). All class fractions now sum to 100% of this value, so Total Stellar-Mass Objects ≈ raw estimate.",
   "Random Seed":
-    "Integer seed for the Park-Miller PRNG used to place systems in 3-D space. The same seed always reproduces the same layout.\n\nDeviation from WS8: WS8 has no coordinate-generation algorithm. This engine places each neighbour system at a random distance (uniform-in-volume cube-root sampling) and random spherical direction derived from the seed.\n\nFor neighbourhood radii > 50 ly the z-axis is progressively compressed to approximate galactic disk geometry (thin-disk scale height ~300 pc).",
+    "Integer seed for the Park-Miller PRNG used to place systems in 3-D space. The same seed always reproduces the same layout.\n\nEach neighbour is placed at a random distance (uniform-in-volume cube-root sampling) and random spherical direction derived from the seed. For neighbourhood radii > 50 ly the z-axis is progressively compressed to approximate galactic disk geometry (thin-disk scale height ~300 pc).",
   "Galactic Habitable Zone":
-    "Computed as 0.47 * galactic radius (inner) to 0.60 * galactic radius (outer), matching WS8. This is a simplified hard-boundary model retained for WS8 compatibility.\n\nThe GHZ Probability field below gives a more accurate Gaussian estimate (Lineweaver 2004).",
+    "Hard-boundary Galactic Habitable Zone (GHZ): 0.47 \u00d7 galactic radius (inner) to 0.60 \u00d7 galactic radius (outer).\n\nThe GHZ Probability field below gives a more accurate continuous Gaussian estimate.\n\nReference: Lineweaver et al. (2004, Science 303, 59).",
   "In Galactic Habitable Zone?":
-    "Checks whether your selected location falls within the WS8 GHZ band (47%–60% of galactic radius). Hard boundary — see also GHZ Probability for a continuous estimate.",
+    "Whether the selected galactocentric distance falls within the GHZ band (47%\u201360% of galactic radius). Hard boundary \u2014 see also GHZ Probability for a continuous estimate.",
   "GHZ Probability":
-    "Probability-based GHZ score (0\u20131) using a Gaussian model centred at 53% of galactic radius (sigma = 10% * R), based on Lineweaver (2004).\n\nA score of 1.0 indicates optimal habitability; scores fall off smoothly toward the core (high supernova rate, tidal disruption) and outer disc (low metallicity, fewer rocky planets). This is more physically meaningful than the hard WS8 band.",
+    "Probability-based GHZ score (0\u20131) using a Gaussian model centred at 53% of galactic radius (\u03c3 = 10% \u00d7 R).\n\nA score of 1.0 indicates optimal habitability; scores fall off smoothly toward the core (high supernova rate, tidal disruption) and outer disc (low metallicity, fewer rocky planets).\n\nReference: Lineweaver et al. (2004, Science 303, 59).",
   "Neighbourhood Volume":
-    "Spherical volume used for object count estimates: (4/3)*pi*r^3, matching WS8.",
+    "Spherical volume of the local neighbourhood: V = (4/3) \u00d7 \u03c0 \u00d7 r\u00b3. Used as the basis for stellar-mass object count estimates.",
   "Estimated Stellar-Mass Objects":
-    "Raw estimate before class breakdown: stellar density * neighbourhood volume.\n\nClass fractions now sum to 100% of this figure (MS 72% + WD 6% + BD 19% + Other 3%), so Total Stellar-Mass Objects ≈ this value (±rounding). This corrects the WS8 140% overcounting.",
+    "Raw estimate before class breakdown: stellar density \u00d7 neighbourhood volume.\n\nClass fractions sum to 100% of this figure (MS 72% + WD 6% + BD 19% + Other 3%), so Total Stellar-Mass Objects \u2248 this value (\u00b1rounding).",
   "Main Sequence Total":
-    "Rounded sum of O/B/A/F/G/K/M stars, each class computed as round(raw * 0.72 * fraction).\n\nThe 0.72 factor allocates 72% of total objects to MS stars, matching the solar-neighbourhood census (Reylé et al. 2021; RECONS within 10 pc). The relative O/B/A/F/G/K/M fractions are unchanged from WS8 (Kroupa/Chabrier IMF). The O-type fraction (3*10^-7) gives essentially 0 O stars for any neighbourhood under ~500 ly, correctly reflecting that the nearest O star is ~1,400 ly away.",
+    "Rounded sum of O/B/A/F/G/K/M stars, each class computed as round(raw \u00d7 0.72 \u00d7 fraction).\n\nThe 0.72 factor allocates 72% of total objects to main-sequence stars, matching the solar-neighbourhood census (Reyl\u00e9 et al. 2021; RECONS within 10 pc). Relative class fractions follow the Kroupa/Chabrier initial mass function (IMF). The O-type fraction (3 \u00d7 10^\u22127) gives essentially 0 O stars for any neighbourhood under ~500 ly.",
   "Total Stellar-Mass Objects":
     "Rounded sum of all stellar-mass object classes (MS + WD + BD + Other).\n\nFractions applied: MS 72%, WD 6%, BD 19%, Other 3% — these sum to 100% of the raw estimate. Sources: Reylé et al. (2021) for BD fraction; typical WD fraction ~5–8% for field stars; RECONS for class breakdown.",
   "Total Star Systems":
-    "Estimated count of gravitationally bound systems derived from the stellar-mass object total using mass-weighted multiplicity fractions.\n\nMultiplicity rates are now class-dependent (Duchêne & Kraus 2013; Raghavan et al. 2010): M dwarfs (~72% of MS) have only ~27% binary fraction; FGK stars ~46%; O/B stars ~50–70%. This gives ~1.3–1.4 stars/system for a typical solar neighbourhood, compared to the WS8 FGK-only value of 1.58. Companion classes are also constrained to be no more massive than their primary.",
+    "Estimated count of gravitationally bound systems derived from the stellar-mass object total using mass-weighted multiplicity fractions.\n\nMultiplicity rates are class-dependent: M dwarfs (~72% of MS) have ~27% binary fraction; FGK stars ~46%; O/B stars ~50\u201370%. This gives ~1.3\u20131.4 stars/system for a typical solar neighbourhood. Companion classes are constrained to be no more massive than their primary.\n\nReferences: Duch\u00eane & Kraus (2013, ARA&A 51, 269); Raghavan et al. (2010, ApJS 190, 1).",
   "Class breakdown":
-    "Class counts use the corrected population fractions (MS 72%, WD 6%, BD 19%, Other 3%). Each generated system is randomly assigned an object class from the same weighted distribution, and companion classes are drawn from a filtered set that excludes classes heavier than the primary — an addition not present in WS8.",
+    "Class counts use population fractions (MS 72%, WD 6%, BD 19%, Other 3%). Each generated system is randomly assigned an object class from the same weighted distribution, and companion classes are drawn from a filtered set that excludes classes heavier than the primary.",
   "System Coordinates":
-    "Home star system is fixed at (0, 0, 0). Neighbour positions are generated with a Park-Miller PRNG seeded from the Random Seed input.\n\nDeviation from WS8: WS8 has no coordinate generator. Distances use cube-root sampling (uniform in volume inside the sphere). Directions use spherical-coordinate sampling.\n\nFor radii > 50 ly, the z-axis is compressed by a disk factor (1 - (r-50)/1000, floored at 0.15) to approximate the Milky Way thin-disk geometry.",
+    "Home star system is fixed at (0, 0, 0). Neighbour positions are generated with a Park-Miller PRNG seeded from the Random Seed input.\n\nDistances use cube-root sampling (uniform in volume inside the sphere). Directions use spherical-coordinate sampling. For radii > 50 ly, the z-axis is compressed by a disk factor (1 \u2212 (r\u221250)/1000, floored at 0.15) to approximate Milky Way thin-disk geometry.",
   "System Name":
     "Editable name override for this generated star system. Leave blank to use the default generated name.",
   "[Fe/H]":
@@ -69,15 +70,6 @@ function toInteger(n, fallback) {
   const x = Number(n);
   return Number.isFinite(x) ? Math.round(x) : fallback;
 }
-
-function esc(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-const escapeAttr = esc;
 
 function sanitizeSystemName(raw) {
   return String(raw ?? "")
@@ -580,9 +572,9 @@ export function initLocalClusterPage(mountEl) {
         (item) => `
       <div class="kpi-wrap">
         <div class="kpi">
-          <div class="kpi__label">${esc(item.label)} ${tipIcon(item.tip || "")}</div>
-          <div class="kpi__value">${esc(item.value)}</div>
-          <div class="kpi__meta">${esc(item.meta)}</div>
+          <div class="kpi__label">${escapeHtml(item.label)} ${tipIcon(item.tip || "")}</div>
+          <div class="kpi__value">${escapeHtml(item.value)}</div>
+          <div class="kpi__meta">${escapeHtml(item.meta)}</div>
         </div>
       </div>
     `,
@@ -600,13 +592,13 @@ export function initLocalClusterPage(mountEl) {
           <td>
             <span class="cluster-object-cell">
               <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-              <span>${esc(row.label)}</span>
+              <span>${escapeHtml(row.label)}</span>
             </span>
           </td>
-          <td>${esc(row.spectralClass)}</td>
+          <td>${escapeHtml(row.spectralClass)}</td>
           <td class="cluster-adjust-cell">
-            <button class="cluster-adjust-btn" data-class="${escapeAttr(row.objectClassKey)}" data-action="add" title="Add ${esc(row.label)}">+</button>
-            <button class="cluster-adjust-btn" data-class="${escapeAttr(row.objectClassKey)}" data-action="remove" title="Remove ${esc(row.label)}"${canRemove ? "" : " disabled"}>&#8722;</button>
+            <button class="cluster-adjust-btn" data-class="${escapeHtml(row.objectClassKey)}" data-action="add" title="Add ${escapeHtml(row.label)}">+</button>
+            <button class="cluster-adjust-btn" data-class="${escapeHtml(row.objectClassKey)}" data-action="remove" title="Remove ${escapeHtml(row.label)}"${canRemove ? "" : " disabled"}>&#8722;</button>
           </td>
           <td>${fmt(adjustedCount, 0)}</td>
         </tr>
@@ -621,11 +613,11 @@ export function initLocalClusterPage(mountEl) {
         const classLabel = formatSystemLabel(system);
         const systemName = resolveSystemDisplayName(system, homeDefaultName);
         return `
-        <tr data-system-id="${escapeAttr(system.id)}">
+        <tr data-system-id="${escapeHtml(system.id)}">
           <td>
             <span class="cluster-object-cell">
               <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-              <span class="cluster-object-tag">${esc(classLabel)}</span>
+              <span class="cluster-object-tag">${escapeHtml(classLabel)}</span>
             </span>
           </td>
           <td>
@@ -633,10 +625,10 @@ export function initLocalClusterPage(mountEl) {
               class="cluster-name-input"
               type="text"
               maxlength="80"
-              data-system-id="${escapeAttr(system.id)}"
-              value="${escapeAttr(systemName)}"
-              placeholder="${escapeAttr(system.name || "Star System")}"
-              aria-label="System name for ${escapeAttr(system.id)}"
+              data-system-id="${escapeHtml(system.id)}"
+              value="${escapeHtml(systemName)}"
+              placeholder="${escapeHtml(system.name || "Star System")}"
+              aria-label="System name for ${escapeHtml(system.id)}"
             />
           </td>
           <td>${fmt(system.x, 2)}</td>
@@ -845,9 +837,9 @@ export function initLocalClusterPage(mountEl) {
       html += '<div class="cluster-context-menu__sep"></div>';
       for (const cls of COMPANION_CLASSES) {
         const visual = getClusterObjectVisual(normalizeClusterObjectKey(cls.key));
-        html += `<div class="cluster-context-menu__item" data-action="add-companion" data-system-id="${escapeAttr(systemId)}" data-class="${escapeAttr(cls.key)}">
+        html += `<div class="cluster-context-menu__item" data-action="add-companion" data-system-id="${escapeHtml(systemId)}" data-class="${escapeHtml(cls.key)}">
           <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-          Add ${esc(cls.label)}
+          Add ${escapeHtml(cls.label)}
         </div>`;
       }
     }
@@ -860,9 +852,9 @@ export function initLocalClusterPage(mountEl) {
         const compKey = normalizeClusterObjectKey(comp.objectClassKey);
         const visual = getClusterObjectVisual(compKey);
         const label = compKey === "LTY" ? "L/T/Y" : compKey;
-        html += `<div class="cluster-context-menu__item danger" data-action="remove-companion" data-system-id="${escapeAttr(systemId)}" data-comp-index="${i}">
+        html += `<div class="cluster-context-menu__item danger" data-action="remove-companion" data-system-id="${escapeHtml(systemId)}" data-comp-index="${i}">
           <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-          Remove ${esc(label)} companion
+          Remove ${escapeHtml(label)} companion
         </div>`;
       }
     }

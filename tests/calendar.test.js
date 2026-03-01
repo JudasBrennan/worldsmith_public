@@ -4,18 +4,18 @@ import assert from "node:assert/strict";
 import { calcCalendarModel, continuedFractionApproximants } from "../engine/calendar.js";
 import { approxEqual } from "./testHelpers.js";
 
-test("continued fraction approximants include zero baseline and expected simple fraction", () => {
+test("continuedFractionApproximants → 0.25 → includes zero and 0.25", () => {
   const approximants = continuedFractionApproximants(0.25, 5);
   assert.deepEqual(approximants, [0, 0.25]);
 });
 
-test("continued fraction approximants use only fractional part and handle invalid values", () => {
+test("continuedFractionApproximants → integer/negative/NaN → uses fractional part or fallback", () => {
   assert.deepEqual(continuedFractionApproximants(2.25, 5), [0, 0.25]);
   assert.deepEqual(continuedFractionApproximants(-3, 5), [0]);
   assert.deepEqual(continuedFractionApproximants(Number.NaN, 5), [0]);
 });
 
-test("calendar model returns expected earth-moon baseline structure", () => {
+test("calcCalendarModel → Earth-Moon baseline → correct structure and values", () => {
   const model = calcCalendarModel({
     planetOrbitalPeriodDays: 365.2422,
     moonOrbitalPeriodDays: 29.5306,
@@ -49,7 +49,7 @@ test("calendar model returns expected earth-moon baseline structure", () => {
   }
 });
 
-test("calendar week blocks are constrained to at least one week per month", () => {
+test("calcCalendarModel → weeks per month = 0 → clamped to at least 1", () => {
   const model = calcCalendarModel({
     planetOrbitalPeriodDays: 20,
     moonOrbitalPeriodDays: 3,
@@ -64,7 +64,7 @@ test("calendar week blocks are constrained to at least one week per month", () =
   assert.ok(model.lunisolar.week.weeksPerMonth >= 1, "lunisolar weeks per month >= 1");
 });
 
-test("calendar model sanitizes invalid orbital and rotation inputs", () => {
+test("calcCalendarModel → invalid inputs → sanitized to positive defaults", () => {
   const model = calcCalendarModel({
     planetOrbitalPeriodDays: -365,
     moonOrbitalPeriodDays: 0,
@@ -82,7 +82,7 @@ test("calendar model sanitizes invalid orbital and rotation inputs", () => {
   assert.equal(model.inputs.lunisolarWeeksPerMonth, 4);
 });
 
-test("calendar model clamps week settings to maximum supported range", () => {
+test("calcCalendarModel → weeks per month = 500 → clamped to 53", () => {
   const model = calcCalendarModel({
     planetOrbitalPeriodDays: 365.2422,
     moonOrbitalPeriodDays: 29.5306,
@@ -97,7 +97,7 @@ test("calendar model clamps week settings to maximum supported range", () => {
   assert.equal(model.inputs.lunisolarWeeksPerMonth, 53);
 });
 
-test("rotation period rescales local month and local year durations", () => {
+test("calcCalendarModel → 48h rotation vs 24h → local days halved", () => {
   const fast = calcCalendarModel({
     planetOrbitalPeriodDays: 400,
     moonOrbitalPeriodDays: 40,
@@ -119,7 +119,7 @@ test("rotation period rescales local month and local year durations", () => {
   approxEqual(slow.actual.localYearDays, fast.actual.localYearDays / 2, 1e-8);
 });
 
-test("lunisolar month counts remain internally consistent", () => {
+test("calcCalendarModel → exotic periods → lunisolar month counts consistent", () => {
   const model = calcCalendarModel({
     planetOrbitalPeriodDays: 730.5,
     moonOrbitalPeriodDays: 20,

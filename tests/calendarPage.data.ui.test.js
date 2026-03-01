@@ -23,7 +23,7 @@ function tick() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-test("calendar JSON import apply updates live UI state", async () => {
+test("calendarPage → JSON import apply → updates live UI state", async () => {
   const harness = installDomHarness();
   localStorage.clear();
   const mount = createPage();
@@ -69,7 +69,7 @@ test("calendar JSON import apply updates live UI state", async () => {
   }
 });
 
-test("calendar profile switching preserves per-profile settings", () => {
+test("calendarPage → profile switch → preserves per-profile settings", () => {
   const harness = installDomHarness();
   localStorage.clear();
   const mount = createPage();
@@ -107,7 +107,7 @@ test("calendar profile switching preserves per-profile settings", () => {
   }
 });
 
-test("work cycle rules are profile-scoped", () => {
+test("calendarPage → work cycles → scoped to active profile", () => {
   const harness = installDomHarness();
   localStorage.clear();
   const mount = createPage();
@@ -148,7 +148,7 @@ test("work cycle rules are profile-scoped", () => {
   }
 });
 
-test("collapsed section state persists after page re-render", () => {
+test("calendarPage → expand section then re-render → state persists", () => {
   const harness = installDomHarness();
   localStorage.clear();
 
@@ -179,7 +179,7 @@ test("collapsed section state persists after page re-render", () => {
   }
 });
 
-test("calendar JSON round-trip preserves work cycle rules on active profile", async () => {
+test("calendarPage → JSON round-trip → preserves work cycle rules", async () => {
   const harness = installDomHarness();
   localStorage.clear();
   const mount = createPage();
@@ -258,7 +258,7 @@ test("calendar JSON round-trip preserves work cycle rules on active profile", as
 
 /* ── QA: Phase 9 round-trip tests ────────────────────────────────── */
 
-test("holiday rules survive JSON round-trip with anchors and observance", async () => {
+test("calendarPage → holiday JSON round-trip → anchors and priority preserved", async () => {
   const harness = installDomHarness();
   localStorage.clear();
   const mount = createPage();
@@ -327,7 +327,7 @@ test("holiday rules survive JSON round-trip with anchors and observance", async 
   }
 });
 
-test("leap rules survive JSON round-trip", async () => {
+test("calendarPage → leap rules JSON round-trip → rules preserved", async () => {
   const harness = installDomHarness();
   localStorage.clear();
   const mount = createPage();

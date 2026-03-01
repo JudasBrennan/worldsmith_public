@@ -40,66 +40,66 @@ function makeMoonCalc(overrides = {}) {
 
 // ── bodyType is always "moon" ───────────────────────────────────
 
-test("bodyType is always 'moon'", () => {
+test("computeMoonVisualProfile → valid input → bodyType is moon", () => {
   const p = computeMoonVisualProfile(makeMoonCalc());
   assert.equal(p.bodyType, "moon");
 });
 
-test("bodyType is 'moon' for null input (fallback)", () => {
+test("computeMoonVisualProfile → null input → bodyType is moon", () => {
   const p = computeMoonVisualProfile(null);
   assert.equal(p.bodyType, "moon");
 });
 
 // ── Palette from composition class ──────────────────────────────
 
-test("Very icy composition -> Very icy displayClass", () => {
+test("palette → Very icy composition → Very icy displayClass", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Very icy" } }));
   assert.equal(p.displayClass, "Very icy");
   assert.ok(p.palette.c1 && p.palette.c2 && p.palette.c3);
 });
 
-test("Icy composition -> Icy displayClass", () => {
+test("palette → Icy composition → Icy displayClass", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Icy" } }));
   assert.equal(p.displayClass, "Icy");
 });
 
-test("Subsurface ocean composition -> Subsurface ocean displayClass", () => {
+test("palette → Subsurface ocean composition → Subsurface ocean displayClass", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Subsurface ocean" } }),
   );
   assert.equal(p.displayClass, "Subsurface ocean");
 });
 
-test("Mixed rock/ice composition -> Mixed rock/ice displayClass", () => {
+test("palette → Mixed rock/ice composition → Mixed rock/ice displayClass", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Mixed rock/ice" } }),
   );
   assert.equal(p.displayClass, "Mixed rock/ice");
 });
 
-test("Rocky composition -> Rocky displayClass", () => {
+test("palette → Rocky composition → Rocky displayClass", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Rocky" } }));
   assert.equal(p.displayClass, "Rocky");
 });
 
-test("Partially molten composition -> Partially molten displayClass", () => {
+test("palette → Partially molten composition → Partially molten displayClass", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Partially molten" } }),
   );
   assert.equal(p.displayClass, "Partially molten");
 });
 
-test("Iron-rich composition -> Iron-rich displayClass", () => {
+test("palette → Iron-rich composition → Iron-rich displayClass", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Iron-rich" } }));
   assert.equal(p.displayClass, "Iron-rich");
 });
 
-test("unknown composition falls back to Rocky displayClass", () => {
+test("palette → unknown composition → falls back to Rocky", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Unknown" } }));
   assert.equal(p.displayClass, "Rocky");
 });
 
-test("compositionOverride takes precedence over compositionClass", () => {
+test("palette → compositionOverride set → overrides compositionClass", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Rocky", compositionOverride: "Very icy" } }),
   );
@@ -108,19 +108,19 @@ test("compositionOverride takes precedence over compositionClass", () => {
 
 // ── Terrain type from tidal heating and density ─────────────────
 
-test("high tidal heating (>10) -> volcanic terrain", () => {
+test("terrain → high tidal heating >10 → volcanic", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 15 } }));
   assert.equal(p.terrain.type, "volcanic");
   assert.ok(p.terrain.craterDensity < 0.05, `craterDensity ${p.terrain.craterDensity}`);
 });
 
-test("moderate tidal heating (1-10) -> active terrain", () => {
+test("terrain → moderate tidal heating 1-10 → active", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 5 } }));
   assert.equal(p.terrain.type, "active");
   assert.ok(p.terrain.craterDensity <= 0.1, `craterDensity ${p.terrain.craterDensity}`);
 });
 
-test("low heating + low density + bright albedo -> icy-smooth terrain", () => {
+test("terrain → low heating + low density + bright albedo → icy-smooth", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { tidalHeatingEarth: 0, compositionClass: "Icy" },
@@ -130,7 +130,7 @@ test("low heating + low density + bright albedo -> icy-smooth terrain", () => {
   assert.equal(p.terrain.type, "icy-smooth");
 });
 
-test("captured asteroid (tiny + dark) -> Rocky worn terrain", () => {
+test("terrain → captured asteroid tiny + dark → Rocky worn", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { tidalHeatingEarth: 0, compositionClass: "Icy" },
@@ -143,7 +143,7 @@ test("captured asteroid (tiny + dark) -> Rocky worn terrain", () => {
   assert.equal(p.iceCoverage, 0);
 });
 
-test("dark icy body (large + dark + low density) -> Dark icy", () => {
+test("terrain → dark icy body large + dark + low density → Dark icy", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { tidalHeatingEarth: 0, compositionClass: "Icy" },
@@ -156,7 +156,7 @@ test("dark icy body (large + dark + low density) -> Dark icy", () => {
   assert.equal(p.iceCoverage, 0.2);
 });
 
-test("bright surface override keeps compClass (Europa-like)", () => {
+test("terrain → bright surface Europa-like → keeps compClass", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { tidalHeatingEarth: 1.5, compositionClass: "Mixed rock/ice" },
@@ -167,7 +167,7 @@ test("bright surface override keeps compClass (Europa-like)", () => {
   assert.equal(p.displayClass, "Mixed rock/ice");
 });
 
-test("high tidal heating override keeps compClass (Io-like)", () => {
+test("terrain → high tidal heating Io-like → keeps compClass", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { tidalHeatingEarth: 20, compositionClass: "Rocky" },
@@ -178,7 +178,7 @@ test("high tidal heating override keeps compClass (Io-like)", () => {
   assert.equal(p.displayClass, "Rocky");
 });
 
-test("albedo tinting darkens low-albedo palette", () => {
+test("palette → low albedo → darker tint than high albedo", () => {
   const lo = computeMoonVisualProfile(makeMoonCalc({ inputs: { albedo: 0.1 } }));
   const hi = computeMoonVisualProfile(makeMoonCalc({ inputs: { albedo: 0.8 } }));
   // Low albedo c1 should be darker (lower hex value) than high albedo c1
@@ -187,7 +187,7 @@ test("albedo tinting darkens low-albedo palette", () => {
   assert.ok(loVal < hiVal, `low albedo c1 ${lo.palette.c1} should be darker than ${hi.palette.c1}`);
 });
 
-test("low heating + medium density (2.0-3.2) -> worn terrain", () => {
+test("terrain → low heating + medium density 2.0-3.2 → worn", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { tidalHeatingEarth: 0 }, inputs: { densityGcm3: 2.5 } }),
   );
@@ -195,7 +195,7 @@ test("low heating + medium density (2.0-3.2) -> worn terrain", () => {
   assert.equal(p.terrain.craterDensity, 0.4);
 });
 
-test("low heating + high density (>=3.2) -> cratered terrain", () => {
+test("terrain → low heating + high density >=3.2 → cratered", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { tidalHeatingEarth: 0 }, inputs: { densityGcm3: 3.5 } }),
   );
@@ -205,102 +205,102 @@ test("low heating + high density (>=3.2) -> cratered terrain", () => {
 
 // ── Ice coverage from composition ───────────────────────────────
 
-test("Very icy -> ice coverage 1.0", () => {
+test("iceCoverage → Very icy → 1.0", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Very icy" } }));
   assert.equal(p.iceCoverage, 1.0);
 });
 
-test("Icy -> ice coverage 0.9", () => {
+test("iceCoverage → Icy → 0.9", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Icy" } }));
   assert.equal(p.iceCoverage, 0.9);
 });
 
-test("Subsurface ocean -> ice coverage 0.95", () => {
+test("iceCoverage → Subsurface ocean → 0.95", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Subsurface ocean" } }),
   );
   assert.equal(p.iceCoverage, 0.95);
 });
 
-test("Mixed rock/ice -> ice coverage 0.4", () => {
+test("iceCoverage → Mixed rock/ice → 0.4", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Mixed rock/ice" } }),
   );
   assert.equal(p.iceCoverage, 0.4);
 });
 
-test("Rocky -> ice coverage 0", () => {
+test("iceCoverage → Rocky → 0", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Rocky" } }));
   assert.equal(p.iceCoverage, 0);
 });
 
-test("Partially molten -> ice coverage 0", () => {
+test("iceCoverage → Partially molten → 0", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Partially molten" } }),
   );
   assert.equal(p.iceCoverage, 0);
 });
 
-test("Iron-rich -> ice coverage 0", () => {
+test("iceCoverage → Iron-rich → 0", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { compositionClass: "Iron-rich" } }));
   assert.equal(p.iceCoverage, 0);
 });
 
 // ── Tidal heating intensity ─────────────────────────────────────
 
-test("no tidal heating -> inactive", () => {
+test("tidalHeating → no heating → inactive", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 0 } }));
   assert.equal(p.tidalHeating.active, false);
   assert.equal(p.tidalHeating.intensity, 0);
 });
 
-test("low tidal heating (0.3) -> inactive (below 0.5 threshold)", () => {
+test("tidalHeating → 0.3 below threshold → inactive", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 0.3 } }));
   assert.equal(p.tidalHeating.active, false);
 });
 
-test("moderate tidal heating (1.0) -> active", () => {
+test("tidalHeating → moderate 1.0 → active", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 1.0 } }));
   assert.equal(p.tidalHeating.active, true);
   assert.ok(p.tidalHeating.intensity > 0, "intensity > 0");
   assert.ok(p.tidalHeating.intensity < 1, "intensity < 1");
 });
 
-test("extreme tidal heating (40) -> intensity clamped to 1", () => {
+test("tidalHeating → extreme 40 → intensity clamped to 1", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 40 } }));
   assert.equal(p.tidalHeating.active, true);
   assert.equal(p.tidalHeating.intensity, 1);
 });
 
-test("very high tidal heating (80) -> intensity still clamped to 1", () => {
+test("tidalHeating → very high 80 → intensity still clamped to 1", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { tidalHeatingEarth: 80 } }));
   assert.equal(p.tidalHeating.intensity, 1);
 });
 
 // ── Special effects ─────────────────────────────────────────────
 
-test("tidalHeatingEarth > 10 -> volcanic special", () => {
+test("special → tidalHeatingEarth >10 → volcanic", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Rocky", tidalHeatingEarth: 15 } }),
   );
   assert.equal(p.special, "volcanic");
 });
 
-test("Subsurface ocean -> subsurface-ocean special", () => {
+test("special → Subsurface ocean → subsurface-ocean", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Subsurface ocean", tidalHeatingEarth: 0 } }),
   );
   assert.equal(p.special, "subsurface-ocean");
 });
 
-test("Partially molten -> molten special", () => {
+test("special → Partially molten → molten", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Partially molten", tidalHeatingEarth: 0 } }),
   );
   assert.equal(p.special, "molten");
 });
 
-test("low density + high albedo -> frozen special", () => {
+test("special → low density + high albedo → frozen", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { compositionClass: "Rocky", tidalHeatingEarth: 0 },
@@ -310,14 +310,14 @@ test("low density + high albedo -> frozen special", () => {
   assert.equal(p.special, "frozen");
 });
 
-test("volcanic special takes precedence over subsurface-ocean", () => {
+test("special → volcanic + subsurface-ocean → volcanic wins", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Subsurface ocean", tidalHeatingEarth: 15 } }),
   );
   assert.equal(p.special, "volcanic");
 });
 
-test("Rocky with low heating -> no special", () => {
+test("special → Rocky + low heating → null", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({ tides: { compositionClass: "Rocky", tidalHeatingEarth: 0 } }),
   );
@@ -326,19 +326,19 @@ test("Rocky with low heating -> no special", () => {
 
 // ── Tidally locked ──────────────────────────────────────────────
 
-test("moonLockedToPlanet 'Yes' -> tidallyLocked true", () => {
+test("tidallyLocked → moonLockedToPlanet Yes → true", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { moonLockedToPlanet: "Yes" } }));
   assert.equal(p.tidallyLocked, true);
 });
 
-test("moonLockedToPlanet 'No' -> tidallyLocked false", () => {
+test("tidallyLocked → moonLockedToPlanet No → false", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ tides: { moonLockedToPlanet: "No" } }));
   assert.equal(p.tidallyLocked, false);
 });
 
 // ── Atmosphere ──────────────────────────────────────────────────
 
-test("small rocky moon -> no atmosphere", () => {
+test("atmosphere → small rocky moon → no atmosphere", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { compositionClass: "Rocky" },
@@ -349,7 +349,7 @@ test("small rocky moon -> no atmosphere", () => {
   assert.equal(p.atmosphere.thickness, 0);
 });
 
-test("large subsurface ocean moon -> thin atmosphere", () => {
+test("atmosphere → large subsurface ocean moon → thin", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { compositionClass: "Subsurface ocean" },
@@ -360,7 +360,7 @@ test("large subsurface ocean moon -> thin atmosphere", () => {
   assert.equal(p.atmosphere.thickness, 0.06);
 });
 
-test("large mixed rock/ice moon with right density -> thin atmosphere", () => {
+test("atmosphere → large mixed rock/ice + right density → thin", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { compositionClass: "Mixed rock/ice" },
@@ -371,7 +371,7 @@ test("large mixed rock/ice moon with right density -> thin atmosphere", () => {
   assert.equal(p.atmosphere.thickness, 0.06);
 });
 
-test("Titan-like large icy moon -> thin atmosphere", () => {
+test("atmosphere → Titan-like large icy moon → thin", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { compositionClass: "Icy" },
@@ -382,7 +382,7 @@ test("Titan-like large icy moon -> thin atmosphere", () => {
   assert.equal(p.atmosphere.thickness, 0.06);
 });
 
-test("large moon but wrong density -> no atmosphere", () => {
+test("atmosphere → large moon + wrong density → none", () => {
   const p = computeMoonVisualProfile(
     makeMoonCalc({
       tides: { compositionClass: "Subsurface ocean" },
@@ -395,19 +395,19 @@ test("large moon but wrong density -> no atmosphere", () => {
 
 // ── Seed ────────────────────────────────────────────────────────
 
-test("seed comes from inputs.name", () => {
+test("seed → inputs.name present → uses name", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ inputs: { name: "Europa" } }));
   assert.equal(p.seed, "Europa");
 });
 
-test("seed falls back to id when name is missing", () => {
+test("seed → name missing → falls back to id", () => {
   const p = computeMoonVisualProfile(makeMoonCalc({ id: "moon-7", inputs: { name: undefined } }));
   assert.equal(p.seed, "moon-7");
 });
 
 // ── Determinism ─────────────────────────────────────────────────
 
-test("same inputs produce identical profiles", () => {
+test("determinism → same inputs → identical profiles", () => {
   const mc = makeMoonCalc();
   const p1 = computeMoonVisualProfile(mc);
   const p2 = computeMoonVisualProfile(mc);
@@ -416,7 +416,7 @@ test("same inputs produce identical profiles", () => {
 
 // ── Fallback for null/missing input ─────────────────────────────
 
-test("null moonCalc -> fallback profile with safe defaults", () => {
+test("fallback → null moonCalc → safe defaults", () => {
   const p = computeMoonVisualProfile(null);
   assert.equal(p.bodyType, "moon");
   assert.deepStrictEqual(p.palette, MOON_PALETTES.Rocky);
@@ -428,7 +428,7 @@ test("null moonCalc -> fallback profile with safe defaults", () => {
   assert.equal(p.tidallyLocked, true);
 });
 
-test("empty object moonCalc -> uses defaults without crashing", () => {
+test("fallback → empty object moonCalc → defaults without crash", () => {
   const p = computeMoonVisualProfile({});
   assert.equal(p.bodyType, "moon");
   assert.ok(p.palette, "has palette");
@@ -437,12 +437,12 @@ test("empty object moonCalc -> uses defaults without crashing", () => {
 
 /* ── MOON_RECIPES ──────────────────────────────────────────────────── */
 
-test("all recipe IDs are unique", () => {
+test("MOON_RECIPES → all IDs → unique", () => {
   const ids = MOON_RECIPES.map((r) => r.id);
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("every recipe has required fields", () => {
+test("MOON_RECIPES → every recipe → has required fields", () => {
   for (const r of MOON_RECIPES) {
     assert.ok(r.id, `${r.label || "?"} missing id`);
     assert.ok(r.label, `${r.id} missing label`);
@@ -452,7 +452,7 @@ test("every recipe has required fields", () => {
   }
 });
 
-test("every recipe apply has moon input fields", () => {
+test("MOON_RECIPES → every apply → has moon input fields", () => {
   const required = [
     "massMoon",
     "densityGcm3",
@@ -468,7 +468,7 @@ test("every recipe apply has moon input fields", () => {
   }
 });
 
-test("every recipe preview has tides/inputs/physical", () => {
+test("MOON_RECIPES → every preview → has tides/inputs/physical", () => {
   for (const r of MOON_RECIPES) {
     assert.ok(r.preview.tides, `${r.id} preview missing tides`);
     assert.ok(r.preview.inputs, `${r.id} preview missing inputs`);
@@ -476,7 +476,7 @@ test("every recipe preview has tides/inputs/physical", () => {
   }
 });
 
-test("every recipe preview produces a valid visual profile", () => {
+test("MOON_RECIPES → every preview → produces valid visual profile", () => {
   for (const r of MOON_RECIPES) {
     const profile = computeMoonVisualProfile(r.preview);
     assert.equal(profile.bodyType, "moon", `${r.id} profile bodyType`);

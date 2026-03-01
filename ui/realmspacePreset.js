@@ -341,7 +341,7 @@ const HARPTOS_HOLIDAYS = [
 // Star assumed ≈ 1 Msol (Toril's 365-day year at 1 AU).
 
 const REALMSPACE_PRESET_WORLD = {
-  version: 44,
+  version: 51,
   selectedBodyType: "planet",
   star: {
     name: "The Sun",
@@ -353,6 +353,8 @@ const REALMSPACE_PRESET_WORLD = {
     metallicityFeH: 0.0,
     physicsMode: "simple",
     advancedDerivationMode: "rl",
+    evolutionMode: "zams",
+    activityModelVersion: "v2",
   },
   system: {
     spacingFactor: 0.3,
@@ -366,6 +368,8 @@ const REALMSPACE_PRESET_WORLD = {
           name: "Coliar",
           au: 0.5,
           slotIndex: 2,
+          style: "jupiter",
+          rings: false,
           radiusRj: 0.68,
           massMjup: null,
           rotationPeriodHours: null,
@@ -412,6 +416,7 @@ const REALMSPACE_PRESET_WORLD = {
           wmfPct: 0.015, // Polar freshwater seas → Shallow oceans
           albedoBond: 0.15,
           greenhouseEffect: 0.0,
+          greenhouseMode: "core",
           observerHeightM: 1.0, // Halfling inhabitants
           pressureAtm: 0.1, // Thin but breathable
           o2Pct: 10.0,
@@ -424,6 +429,7 @@ const REALMSPACE_PRESET_WORLD = {
           nh3Pct: 0,
           arPct: 1.0,
           tectonicRegime: "stagnant", // Small, geologically dead
+          mantleOxidation: "earth",
           vegOverride: true, // Polar vegetation (trees, pastoral fields)
           vegPaleHexOverride: "#5a8a40",
           vegDeepHexOverride: "#2a5a15",
@@ -444,10 +450,11 @@ const REALMSPACE_PRESET_WORLD = {
           rotationPeriodHours: 24.0,
           axialTiltDeg: 23.5,
           massEarth: 1.0,
-          cmfPct: 32.0,
+          cmfPct: 33.0,
           wmfPct: 0.5, // ~60% ocean → Extensive oceans
           albedoBond: 0.3,
           greenhouseEffect: 1.65,
+          greenhouseMode: "core",
           observerHeightM: 1.75,
           pressureAtm: 1.0,
           o2Pct: 21.0,
@@ -459,7 +466,7 @@ const REALMSPACE_PRESET_WORLD = {
           so2Pct: 0,
           nh3Pct: 0,
           arPct: 0.93,
-          tectonicRegime: "mobile",
+          tectonicRegime: "auto",
           mantleOxidation: "earth",
         },
       },
@@ -482,6 +489,7 @@ const REALMSPACE_PRESET_WORLD = {
           wmfPct: 5, // 100% water surface → Global ocean
           albedoBond: 0.4, // Ocean + polar ice mix
           greenhouseEffect: 4, // Equatorial liquid water, polar ice caps
+          greenhouseMode: "core",
           observerHeightM: 1.75,
           pressureAtm: 1.0, // "Remarkably clean" breathable atmosphere
           o2Pct: 21.0, // Fresh/Type A atmosphere
@@ -494,6 +502,7 @@ const REALMSPACE_PRESET_WORLD = {
           nh3Pct: 0,
           arPct: 0.93,
           tectonicRegime: "stagnant", // No visible land tectonics
+          mantleOxidation: "earth",
         },
       },
       p_chandos: {
@@ -515,6 +524,7 @@ const REALMSPACE_PRESET_WORLD = {
           wmfPct: 2, // Predominantly water + floating rock islands → Global ocean
           albedoBond: 0.35,
           greenhouseEffect: 9, // Liquid water at 2 AU (~271 K average)
+          greenhouseMode: "core",
           observerHeightM: 1.75,
           pressureAtm: 1.2, // Breathable (Type B), supports greenhouse
           o2Pct: 18.0, // Breathable but lacks ozone layer
@@ -527,6 +537,7 @@ const REALMSPACE_PRESET_WORLD = {
           nh3Pct: 0,
           arPct: 1.0,
           tectonicRegime: "episodic", // Constant instability, islands rise/sink
+          mantleOxidation: "earth",
         },
       },
       // Glyth: canonically a Size E Earth Body (SJR2), not a gas giant.
@@ -551,6 +562,7 @@ const REALMSPACE_PRESET_WORLD = {
           wmfPct: 0.015, // 20% gelatinous "water" → Shallow oceans
           albedoBond: 0.2, // Dull gray appearance
           greenhouseEffect: 60, // Thick smoky atmosphere warms surface at 5 AU
+          greenhouseMode: "core",
           observerHeightM: 1.75,
           pressureAtm: 1.5, // Thick, fouled atmosphere
           o2Pct: 8.0, // Depleted by controlled burns
@@ -563,6 +575,7 @@ const REALMSPACE_PRESET_WORLD = {
           nh3Pct: 0,
           arPct: 1.0,
           tectonicRegime: "stagnant",
+          mantleOxidation: "earth",
         },
       },
     },
@@ -584,6 +597,7 @@ const REALMSPACE_PRESET_WORLD = {
           massMoon: 0.72, // ~93% Luna radius, density 3.0 → 72% Luna mass
           densityGcm3: 3.0,
           albedo: 0.12,
+          compositionOverride: null,
         },
       },
     },
@@ -673,6 +687,11 @@ const REALMSPACE_PRESET_WORLD = {
     randomSeed: 1,
   },
   clusterSystemNames: {},
+  clusterAdjustments: {
+    addedSystems: [],
+    removedSystemIds: [],
+    componentOverrides: {},
+  },
 };
 
 function deepClone(value) {

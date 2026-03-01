@@ -3404,7 +3404,7 @@ export function initCalendarPage(mountEl) {
       <div class="calendar-controls-stack">
         <div class="panel"><div class="panel__header"><h2>Inputs</h2></div><div class="panel__body">
           <div class="form-row"><div><div class="label">Calendar profile ${tipIcon(TIPS["Calendar profile"] || "")}</div></div><select id="calProfileSelect"></select></div>
-          <div class="button-row"><button id="calProfileNew" type="button" data-tip="${esc(TIPS["New profile"] || "")}">New</button><button id="calProfileDuplicate" type="button" data-tip="${esc(TIPS["Duplicate profile"] || "")}">Duplicate</button><button id="calProfileDelete" class="danger" type="button" data-tip="${esc(TIPS["Delete profile"] || "")}">Delete</button></div>
+          <div class="button-row"><button id="calProfileNew" type="button" data-tip="${esc(TIPS["New profile"] || "")}">New</button><button id="calProfileDuplicate" type="button" data-tip="${esc(TIPS["Duplicate profile"] || "")}">Duplicate</button><button id="calProfileDelete" class="small danger" type="button" data-tip="${esc(TIPS["Delete profile"] || "")}">Delete</button></div>
           <div class="form-row"><div><div class="label">Source planet ${tipIcon(TIPS["Source planet"] || "")}</div></div><select id="calSourcePlanet"></select></div>
           <div class="form-row"><div><div class="label">Primary moon ${tipIcon(TIPS["Primary moon"] || "")}</div></div><select id="calPrimaryMoon"></select></div>
           <div class="form-row"><div><div class="label">Extra moon 1 ${tipIcon(TIPS["Extra moon"] || "")}</div></div><select id="calExtraMoon1"></select></div>

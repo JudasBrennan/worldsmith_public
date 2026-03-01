@@ -12,17 +12,17 @@ import {
   normalizeNameList,
 } from "../engine/usableCalendar.js";
 
-test("normalizes name list to expected count with sensible defaults", () => {
+test("normalizeNameList → sparse array → fills blanks with defaults", () => {
   const names = normalizeNameList(["", "Moonday"], 4, "Day");
   assert.deepEqual(names, ["Day 1", "Moonday", "Day 3", "Day 4"]);
 });
 
-test("normalizes name list from comma/newline text input", () => {
+test("normalizeNameList → comma/newline text → splits and pads", () => {
   const names = normalizeNameList("Sun\nMoon, Stars", 5, "Day");
   assert.deepEqual(names, ["Sun", "Moon", "Stars", "Day 4", "Day 5"]);
 });
 
-test("applies leap rules to specific target month", () => {
+test("getMonthLengthsForYear → leap rule on month 1 → adds days in matching year", () => {
   const metrics = {
     monthsPerYear: 3,
     daysPerMonth: 10,
@@ -45,7 +45,7 @@ test("applies leap rules to specific target month", () => {
   assert.deepEqual(monthLengthsYear2, [10, 10, 10]);
 });
 
-test("normalizes leap rules with bounds and drops zero-day rules", () => {
+test("normalizeLeapRules → out-of-bound/zero-delta rules → clamps and drops", () => {
   const out = normalizeLeapRules(
     [
       { id: "A", name: "", cycleYears: 0, offsetYear: -1, monthIndex: 999, dayDelta: 40 },
@@ -74,7 +74,7 @@ test("normalizes leap rules with bounds and drops zero-day rules", () => {
   });
 });
 
-test("normalizes holidays and filters unnamed entries", () => {
+test("normalizeHolidays → blank name / out-of-range → filters and clamps", () => {
   const out = normalizeHolidays(
     [
       { id: "h1", name: " Founding Day ", monthIndex: 2, day: 10 },
@@ -90,7 +90,7 @@ test("normalizes holidays and filters unnamed entries", () => {
   ]);
 });
 
-test("month lengths apply intercalary days and clamp month minimum to one", () => {
+test("getMonthLengthsForYear → negative intercalary + leap → clamps month to 1", () => {
   const metrics = {
     monthsPerYear: 3,
     daysPerMonth: 5,
@@ -107,7 +107,7 @@ test("month lengths apply intercalary days and clamp month minimum to one", () =
   assert.deepEqual(monthLengths, [1, 5, 1]);
 });
 
-test("year start day index advances by total year length modulo week length", () => {
+test("getYearStartDayIndex → year 2 → advances by year length mod week length", () => {
   const metrics = {
     monthsPerYear: 2,
     daysPerMonth: 10,
@@ -130,7 +130,7 @@ test("year start day index advances by total year length modulo week length", ()
   assert.equal(year2, 1); // 2 + 20 mod 7 = 1
 });
 
-test("year start day index accounts for leap rules from prior years", () => {
+test("getYearStartDayIndex → leap rules in prior years → adjusts start day", () => {
   const metrics = {
     monthsPerYear: 2,
     daysPerMonth: 10,
@@ -150,7 +150,7 @@ test("year start day index accounts for leap rules from prior years", () => {
   assert.equal(year3, 0);
 });
 
-test("builds a calendar month grid with holidays and moon data", () => {
+test("buildUsableCalendarMonth → holidays + moon → grid with markers", () => {
   const view = buildUsableCalendarMonth({
     metrics: {
       monthsPerYear: 4,
@@ -179,7 +179,7 @@ test("builds a calendar month grid with holidays and moon data", () => {
   assert.equal(typeof day3.moon.phaseName, "string");
 });
 
-test("build month honours week start offset and pads rows", () => {
+test("buildUsableCalendarMonth → week start offset → pads leading cells", () => {
   const view = buildUsableCalendarMonth({
     metrics: {
       monthsPerYear: 2,
@@ -212,7 +212,7 @@ test("build month honours week start offset and pads rows", () => {
   );
 });
 
-test("build month absolute day tracks leap-adjusted prior months", () => {
+test("buildUsableCalendarMonth → leap-adjusted prior months → correct absoluteDay", () => {
   const metrics = {
     monthsPerYear: 3,
     daysPerMonth: 10,
@@ -238,7 +238,7 @@ test("build month absolute day tracks leap-adjusted prior months", () => {
   assert.equal(firstDayCell.absoluteDay, 44);
 });
 
-test("moon phase description returns expected markers", () => {
+test("describeMoonPhase → new and full moon → correct phase markers", () => {
   const newMoon = describeMoonPhase({ ageDays: 0, synodicDays: 30 });
   const fullMoon = describeMoonPhase({ ageDays: 15, synodicDays: 30 });
   assert.equal(newMoon.phaseShort, "N");
@@ -246,7 +246,7 @@ test("moon phase description returns expected markers", () => {
   assert.equal(newMoon.illuminationPct < fullMoon.illuminationPct, true);
 });
 
-test("moon phase boundaries map to expected phase buckets", () => {
+test("describeMoonPhase → various age fractions → correct phase buckets", () => {
   const synodicDays = 16;
   const atWaxingCrescent = describeMoonPhase({ ageDays: 1, synodicDays }); // 1/16
   const atFirstQuarter = describeMoonPhase({ ageDays: 3, synodicDays }); // 3/16
@@ -259,7 +259,7 @@ test("moon phase boundaries map to expected phase buckets", () => {
   assert.equal(atCycleWrap.phaseShort, "N");
 });
 
-test("basis metrics extraction chooses requested model branch", () => {
+test("getCalendarBasisMetrics → solar/lunar/lunisolar → selects correct branch", () => {
   const calendarModel = {
     solar: {
       monthsPerYear: 12,
@@ -283,7 +283,7 @@ test("basis metrics extraction chooses requested model branch", () => {
   assert.equal(getCalendarBasisMetrics(calendarModel, "lunisolar").monthsPerYear, 13);
 });
 
-test("basis metrics fallback to solar for unknown basis", () => {
+test("getCalendarBasisMetrics → unknown basis → falls back to solar", () => {
   const calendarModel = {
     solar: {
       monthsPerYear: 11,
@@ -302,7 +302,7 @@ test("basis metrics fallback to solar for unknown basis", () => {
 
 /* ── QA: holiday overlap ─────────────────────────────────────────── */
 
-test("two holidays on same day both appear via merge (simple model)", () => {
+test("buildUsableCalendarMonth → two holidays on same day → both appear merged", () => {
   const view = buildUsableCalendarMonth({
     metrics: {
       monthsPerYear: 2,
@@ -328,7 +328,7 @@ test("two holidays on same day both appear via merge (simple model)", () => {
   assert.ok(day5.holidayNames.includes("Beta"), "Beta should match");
 });
 
-test("multiple leap rules targeting same month produce net effect", () => {
+test("getMonthLengthsForYear → two leap rules on same month → net effect applied", () => {
   const metrics = {
     monthsPerYear: 3,
     daysPerMonth: 10,
@@ -345,7 +345,7 @@ test("multiple leap rules targeting same month produce net effect", () => {
   assert.deepEqual(lengths, [10, 11, 10]);
 });
 
-test("negative leap delta clamps month minimum to one day", () => {
+test("getMonthLengthsForYear → negative delta exceeds base → clamps to 1 day", () => {
   const metrics = {
     monthsPerYear: 2,
     daysPerMonth: 4,
@@ -360,7 +360,7 @@ test("negative leap delta clamps month minimum to one day", () => {
   assert.equal(lengths[1], 4);
 });
 
-test("multi-day holiday near month boundary only matches in-range days", () => {
+test("buildUsableCalendarMonth → holiday near month end → only in-range days match", () => {
   const view = buildUsableCalendarMonth({
     metrics: {
       monthsPerYear: 2,
@@ -383,7 +383,7 @@ test("multi-day holiday near month boundary only matches in-range days", () => {
   assert.ok(!day10.holidayNames.includes("Boundary"), "Day 10 should not");
 });
 
-test("moon phase cycles correctly with very short synodic period", () => {
+test("describeMoonPhase → short synodic period → cycles N/F/N correctly", () => {
   const synodic = 5;
   // At day 0 = new moon (age 0)
   const newMoon = describeMoonPhase({ ageDays: 0, synodicDays: synodic });
@@ -396,7 +396,7 @@ test("moon phase cycles correctly with very short synodic period", () => {
   assert.equal(wrapped.phaseShort, "N");
 });
 
-test("moon phase handles synodic period of one day without error", () => {
+test("describeMoonPhase → synodic period = 1 day → no error", () => {
   const phase = describeMoonPhase({ ageDays: 0.5, synodicDays: 1 });
   assert.equal(typeof phase.phaseName, "string");
   assert.ok(Number.isFinite(phase.illuminationPct));

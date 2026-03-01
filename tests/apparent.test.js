@@ -17,7 +17,7 @@ import {
 } from "../engine/apparent.js";
 import { approxEqual } from "./testHelpers.js";
 
-test("star absolute/app magnitude baseline is sun-like at 1 AU", () => {
+test("calcStarApparentAtOrbit → sun-like star at 1 AU → matches Sol baseline", () => {
   const abs = calcStarAbsoluteMagnitude(1);
   approxEqual(abs, 4.81013, 1e-5);
 
@@ -33,7 +33,7 @@ test("star absolute/app magnitude baseline is sun-like at 1 AU", () => {
   approxEqual(apparent.apparentSizeRelativeToEarthSun, 1, 1e-9);
 });
 
-test("body apparent model clamps current distance into valid geometric bounds", () => {
+test("calcBodyApparentFromHome → distance out of range → clamps to geometric bounds", () => {
   const body = calcBodyApparentFromHome({
     homeOrbitAu: 1,
     orbitAu: 5,
@@ -51,7 +51,7 @@ test("body apparent model clamps current distance into valid geometric bounds", 
   assert.equal(Number.isFinite(body.apparentMagnitude), true);
 });
 
-test("moon brightness ratio uses full moon baseline correctly", () => {
+test("calcMoonApparentFromHome → Earth-Moon defaults → brightness ratio ~1", () => {
   const moon = calcMoonApparentFromHome({
     starLuminosityLsol: 1,
     homeOrbitAu: 1,
@@ -72,7 +72,7 @@ test("moon brightness ratio uses full moon baseline correctly", () => {
   assert.equal(moon.eclipseType, "Annular Eclipses Only");
 });
 
-test("composed apparent model returns star/body/moon sections", () => {
+test("calcApparentModel → full inputs → returns star/body/moon sections", () => {
   const model = calcApparentModel({
     starMassMsol: 1,
     homeOrbitAu: 1,
@@ -105,14 +105,14 @@ test("composed apparent model returns star/body/moon sections", () => {
   assert.equal(model.moon.name, "Moon");
 });
 
-test("radius converters map Earth and Jupiter units to kilometres", () => {
+test("convertPlanetRadiusEarthToKm / convertGasGiantRadiusRjToKm → 1 unit → correct km", () => {
   approxEqual(convertPlanetRadiusEarthToKm(1), 6371, 1e-12);
   approxEqual(convertGasGiantRadiusRjToKm(1), 69911, 1e-12);
 });
 
 /* ── Body type classification ──────────────────────────────────── */
 
-test("classifyBodyType and integration through calcBodyApparentFromHome", () => {
+test("classifyBodyType → various radii/atmosphere combos → correct body type labels", () => {
   // Direct classification
   assert.equal(classifyBodyType(6371, false), 1); // Earth-size rocky airless
   assert.equal(classifyBodyType(6371, true), 2); // Earth-size with atmosphere
@@ -145,7 +145,7 @@ test("classifyBodyType and integration through calcBodyApparentFromHome", () => 
 
 /* ── Star luminosity correction ────────────────────────────────── */
 
-test("brighter star makes planet appear brighter (lower magnitude)", () => {
+test("calcBodyApparentFromHome → 10x star luminosity → magnitude drops by 2.5", () => {
   const base = calcBodyApparentFromHome({
     homeOrbitAu: 1,
     orbitAu: 5,
@@ -174,7 +174,7 @@ test("brighter star makes planet appear brighter (lower magnitude)", () => {
 
 /* ── Phase angle > 160° guard ──────────────────────────────────── */
 
-test("phase angle above 160 degrees returns NaN magnitude", () => {
+test("calcBodyApparentFromHome → phase angle > 160° → NaN magnitude", () => {
   const body = calcBodyApparentFromHome({
     homeOrbitAu: 1,
     orbitAu: 0.72,
@@ -188,7 +188,7 @@ test("phase angle above 160 degrees returns NaN magnitude", () => {
 
 /* ── Bond → geometric albedo conversion ────────────────────────── */
 
-test("bondToGeometricAlbedo converts using type-dependent phase integral", () => {
+test("bondToGeometricAlbedo → each body type → correct phase integral division", () => {
   // Type 1 (rocky airless): q ≈ 0.48 → geo = bond / 0.48
   const geo1 = bondToGeometricAlbedo(0.3, 1);
   approxEqual(geo1, 0.3 / 0.48, 1e-6);
@@ -208,7 +208,7 @@ test("bondToGeometricAlbedo converts using type-dependent phase integral", () =>
 
 /* ── Visibility thresholds match WS8 ──────────────────────────── */
 
-test("visibility classification includes Day and night tier for very bright objects", () => {
+test("calcBodyApparentFromHome → very bright object → visibility 'Day and night'", () => {
   // Outer planet at opposition (elongation ~180°) with very bright star → Day and night
   const veryBright = calcBodyApparentFromHome({
     homeOrbitAu: 1,
@@ -230,7 +230,7 @@ test("visibility classification includes Day and night tier for very bright obje
 
 /* ── Eclipse comparison uses absolute angular sizes ────────────── */
 
-test("perigee moon produces total eclipses (vs annular at average distance)", () => {
+test("calcMoonApparentFromHome → perigee distance → total eclipses possible", () => {
   // At perigee (~356500 km), Moon angular radius > Sun angular radius → total
   const moonPerigee = calcMoonApparentFromHome({
     starLuminosityLsol: 1,
@@ -281,7 +281,7 @@ test("moon at 2 AU home orbit \u2192 correct magnitude (distance bug regression)
 
 /* ── Angular size fields ─────────────────────────────────────── */
 
-test("star angular diameter at 1 AU matches Sun reference (~31.6 arcmin)", () => {
+test("calcStarApparentAtOrbit → 1 AU → angular diameter ~31.6 arcmin", () => {
   const result = calcStarApparentAtOrbit({
     starAbsoluteMagnitude: calcStarAbsoluteMagnitude(1),
     starRadiusRsol: 1,
@@ -291,7 +291,7 @@ test("star angular diameter at 1 AU matches Sun reference (~31.6 arcmin)", () =>
   assert.equal(typeof result.angularDiameterLabel, "string");
 });
 
-test("body angular diameter scales inversely with distance", () => {
+test("calcBodyApparentFromHome → 4x distance → angular diameter 4x smaller", () => {
   const near = calcBodyApparentFromHome({
     homeOrbitAu: 1,
     orbitAu: 2,
@@ -316,7 +316,7 @@ test("body angular diameter scales inversely with distance", () => {
   );
 });
 
-test("Moon angular diameter at 384748 km \u2248 31 arcmin", () => {
+test("Moon angular diameter → 384748 km → ≈ 31 arcmin", () => {
   const moon = calcMoonApparentFromHome({
     starLuminosityLsol: 1,
     homeOrbitAu: 1,
@@ -334,7 +334,7 @@ test("Moon angular diameter at 384748 km \u2248 31 arcmin", () => {
 
 /* ── Multi-moon support ──────────────────────────────────────── */
 
-test("calcApparentModel with moonSamples returns multiple moons", () => {
+test("calcApparentModel → moonSamples array → returns multiple moons", () => {
   const model = calcApparentModel({
     starMassMsol: 1,
     homeOrbitAu: 1,
@@ -359,7 +359,7 @@ test("calcApparentModel with moonSamples returns multiple moons", () => {
 
 /* ── Sol references ──────────────────────────────────────────── */
 
-test("SOL_REFERENCES contains expected entries", () => {
+test("SOL_REFERENCES → Sun entry → appMag ~-26.74", () => {
   assert.ok(Array.isArray(SOL_REFERENCES));
   assert.ok(SOL_REFERENCES.length >= 6);
   const sun = SOL_REFERENCES.find((r) => r.name === "Sun");
@@ -367,7 +367,7 @@ test("SOL_REFERENCES contains expected entries", () => {
   approxEqual(sun.appMag, -26.74, 0.01);
 });
 
-test("formatAngularLabel formats degrees, arcmin, arcsec correctly", () => {
+test("formatAngularLabel → various sizes → correct unit symbols", () => {
   assert.ok(formatAngularLabel({ arcsec: 7200, arcmin: 120, degrees: 2 }).includes("\u00b0"));
   assert.ok(formatAngularLabel({ arcsec: 1800, arcmin: 30, degrees: 0.5 }).includes("\u2032"));
   assert.ok(formatAngularLabel({ arcsec: 45, arcmin: 0.75, degrees: 0.0125 }).includes("\u2033"));

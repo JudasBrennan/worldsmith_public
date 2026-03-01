@@ -16,7 +16,7 @@ const LEGACY_KEY = "worldsmith.world";
 let volatileWorldRaw = null;
 
 // Schema version for migrations
-const SCHEMA_VERSION = 46;
+const SCHEMA_VERSION = 51;
 // Practical giant-planet radius bounds in Jupiter radii (Rj):
 // lower bound ~= Neptune-size (~0.35 Rj), upper bound ~= inflated HAT-P-67 b (2.14 Rj).
 export const GAS_GIANT_RADIUS_MIN_RJ = 0.35;
@@ -320,6 +320,43 @@ function defaultWorld() {
     planet: {},
     // Back-compat single-moon view used by older pages (kept in sync)
     moon: {},
+    // Tectonics page inputs (mountain ranges, ocean depth config)
+    tectonics: {
+      ridgeHeightM: 2600,
+      mountainRanges: [
+        {
+          id: "mr1",
+          type: "andean",
+          label: "Range 1",
+          widths: {},
+          heights: {},
+          slabAngleDeg: 45,
+          convergenceMmYr: 50,
+        },
+      ],
+      inactiveRanges: [],
+      spreadingRateFraction: 0.5,
+      isostasyMode: "off",
+      margin: { shelfWidthKm: 80, shelfDepthM: 130, slopeAngleDeg: 3.5 },
+      shieldVolcanoes: [],
+      riftValleys: [],
+    },
+    // Population page inputs (civilization parameters)
+    population: {
+      techEra: "Medieval",
+      initialPopulation: 1000,
+      growthRate: null,
+      timeElapsedYears: 500,
+      continentCount: 6,
+      regionCount: 10,
+      zipfExponent: 1.0,
+      oceanPctOverride: null,
+      habitablePctOverride: null,
+      productivePctOverride: null,
+      cropPctOverride: null,
+    },
+    // Climate page inputs
+    climate: { altitudeM: 0 },
   };
 }
 
@@ -546,6 +583,74 @@ function migrateWorld(world) {
       if (!inp) continue;
       if (inp.cmfPct === 32 || inp.cmfPct === 32.0) inp.cmfPct = -1;
     }
+  }
+
+  // v47: add tectonics page state
+  if (!world.tectonics || typeof world.tectonics !== "object") {
+    world.tectonics = {
+      ridgeHeightM: 2600,
+      mountainRanges: [
+        {
+          id: "mr1",
+          type: "andean",
+          label: "Range 1",
+          widths: {},
+          heights: {},
+          slabAngleDeg: 45,
+          convergenceMmYr: 50,
+        },
+      ],
+      inactiveRanges: [],
+      spreadingRateFraction: 0.5,
+      isostasyMode: "off",
+      margin: { shelfWidthKm: 80, shelfDepthM: 130, slopeAngleDeg: 3.5 },
+      shieldVolcanoes: [],
+      riftValleys: [],
+    };
+  }
+
+  // v48: expand tectonics state for Phase 2+3
+  if (world.tectonics) {
+    const t = world.tectonics;
+    if (t.spreadingRateFraction == null) t.spreadingRateFraction = 0.5;
+    if (!t.isostasyMode) t.isostasyMode = "off";
+    if (!t.margin) t.margin = { shelfWidthKm: 80, shelfDepthM: 130, slopeAngleDeg: 3.5 };
+    if (!Array.isArray(t.shieldVolcanoes)) t.shieldVolcanoes = [];
+    if (!Array.isArray(t.riftValleys)) t.riftValleys = [];
+    if (Array.isArray(t.mountainRanges)) {
+      for (const mr of t.mountainRanges) {
+        if (mr.slabAngleDeg == null) mr.slabAngleDeg = 45;
+      }
+    }
+  }
+
+  // v49: add convergenceMmYr to mountain ranges
+  if (world.tectonics && Array.isArray(world.tectonics.mountainRanges)) {
+    for (const mr of world.tectonics.mountainRanges) {
+      if (mr.convergenceMmYr == null) mr.convergenceMmYr = 50;
+    }
+  }
+
+  // v50: add population page state
+  if (!world.population || typeof world.population !== "object") {
+    world.population = {
+      techEra: "Medieval",
+      initialPopulation: 1000,
+      growthRate: null,
+      timeElapsedYears: 500,
+      continentCount: 6,
+      regionCount: 10,
+      zipfExponent: 1.0,
+      oceanPctOverride: null,
+      habitablePctOverride: null,
+      productivePctOverride: null,
+      cropPctOverride: null,
+    };
+  }
+
+  // v51: add climate page state
+  if (!world.climate || typeof world.climate !== "object") {
+    world.climate = { altitudeM: 0 };
   }
 
   canonicalizeSystemFeatures(world);

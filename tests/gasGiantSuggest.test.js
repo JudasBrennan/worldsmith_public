@@ -45,7 +45,7 @@ function makeGgCalc(overrides = {}) {
 
 // ── Sudarsky class mapping ───────────────────────────────────────
 
-test("Class I-ice Neptune-mass -> neptune family candidates", () => {
+test("suggestStyles → Class I-ice Neptune-mass → neptune family candidates", () => {
   const r = suggestStyles(
     makeGgCalc({ classification: { sudarsky: "I-ice" }, inputs: { massMjup: 0.054 } }),
   );
@@ -55,7 +55,7 @@ test("Class I-ice Neptune-mass -> neptune family candidates", () => {
   assert.ok(r.candidates.includes("neptune-classic"), "has neptune-classic");
 });
 
-test("Class I heavy (>1.0 Mjup) -> super-jupiter primary", () => {
+test("suggestStyles → Class I heavy (>1.0 Mjup) → super-jupiter primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -66,7 +66,7 @@ test("Class I heavy (>1.0 Mjup) -> super-jupiter primary", () => {
   assert.ok(r.candidates.includes("jupiter"), "has jupiter");
 });
 
-test("Class I mid-mass (0.5-1.0 Mjup) -> jupiter primary", () => {
+test("suggestStyles → Class I mid-mass (0.5–1.0 Mjup) → jupiter primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -78,7 +78,7 @@ test("Class I mid-mass (0.5-1.0 Mjup) -> jupiter primary", () => {
   assert.ok(r.candidates.includes("hazy"), "has hazy");
 });
 
-test("Class I light (<0.5 Mjup) -> saturn-like candidates", () => {
+test("suggestStyles → Class I light (<0.5 Mjup) → saturn-like candidates", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -90,7 +90,7 @@ test("Class I light (<0.5 Mjup) -> saturn-like candidates", () => {
   assert.ok(r.candidates.includes("hazy"), "has hazy");
 });
 
-test("Class I Saturn-mass + prominent rings keeps saturn primary", () => {
+test("suggestStyles → Class I Saturn-mass + Dense rings → saturn primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -103,7 +103,7 @@ test("Class I Saturn-mass + prominent rings keeps saturn primary", () => {
   assert.ok(r.candidates.includes("hazy"), "elevated metallicity still suggests hazy");
 });
 
-test("Class I high metallicity without prominent rings -> hazy primary", () => {
+test("suggestStyles → Class I high metallicity + Tenuous rings → hazy primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -116,7 +116,7 @@ test("Class I high metallicity without prominent rings -> hazy primary", () => {
   assert.ok(r.candidates.includes("saturn"), "still keeps saturn as candidate");
 });
 
-test("Class II -> water-cloud primary", () => {
+test("suggestStyles → Class II → water-cloud primary", () => {
   const r = suggestStyles(makeGgCalc({ classification: { sudarsky: "II" } }));
   assert.equal(r.primary, "water-cloud");
   assert.ok(r.candidates.includes("warm-giant"), "has warm-giant");
@@ -124,7 +124,7 @@ test("Class II -> water-cloud primary", () => {
   assert.ok(r.candidates.includes("hazy"), "has hazy");
 });
 
-test("Class III cold -> warm-giant primary", () => {
+test("suggestStyles → Class III cold → warm-giant primary", () => {
   const r = suggestStyles(
     makeGgCalc({ classification: { sudarsky: "III" }, thermal: { equilibriumTempK: 350 } }),
   );
@@ -133,7 +133,7 @@ test("Class III cold -> warm-giant primary", () => {
   assert.ok(r.candidates.includes("cloudless"), "has cloudless");
 });
 
-test("Class III hot -> cloudless primary", () => {
+test("suggestStyles → Class III hot → cloudless primary", () => {
   const r = suggestStyles(
     makeGgCalc({ classification: { sudarsky: "III" }, thermal: { equilibriumTempK: 600 } }),
   );
@@ -142,14 +142,14 @@ test("Class III hot -> cloudless primary", () => {
   assert.ok(r.candidates.includes("warm-giant"), "has warm-giant");
 });
 
-test("Class IV -> alkali primary", () => {
+test("suggestStyles → Class IV → alkali primary", () => {
   const r = suggestStyles(makeGgCalc({ classification: { sudarsky: "IV" } }));
   assert.equal(r.primary, "alkali");
   assert.ok(r.candidates.includes("hot-jupiter"), "has hot-jupiter");
   assert.ok(r.candidates.includes("cloudless"), "has cloudless");
 });
 
-test("Class V default -> silicate primary", () => {
+test("suggestStyles → Class V default → silicate primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "V" },
@@ -160,7 +160,7 @@ test("Class V default -> silicate primary", () => {
   assert.ok(r.candidates.includes("hot-jupiter"), "has hot-jupiter");
 });
 
-test("Class V ultra-hot (>1800K) -> hot-jupiter primary", () => {
+test("suggestStyles → Class V ultra-hot (>1800 K) → hot-jupiter primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "V" },
@@ -173,7 +173,7 @@ test("Class V ultra-hot (>1800K) -> hot-jupiter primary", () => {
 
 // ── Structural invariants ────────────────────────────────────────
 
-test("primary is always first in candidates array", () => {
+test("suggestStyles → any class → primary is first in candidates", () => {
   const classes = ["I-ice", "I", "II", "III", "IV", "V"];
   for (const cls of classes) {
     const r = suggestStyles(makeGgCalc({ classification: { sudarsky: cls } }));
@@ -181,7 +181,7 @@ test("primary is always first in candidates array", () => {
   }
 });
 
-test("candidates length is between 2 and 5", () => {
+test("suggestStyles → any class → candidates length 2–5", () => {
   const classes = ["I-ice", "I", "II", "III", "IV", "V"];
   for (const cls of classes) {
     const r = suggestStyles(makeGgCalc({ classification: { sudarsky: cls } }));
@@ -196,7 +196,7 @@ test("candidates length is between 2 and 5", () => {
   }
 });
 
-test("no fantastical styles appear in candidates", () => {
+test("suggestStyles → any class → no fantastical styles in candidates", () => {
   const classes = ["I-ice", "I", "II", "III", "IV", "V"];
   for (const cls of classes) {
     const r = suggestStyles(makeGgCalc({ classification: { sudarsky: cls } }));
@@ -206,7 +206,7 @@ test("no fantastical styles appear in candidates", () => {
   }
 });
 
-test("candidates contain no duplicates", () => {
+test("suggestStyles → any class → no duplicate candidates", () => {
   const classes = ["I-ice", "I", "II", "III", "IV", "V"];
   for (const cls of classes) {
     const r = suggestStyles(makeGgCalc({ classification: { sudarsky: cls } }));
@@ -216,7 +216,7 @@ test("candidates contain no duplicates", () => {
 
 // ── Modifiers ────────────────────────────────────────────────────
 
-test("puffy/inflated giant adds puffy candidate", () => {
+test("suggestStyles → inflated giant → puffy primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -227,7 +227,7 @@ test("puffy/inflated giant adds puffy candidate", () => {
   assert.ok(r.candidates.includes("puffy"), "inflated giant includes puffy");
 });
 
-test("non-inflated giant omits puffy candidate", () => {
+test("suggestStyles → non-inflated giant → omits puffy", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -237,7 +237,7 @@ test("non-inflated giant omits puffy candidate", () => {
   assert.ok(!r.candidates.includes("puffy"), "normal giant omits puffy");
 });
 
-test("high metallicity (>10x solar) adds sub-neptune for Class I", () => {
+test("suggestStyles → Class I + high metallicity → adds sub-neptune", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -247,7 +247,7 @@ test("high metallicity (>10x solar) adds sub-neptune for Class I", () => {
   assert.ok(r.candidates.includes("sub-neptune"), "high metallicity adds sub-neptune");
 });
 
-test("Class I-ice very small mass -> sub-neptune primary", () => {
+test("suggestStyles → Class I-ice very small mass → sub-neptune primary", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I-ice" },
@@ -258,7 +258,7 @@ test("Class I-ice very small mass -> sub-neptune primary", () => {
   assert.ok(r.candidates.includes("sub-neptune"), "has sub-neptune");
 });
 
-test("low metallicity omits sub-neptune", () => {
+test("suggestStyles → Class I + low metallicity → omits sub-neptune", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -268,7 +268,7 @@ test("low metallicity omits sub-neptune", () => {
   assert.ok(!r.candidates.includes("sub-neptune"), "low metallicity omits sub-neptune");
 });
 
-test("ringed ice giant adds ringed-ice when ring depth is Dense", () => {
+test("suggestStyles → ice giant + Dense rings → adds ringed-ice", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I-ice" },
@@ -278,7 +278,7 @@ test("ringed ice giant adds ringed-ice when ring depth is Dense", () => {
   assert.ok(r.candidates.includes("ringed-ice"), "Dense rings add ringed-ice");
 });
 
-test("ringed ice giant adds ringed-ice when ring depth is Moderate", () => {
+test("suggestStyles → ice giant + Moderate rings → adds ringed-ice", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I-ice" },
@@ -288,7 +288,7 @@ test("ringed ice giant adds ringed-ice when ring depth is Moderate", () => {
   assert.ok(r.candidates.includes("ringed-ice"), "Moderate rings add ringed-ice");
 });
 
-test("Tenuous rings + small mass omit ringed-ice", () => {
+test("suggestStyles → Tenuous rings + small mass → omits ringed-ice", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I-ice" },
@@ -304,7 +304,7 @@ test("Tenuous rings + small mass omit ringed-ice", () => {
 
 // ── Helium giant modifier ────────────────────────────────────────
 
-test("helium-dominated atmosphere adds helium candidate", () => {
+test("suggestStyles → He >50% → adds helium candidate", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -314,7 +314,7 @@ test("helium-dominated atmosphere adds helium candidate", () => {
   assert.ok(r.candidates.includes("helium"), "He >50% adds helium");
 });
 
-test("normal helium fraction omits helium candidate", () => {
+test("suggestStyles → He <50% → omits helium candidate", () => {
   const r = suggestStyles(
     makeGgCalc({
       classification: { sudarsky: "I" },
@@ -326,13 +326,13 @@ test("normal helium fraction omits helium candidate", () => {
 
 // ── Null/missing input fallback ──────────────────────────────────
 
-test("null input -> safe fallback", () => {
+test("suggestStyles → null input → safe fallback to jupiter", () => {
   const r = suggestStyles(null);
   assert.equal(r.primary, "jupiter");
   assert.deepStrictEqual(r.candidates, ["jupiter", "saturn"]);
 });
 
-test("missing classification -> safe fallback", () => {
+test("suggestStyles → missing classification → safe fallback to jupiter", () => {
   const r = suggestStyles({});
   assert.equal(r.primary, "jupiter");
   assert.deepStrictEqual(r.candidates, ["jupiter", "saturn"]);

@@ -13,7 +13,7 @@ import {
 
 /* ── Style count & categories ──────────────────────────────────────── */
 
-test("all styles are Realistic", () => {
+test("GAS_GIANT_STYLES → all entries → category is Realistic", () => {
   assert.ok(
     GAS_GIANT_STYLES.length >= 17,
     `expected at least 17 styles, got ${GAS_GIANT_STYLES.length}`,
@@ -23,32 +23,32 @@ test("all styles are Realistic", () => {
   }
 });
 
-test("all style IDs are unique", () => {
+test("GAS_GIANT_STYLES → all IDs → unique", () => {
   const ids = GAS_GIANT_STYLES.map((s) => s.id);
   assert.equal(new Set(ids).size, ids.length);
 });
 
 /* ── getStyleById ──────────────────────────────────────────────────── */
 
-test("getStyleById returns jupiter for known id", () => {
+test("getStyleById → known id 'jupiter' → returns jupiter style", () => {
   const s = getStyleById("jupiter");
   assert.equal(s.id, "jupiter");
   assert.equal(s.label, "Jupiter-like");
 });
 
-test("getStyleById falls back to jupiter for unknown id", () => {
+test("getStyleById → unknown id → falls back to jupiter", () => {
   const s = getStyleById("nonexistent");
   assert.equal(s.id, "jupiter");
 });
 
-test("getStyleById resolves legacy aliases", () => {
+test("getStyleById → legacy aliases → resolves correctly", () => {
   assert.equal(getStyleById("ice").id, "neptune");
   assert.equal(getStyleById("hot").id, "hot-jupiter");
 });
 
 /* ── styleLabel ────────────────────────────────────────────────────── */
 
-test("styleLabel returns string for every style", () => {
+test("styleLabel → every style → non-empty string", () => {
   for (const s of GAS_GIANT_STYLES) {
     const label = styleLabel(s.id);
     assert.equal(typeof label, "string");
@@ -58,7 +58,7 @@ test("styleLabel returns string for every style", () => {
 
 /* ── gasStylePalette ───────────────────────────────────────────────── */
 
-test("gasStylePalette returns required keys for every style", () => {
+test("gasStylePalette → every style → has size, c1, c2, c3, ring", () => {
   for (const s of GAS_GIANT_STYLES) {
     const p = gasStylePalette(s.id);
     assert.ok(typeof p.size === "number" && p.size > 0, `${s.id} size > 0`);
@@ -69,7 +69,7 @@ test("gasStylePalette returns required keys for every style", () => {
   }
 });
 
-test("every style has a ringStyle with colour, gap, and width", () => {
+test("ringStyle → every style → has colour, gap, and width", () => {
   for (const s of GAS_GIANT_STYLES) {
     const def = getStyleById(s.id);
     assert.ok(def.ringStyle, `${s.id} should have ringStyle`);
@@ -84,20 +84,20 @@ test("every style has a ringStyle with colour, gap, and width", () => {
 
 /* ── normalizeStyleId ──────────────────────────────────────────────── */
 
-test("normalizeStyleId passes through known styles", () => {
+test("normalizeStyleId → known styles → passes through unchanged", () => {
   assert.equal(normalizeStyleId("jupiter"), "jupiter");
   assert.equal(normalizeStyleId("saturn"), "saturn");
   assert.equal(normalizeStyleId("neptune"), "neptune");
 });
 
-test("normalizeStyleId defaults to jupiter for null/undefined", () => {
+test("normalizeStyleId → null/undefined → defaults to jupiter", () => {
   assert.equal(normalizeStyleId(null), "jupiter");
   assert.equal(normalizeStyleId(undefined), "jupiter");
 });
 
 /* ── computeGasGiantVisualProfile ──────────────────────────────────── */
 
-test("computeGasGiantVisualProfile returns bodyType and styleId", () => {
+test("computeGasGiantVisualProfile → valid input → returns bodyType and styleId", () => {
   const profile = computeGasGiantVisualProfile({
     classification: { sudarsky: "I" },
     inputs: { massMjup: 1.0 },
@@ -111,7 +111,7 @@ test("computeGasGiantVisualProfile returns bodyType and styleId", () => {
   assert.ok(profile.styleId.length > 0);
 });
 
-test("computeGasGiantVisualProfile styleId matches suggestStyles primary", () => {
+test("computeGasGiantVisualProfile → Class IV input → matches suggestStyles primary", () => {
   const ggCalc = {
     classification: { sudarsky: "IV" },
     inputs: { massMjup: 1.0 },
@@ -126,19 +126,19 @@ test("computeGasGiantVisualProfile styleId matches suggestStyles primary", () =>
 
 /* ── GAS_GIANT_RECIPES structural validation ───────────────────────── */
 
-test("GAS_GIANT_RECIPES has at least 15 entries", () => {
+test("GAS_GIANT_RECIPES → count → at least 15 entries", () => {
   assert.ok(
     GAS_GIANT_RECIPES.length >= 15,
     `expected at least 15 recipes, got ${GAS_GIANT_RECIPES.length}`,
   );
 });
 
-test("all recipe IDs are unique", () => {
+test("GAS_GIANT_RECIPES → all IDs → unique", () => {
   const ids = GAS_GIANT_RECIPES.map((r) => r.id);
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("every recipe has required fields", () => {
+test("GAS_GIANT_RECIPES → every recipe → has required fields", () => {
   for (const r of GAS_GIANT_RECIPES) {
     assert.ok(typeof r.id === "string" && r.id.length > 0, `${r.id}: id`);
     assert.ok(typeof r.label === "string" && r.label.length > 0, `${r.id}: label`);
@@ -157,14 +157,14 @@ test("every recipe has required fields", () => {
   }
 });
 
-test("all recipe preview.styleId values are valid style IDs", () => {
+test("GAS_GIANT_RECIPES → preview.styleId → all valid style IDs", () => {
   const validIds = new Set(GAS_GIANT_STYLES.map((s) => s.id));
   for (const r of GAS_GIANT_RECIPES) {
     assert.ok(validIds.has(r.preview.styleId), `${r.id}: "${r.preview.styleId}" is a valid style`);
   }
 });
 
-test("recipes span at least 4 categories", () => {
+test("GAS_GIANT_RECIPES → categories → at least 4 distinct", () => {
   const cats = new Set(GAS_GIANT_RECIPES.map((r) => r.category));
   assert.ok(cats.size >= 4, `expected at least 4 categories, got ${cats.size}`);
   assert.ok(cats.has("Cold Giants"));

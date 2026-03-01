@@ -131,67 +131,67 @@ const MARS = {
    NASA reference values from references/*-factsheet.md
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: Earth density ≈ 5.514 g/cm³ (within 3%)", () => {
+test("NASA → Earth density → ~5.514 g/cm³ (within 3%)", () => {
   const p = calcPlanetExact(EARTH);
   assertPctWithin(p.derived.densityGcm3, 5.514, 3, "Earth density");
 });
 
-test("NASA: Earth radius ≈ 1.0 R⊕ (within 3%)", () => {
+test("NASA → Earth radius → ~1.0 R⊕ (within 3%)", () => {
   const p = calcPlanetExact(EARTH);
   assertPctWithin(p.derived.radiusEarth, 1.0, 3, "Earth radius");
 });
 
-test("NASA: Earth gravity ≈ 1.0 g (within 5%)", () => {
+test("NASA → Earth gravity → ~1.0 g (within 5%)", () => {
   const p = calcPlanetExact(EARTH);
   assertPctWithin(p.derived.gravityG, 1.0, 5, "Earth gravity");
 });
 
-test("NASA: Earth surface temp ≈ 288 K (within 3%)", () => {
+test("NASA → Earth surface temp → ~288 K (within 3%)", () => {
   const p = calcPlanetExact(EARTH);
   approxEqual(p.derived.surfaceTempK, 288, 10, "Earth surface temp");
 });
 
-test("NASA: Mercury density ≈ 5.429 g/cm³ (within 3%)", () => {
+test("NASA → Mercury density → ~5.429 g/cm³ (within 3%)", () => {
   const p = calcPlanetExact(MERCURY);
   assertPctWithin(p.derived.densityGcm3, 5.429, 3, "Mercury density");
 });
 
-test("NASA: Mercury radius ≈ 0.383 R⊕ (within 3%)", () => {
+test("NASA → Mercury radius → ~0.383 R⊕ (within 3%)", () => {
   const p = calcPlanetExact(MERCURY);
   assertPctWithin(p.derived.radiusEarth, 0.383, 3, "Mercury radius");
 });
 
-test("NASA: Mercury gravity ≈ 0.377 g (within 3%)", () => {
+test("NASA → Mercury gravity → ~0.377 g (within 3%)", () => {
   const p = calcPlanetExact(MERCURY);
   assertPctWithin(p.derived.gravityG, 0.377, 3, "Mercury gravity");
 });
 
-test("NASA: Venus density ≈ 5.243 g/cm³ (within 5%)", () => {
+test("NASA → Venus density → ~5.243 g/cm³ (within 5%)", () => {
   const p = calcPlanetExact(VENUS);
   assertPctWithin(p.derived.densityGcm3, 5.243, 5, "Venus density");
 });
 
-test("NASA: Venus radius ≈ 0.949 R⊕ (within 5%)", () => {
+test("NASA → Venus radius → ~0.949 R⊕ (within 5%)", () => {
   const p = calcPlanetExact(VENUS);
   assertPctWithin(p.derived.radiusEarth, 0.949, 5, "Venus radius");
 });
 
-test("NASA: Venus gravity ≈ 0.905 g (within 5%)", () => {
+test("NASA → Venus gravity → ~0.905 g (within 5%)", () => {
   const p = calcPlanetExact(VENUS);
   assertPctWithin(p.derived.gravityG, 0.905, 5, "Venus gravity");
 });
 
-test("NASA: Mars density ≈ 3.934 g/cm³ (within 3%)", () => {
+test("NASA → Mars density → ~3.934 g/cm³ (within 3%)", () => {
   const p = calcPlanetExact(MARS);
   assertPctWithin(p.derived.densityGcm3, 3.934, 3, "Mars density");
 });
 
-test("NASA: Mars radius ≈ 0.532 R⊕ (within 3%)", () => {
+test("NASA → Mars radius → ~0.532 R⊕ (within 3%)", () => {
   const p = calcPlanetExact(MARS);
   assertPctWithin(p.derived.radiusEarth, 0.532, 3, "Mars radius");
 });
 
-test("NASA: Mars gravity ≈ 0.378 g (within 3%)", () => {
+test("NASA → Mars gravity → ~0.378 g (within 3%)", () => {
   const p = calcPlanetExact(MARS);
   assertPctWithin(p.derived.gravityG, 0.378, 3, "Mars gravity");
 });
@@ -200,7 +200,7 @@ test("NASA: Mars gravity ≈ 0.378 g (within 3%)", () => {
    COMPOSITION CLASSES (Phase A)
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: Mercury (CMF=70%) classified as Mercury-like or Iron world", () => {
+test("NASA → Mercury CMF=70% → Mercury-like or Iron world", () => {
   const p = calcPlanetExact(MERCURY);
   assert.ok(
     ["Mercury-like", "Iron world"].includes(p.derived.compositionClass),
@@ -208,22 +208,22 @@ test("NASA: Mercury (CMF=70%) classified as Mercury-like or Iron world", () => {
   );
 });
 
-test("NASA: Venus (CMF=32%) classified as Earth-like", () => {
+test("NASA → Venus CMF=32% → Earth-like", () => {
   const p = calcPlanetExact(VENUS);
   assert.equal(p.derived.compositionClass, "Earth-like");
 });
 
-test("NASA: Earth (CMF=32%) classified as Earth-like", () => {
+test("NASA → Earth CMF=32% → Earth-like", () => {
   const p = calcPlanetExact(EARTH);
   assert.equal(p.derived.compositionClass, "Earth-like");
 });
 
-test("NASA: Mars (CMF=24%) classified as Mars-like", () => {
+test("NASA → Mars CMF=24% → Mars-like", () => {
   const p = calcPlanetExact(MARS);
   assert.equal(p.derived.compositionClass, "Mars-like");
 });
 
-test("NASA: all four inner planets are Dry (WMF=0)", () => {
+test("NASA → all inner planets WMF=0 → Dry", () => {
   for (const [name, cfg] of [
     ["Mercury", MERCURY],
     ["Venus", VENUS],
@@ -240,18 +240,18 @@ test("NASA: all four inner planets are Dry (WMF=0)", () => {
    CRF ≈ √CMF — validated against NASA/InSight measurements
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: Earth core radius fraction ≈ 0.547 (within 5%)", () => {
+test("NASA → Earth CRF → ~0.547 (within 5%)", () => {
   // NASA factsheet: core radius 3,485 km / mean radius 6,371 km = 0.547
   const p = calcPlanetExact(EARTH);
   assertPctWithin(p.derived.coreRadiusFraction, 0.547, 5, "Earth CRF");
 });
 
-test("NASA: Earth core radius ≈ 3,485 km (within 8%)", () => {
+test("NASA → Earth core radius → ~3485 km (within 8%)", () => {
   const p = calcPlanetExact(EARTH);
   assertPctWithin(p.derived.coreRadiusKm, 3485, 8, "Earth core radius km");
 });
 
-test("NASA: Mercury core radius fraction ≈ 0.85 (within 5%)", () => {
+test("NASA → Mercury CRF → ~0.85 (within 5%)", () => {
   // NASA factsheet: core radius ~2,074 km / mean radius 2,440 km ≈ 0.85
   const p = calcPlanetExact(MERCURY);
   assertPctWithin(p.derived.coreRadiusFraction, 0.85, 5, "Mercury CRF");
@@ -262,28 +262,28 @@ test("NASA: Mercury core radius fraction ≈ 0.85 (within 5%)", () => {
    Validated against observed planetary magnetic fields
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: Earth has active dipolar dynamo", () => {
+test("NASA → Earth dynamo → active dipolar, partially solidified", () => {
   const p = calcPlanetExact(EARTH);
   assert.ok(p.derived.dynamoActive, "Earth dynamo should be active");
   assert.equal(p.derived.fieldMorphology, "dipolar", "Earth field is dipolar");
   assert.equal(p.derived.coreState, "partially solidified", "Earth core is partially solidified");
 });
 
-test("NASA: Earth surface field ≈ 1× Earth (within 50%)", () => {
+test("NASA → Earth surface field → ~1× Earth (within 50%)", () => {
   // By construction the model is normalised to Earth ≈ 1.0,
   // but the exact value depends on the solidification boost factor
   const p = calcPlanetExact(EARTH);
   approxEqual(p.derived.surfaceFieldEarths, 1.0, 0.5, "Earth field strength");
 });
 
-test("NASA: Mercury has active dynamo (observed by MESSENGER)", () => {
+test("NASA → Mercury dynamo → active (MESSENGER)", () => {
   // Mercury has a weak but confirmed global magnetic field.
   // Our model: large CMF → active dynamo, but very slow rotation → multipolar → weak.
   const p = calcPlanetExact(MERCURY);
   assert.ok(p.derived.dynamoActive, "Mercury dynamo should be active");
 });
 
-test("NASA: Mercury field is much weaker than Earth (~1% observed)", () => {
+test("NASA → Mercury field strength → ~1% of Earth", () => {
   // NASA/MESSENGER: Mercury's field is ~0.7-1% of Earth's (~300 nT vs 30000 nT).
   // Model: multipolar (×0.1) + thin-shell suppression (sf≈1) gives ~0.8%.
   const p = calcPlanetExact(MERCURY);
@@ -297,12 +297,12 @@ test("NASA: Mercury field is much weaker than Earth (~1% observed)", () => {
   );
 });
 
-test("NASA: Mercury has multipolar field (slow rotator)", () => {
+test("NASA → Mercury field morphology → multipolar (slow rotator)", () => {
   const p = calcPlanetExact(MERCURY);
   assert.equal(p.derived.fieldMorphology, "multipolar", "Mercury is a very slow rotator");
 });
 
-test("NASA: Venus has no active dynamo (no observed global field)", () => {
+test("NASA → Venus dynamo → inactive, zero field", () => {
   // Venus has no observed global magnetic field. Rotation efficiency
   // (rotEff = 0.064) + multipolar (×0.05) reduces the field below the
   // 0.005 practical threshold → dynamo declared inactive.
@@ -312,7 +312,7 @@ test("NASA: Venus has no active dynamo (no observed global field)", () => {
   assert.equal(p.derived.fieldLabel, "None", "Venus field label should be None");
 });
 
-test("NASA: Mars has no active dynamo (dead by 4.6 Gyr)", () => {
+test("NASA → Mars dynamo → inactive, core solidified", () => {
   // Mars had an early dynamo (crustal remnant magnetisation) but it
   // shut down ~4 Gyr ago.  Our model: small mass + low CMF → short
   // solidification timescale → core fully solidified.
@@ -327,7 +327,7 @@ test("NASA: Mars has no active dynamo (dead by 4.6 Gyr)", () => {
    Solar [Fe/H] = 0 should predict ~32–33% CMF (Earth-like)
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: suggested CMF from [Fe/H]=0 matches Earth's observed ~32%", () => {
+test("NASA → suggestedCmf [Fe/H]=0 → ~32%", () => {
   const p = calcPlanetExact(EARTH);
   approxEqual(p.derived.suggestedCmfPct, 32.5, 3, "Stellar CMF suggestion");
 });
@@ -337,7 +337,7 @@ test("NASA: suggested CMF from [Fe/H]=0 matches Earth's observed ~32%", () => {
    Mercury ≈ Earth > Venus >> Mars (NASA factsheets)
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: density ordering Mercury ≈ Earth > Venus >> Mars", () => {
+test("NASA → density ordering → Earth > Venus >> Mars", () => {
   const me = calcPlanetExact(MERCURY).derived.densityGcm3;
   const ve = calcPlanetExact(VENUS).derived.densityGcm3;
   const ea = calcPlanetExact(EARTH).derived.densityGcm3;
@@ -353,7 +353,7 @@ test("NASA: density ordering Mercury ≈ Earth > Venus >> Mars", () => {
    Venus < Earth, Mars < Mercury < Venus (by R⊕)
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: radius ordering Mercury < Mars < Venus < Earth", () => {
+test("NASA → radius ordering → Mercury < Mars < Venus < Earth", () => {
   // NASA: Mercury 2,440 km < Mars 3,390 km < Venus 6,052 km < Earth 6,371 km
   const me = calcPlanetExact(MERCURY).derived.radiusEarth;
   const ve = calcPlanetExact(VENUS).derived.radiusEarth;
@@ -371,7 +371,7 @@ test("NASA: radius ordering Mercury < Mars < Venus < Earth", () => {
    Earth and Mars are not tidally evolved.
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: Mercury is in 3:2 spin-orbit resonance", () => {
+test("NASA → Mercury tidal → 3:2 spin-orbit resonance", () => {
   const p = calcPlanetExact(MERCURY);
   assert.equal(p.derived.tidallyEvolved, true, "Mercury has tidally evolved");
   assert.equal(p.derived.spinOrbitResonance, "3:2", "Mercury should be in 3:2 resonance");
@@ -383,7 +383,7 @@ test("NASA: Mercury is in 3:2 spin-orbit resonance", () => {
   );
 });
 
-test("NASA: Venus atmosphere prevents tidal locking", () => {
+test("NASA → Venus atmosphere → prevents tidal locking", () => {
   const p = calcPlanetExact(VENUS);
   assert.equal(
     p.derived.atmospherePreventsLocking,
@@ -395,14 +395,14 @@ test("NASA: Venus atmosphere prevents tidal locking", () => {
   assert.equal(p.derived.spinOrbitResonance, null, "Venus should have no resonance");
 });
 
-test("NASA: Earth is not tidally evolved", () => {
+test("NASA → Earth tidal → not evolved", () => {
   const p = calcPlanetExact(EARTH);
   assert.ok(!p.derived.tidallyLockedToStar, "Earth should not be tidally locked");
   assert.equal(p.derived.tidallyEvolved, false, "Earth should not be tidally evolved");
   assert.equal(p.derived.atmospherePreventsLocking, false);
 });
 
-test("NASA: Mars is not tidally evolved", () => {
+test("NASA → Mars tidal → not evolved", () => {
   const p = calcPlanetExact(MARS);
   assert.ok(!p.derived.tidallyLockedToStar, "Mars should not be tidally locked");
   assert.equal(p.derived.tidallyEvolved, false, "Mars should not be tidally evolved");
@@ -414,17 +414,17 @@ test("NASA: Mars is not tidally evolved", () => {
    Mars is marginal (often just inside outer limit).
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: Earth is in the habitable zone", () => {
+test("NASA → Earth HZ → inside", () => {
   const p = calcPlanetExact(EARTH);
   assert.ok(p.derived.inHabitableZone, "Earth should be in HZ");
 });
 
-test("NASA: Mercury is not in the habitable zone", () => {
+test("NASA → Mercury HZ → outside", () => {
   const p = calcPlanetExact(MERCURY);
   assert.ok(!p.derived.inHabitableZone, "Mercury should not be in HZ");
 });
 
-test("NASA: Venus is not in the habitable zone", () => {
+test("NASA → Venus HZ → outside", () => {
   const p = calcPlanetExact(VENUS);
   assert.ok(!p.derived.inHabitableZone, "Venus should not be in HZ");
 });
@@ -433,7 +433,7 @@ test("NASA: Venus is not in the habitable zone", () => {
    DISPLAY STRINGS — sanity checks
    ══════════════════════════════════════════════════════════════════ */
 
-test("NASA: all four planets produce valid display strings for new fields", () => {
+test("NASA → all four planets → valid display strings", () => {
   for (const [name, cfg] of [
     ["Mercury", MERCURY],
     ["Venus", VENUS],
@@ -454,7 +454,7 @@ test("NASA: all four planets produce valid display strings for new fields", () =
    REGRESSION: WMF=0 produces identical outputs to pre-overhaul
    ══════════════════════════════════════════════════════════════════ */
 
-test("regression: WMF=0 density/radius match WMF-unaware path exactly", () => {
+test("regression → WMF=0 → density/radius match WMF-unaware path", () => {
   // With WMF=0, the water inflation factor is 1.0 and all dry-planet
   // outputs must be identical to the pre-overhaul formula.
   const withWmf = calcPlanetExact({

@@ -11,14 +11,14 @@ const INPUTS = {
   randomSeed: 42,
 };
 
-test("local cluster generation is deterministic for a fixed seed", () => {
+test("calcLocalCluster → fixed seed → deterministic output", () => {
   const a = calcLocalCluster(INPUTS);
   const b = calcLocalCluster(INPUTS);
   assert.deepEqual(a.systems, b.systems);
   assert.deepEqual(a.systemCounts, b.systemCounts);
 });
 
-test("generated systems stay inside neighbourhood radius", () => {
+test("calcLocalCluster → all systems → inside neighbourhood radius", () => {
   const model = calcLocalCluster(INPUTS);
   const radius = model.inputs.neighbourhoodRadiusLy;
 
@@ -31,7 +31,7 @@ test("generated systems stay inside neighbourhood radius", () => {
   }
 });
 
-test("fixed-seed sample coordinates remain stable", () => {
+test("calcLocalCluster → fixed seed → sample coordinates stable", () => {
   const model = calcLocalCluster(INPUTS);
   const first = model.systems[1];
 
@@ -42,7 +42,7 @@ test("fixed-seed sample coordinates remain stable", () => {
 
 // --- Edge-case tests ---
 
-test("home system is always first and at origin", () => {
+test("calcLocalCluster → home system → first and at origin", () => {
   const model = calcLocalCluster(INPUTS);
   const home = model.systems[0];
   assert.equal(home.isHome, true);
@@ -52,7 +52,7 @@ test("home system is always first and at origin", () => {
   assert.equal(home.distanceLy, 0);
 });
 
-test("different seeds produce different system layouts", () => {
+test("calcLocalCluster → different seeds → different layouts", () => {
   const a = calcLocalCluster({ ...INPUTS, randomSeed: 1 });
   const b = calcLocalCluster({ ...INPUTS, randomSeed: 2 });
   const a1 = a.systems[1];
@@ -63,25 +63,25 @@ test("different seeds produce different system layouts", () => {
   );
 });
 
-test("location inside GHZ reports inHabitableZone true", () => {
+test("calcLocalCluster → location inside GHZ → inHabitableZone true", () => {
   // GHZ inner = 0.47 * galacticRadiusLy, outer = 0.6 * galacticRadiusLy
   const model = calcLocalCluster({ ...INPUTS, locationLy: 25000 }); // 25000/50000 = 0.5 — inside
   assert.equal(model.inHabitableZone, true);
 });
 
-test("location outside GHZ reports inHabitableZone false", () => {
+test("calcLocalCluster → location outside GHZ → inHabitableZone false", () => {
   const model = calcLocalCluster({ ...INPUTS, locationLy: 5000 }); // 5000/50000 = 0.1 — outside
   assert.equal(model.inHabitableZone, false);
 });
 
-test("zero density produces no stellar mass objects", () => {
+test("calcLocalCluster → zero density → no stellar mass objects", () => {
   const model = calcLocalCluster({ ...INPUTS, stellarDensityPerLy3: 0 });
   assert.equal(model.totalStellarMassObjects, 0);
   // Only home system should exist
   assert.equal(model.systems.length, 1);
 });
 
-test("normalizeLocalClusterInputs clamps galacticRadiusLy", () => {
+test("normalizeLocalClusterInputs → extreme galacticRadiusLy → clamped", () => {
   const norm = normalizeLocalClusterInputs({ galacticRadiusLy: 0 });
   assert.equal(norm.galacticRadiusLy, 1000);
 
@@ -89,18 +89,18 @@ test("normalizeLocalClusterInputs clamps galacticRadiusLy", () => {
   assert.equal(big.galacticRadiusLy, 1000000);
 });
 
-test("normalizeLocalClusterInputs clamps locationLy to galacticRadius", () => {
+test("normalizeLocalClusterInputs → locationLy > radius → clamped", () => {
   const norm = normalizeLocalClusterInputs({ galacticRadiusLy: 1000, locationLy: 9999 });
   assert.equal(norm.locationLy, 1000);
 });
 
-test("stellar row counts sum to totalStellarMassObjects", () => {
+test("stellarRows → sum of counts → equals totalStellarMassObjects", () => {
   const model = calcLocalCluster(INPUTS);
   const rowTotal = model.stellarRows.reduce((sum, row) => sum + row.count, 0);
   assert.equal(rowTotal, model.totalStellarMassObjects);
 });
 
-test("nearestSystems are sorted by distance ascending", () => {
+test("nearestSystems → all entries → sorted by distance ascending", () => {
   const model = calcLocalCluster(INPUTS);
   for (let i = 1; i < model.nearestSystems.length; i++) {
     assert.ok(
@@ -115,7 +115,7 @@ test("nearestSystems are sorted by distance ascending", () => {
 const VALID_MULT = new Set(["single", "binary", "triple", "quadruple"]);
 const MULT_SIZE = { single: 1, binary: 2, triple: 3, quadruple: 4 };
 
-test("home system has multiplicity single and one component", () => {
+test("multiplicity → home system → single with one component", () => {
   const model = calcLocalCluster(INPUTS);
   const home = model.systems[0];
   assert.equal(home.isHome, true);
@@ -125,7 +125,7 @@ test("home system has multiplicity single and one component", () => {
   assert.equal(home.components[0].objectClassKey, "HOME");
 });
 
-test("all neighbour systems have valid multiplicity and components", () => {
+test("multiplicity → all neighbours → valid type and component count", () => {
   const model = calcLocalCluster(INPUTS);
   for (const system of model.systems) {
     if (system.isHome) continue;
@@ -147,7 +147,7 @@ test("all neighbour systems have valid multiplicity and components", () => {
   }
 });
 
-test("different seeds produce different multiplicity distributions", () => {
+test("multiplicity → different seeds → different distributions", () => {
   const a = calcLocalCluster({ ...INPUTS, randomSeed: 1 });
   const b = calcLocalCluster({ ...INPUTS, randomSeed: 999 });
   // Compare only neighbour systems (skip home which is always single)
@@ -164,7 +164,7 @@ test("different seeds produce different multiplicity distributions", () => {
 
 // --- Scientific accuracy tests ---
 
-test("ghzProbability is in [0, 1]", () => {
+test("ghzProbability → various locations → in [0, 1]", () => {
   for (const locationLy of [0, 5000, 25000, 30000, 50000]) {
     const model = calcLocalCluster({ ...INPUTS, locationLy });
     assert.ok(
@@ -174,7 +174,7 @@ test("ghzProbability is in [0, 1]", () => {
   }
 });
 
-test("ghzProbability peaks near 53% of galactic radius", () => {
+test("ghzProbability → near 53% of galactic radius → peaks at 1.0", () => {
   const galacticRadiusLy = 50000;
   const peak = 0.53 * galacticRadiusLy; // 26500
   const atPeak = calcLocalCluster({ ...INPUTS, galacticRadiusLy, locationLy: peak });
@@ -185,7 +185,7 @@ test("ghzProbability peaks near 53% of galactic radius", () => {
   assert.ok(Math.abs(atPeak.ghzProbability - 1.0) < 1e-9, "ghzProbability at peak ≈ 1.0");
 });
 
-test("systemsOmitted is zero for small neighbourhood", () => {
+test("systemsOmitted → small neighbourhood → zero", () => {
   // With default inputs and small density the total is well under the 100 cap
   const model = calcLocalCluster({
     ...INPUTS,
@@ -195,7 +195,7 @@ test("systemsOmitted is zero for small neighbourhood", () => {
   assert.equal(model.systemsOmitted, 0);
 });
 
-test("systemsOmitted is positive when total exceeds 100", () => {
+test("systemsOmitted → total exceeds 100 → positive", () => {
   // High density / large radius should exceed the 99-neighbour cap
   const model = calcLocalCluster({
     ...INPUTS,
@@ -209,7 +209,7 @@ test("systemsOmitted is positive when total exceeds 100", () => {
   assert.equal(model.systemsOmitted, Math.max(0, model.systemCounts.total - 100));
 });
 
-test("class fractions sum to ~100% of rawStellarMassObjects", () => {
+test("classFractions → sum of counts → ~100% of rawStellarMassObjects", () => {
   const model = calcLocalCluster(INPUTS);
   // totalStellarMassObjects should be close to rawStellarMassObjects (within rounding)
   // Previous WS8 behaviour was 140%, now it should be ~100%
@@ -217,7 +217,7 @@ test("class fractions sum to ~100% of rawStellarMassObjects", () => {
   assert.ok(ratio >= 0.9 && ratio <= 1.1, `fraction sum ratio ${ratio} should be near 1.0`);
 });
 
-test("companion classes are never heavier than their primary", () => {
+test("companions → all systems → never heavier than primary", () => {
   const RANK = { O: 0, B: 1, A: 2, F: 3, G: 4, K: 5, M: 6, D: 7, LTY: 8, OTHER: 9 };
   const model = calcLocalCluster(INPUTS);
   for (const system of model.systems) {
@@ -234,7 +234,7 @@ test("companion classes are never heavier than their primary", () => {
   }
 });
 
-test("M-dwarf-dominated neighbourhood has lower binary fraction than FGK neighbourhood", () => {
+test("binaryFraction → M-dwarf-dominated → lower than FGK rate", () => {
   // High density, small radius: ~75% M dwarfs → lower multiplicity than FGK
   const mDwarfHeavy = calcLocalCluster({
     ...INPUTS,
@@ -249,7 +249,7 @@ test("M-dwarf-dominated neighbourhood has lower binary fraction than FGK neighbo
   );
 });
 
-test("disk z-scale is 1.0 for small radii", () => {
+test("diskZScale → small radius → 1.0 (no compression)", () => {
   // All generated z values should equal distanceLy * cos(phi) exactly — i.e. no compression
   const model = calcLocalCluster({ ...INPUTS, neighbourhoodRadiusLy: 12 });
   for (const system of model.systems) {
@@ -264,7 +264,7 @@ test("disk z-scale is 1.0 for small radii", () => {
 
 // ── Metallicity tests ─────────────────────────────────────────────────
 
-test("all generated systems have a finite metallicityFeH", () => {
+test("metallicityFeH → all systems → finite value", () => {
   const model = calcLocalCluster(INPUTS);
   for (const system of model.systems) {
     assert.equal(
@@ -275,7 +275,7 @@ test("all generated systems have a finite metallicityFeH", () => {
   }
 });
 
-test("metallicityFeH is deterministic for fixed seed", () => {
+test("metallicityFeH → fixed seed → deterministic", () => {
   const a = calcLocalCluster(INPUTS);
   const b = calcLocalCluster(INPUTS);
   for (let i = 0; i < a.systems.length; i++) {
@@ -287,7 +287,7 @@ test("metallicityFeH is deterministic for fixed seed", () => {
   }
 });
 
-test("different seeds produce different metallicity distributions", () => {
+test("metallicityFeH → different seeds → different distributions", () => {
   const a = calcLocalCluster({ ...INPUTS, randomSeed: 1 });
   const b = calcLocalCluster({ ...INPUTS, randomSeed: 999 });
   const aFeH = a.systems
@@ -301,7 +301,7 @@ test("different seeds produce different metallicity distributions", () => {
   assert.notEqual(aFeH, bFeH, "different seeds should produce different metallicities");
 });
 
-test("metallicityFeH values are within physical range [-3, 0.5]", () => {
+test("metallicityFeH → all systems → within [-3, 0.5]", () => {
   const model = calcLocalCluster(INPUTS);
   for (const system of model.systems) {
     assert.ok(
@@ -311,19 +311,19 @@ test("metallicityFeH values are within physical range [-3, 0.5]", () => {
   }
 });
 
-test("home system uses provided homeMetallicityFeH", () => {
+test("metallicityFeH → homeMetallicityFeH provided → uses it", () => {
   const model = calcLocalCluster({ ...INPUTS, homeMetallicityFeH: -0.15 });
   const home = model.systems[0];
   assert.equal(home.metallicityFeH, -0.15, "home system should use provided metallicity");
 });
 
-test("home system defaults to [Fe/H] = 0 when not provided", () => {
+test("metallicityFeH → homeMetallicityFeH omitted → defaults to 0", () => {
   const model = calcLocalCluster(INPUTS);
   const home = model.systems[0];
   assert.equal(home.metallicityFeH, 0, "home system defaults to solar metallicity");
 });
 
-test("solar neighbourhood mean metallicity is near -0.05 dex", () => {
+test("metallicityFeH → solar neighbourhood → mean near -0.05 dex", () => {
   const model = calcLocalCluster({
     ...INPUTS,
     locationLy: 25800,
@@ -338,7 +338,7 @@ test("solar neighbourhood mean metallicity is near -0.05 dex", () => {
   );
 });
 
-test("inner disk location produces higher mean metallicity than outer disk", () => {
+test("metallicityFeH → inner vs outer disk → inner mean higher", () => {
   const inner = calcLocalCluster({ ...INPUTS, locationLy: 15000 });
   const outer = calcLocalCluster({ ...INPUTS, locationLy: 40000 });
   const avg = (systems) => {

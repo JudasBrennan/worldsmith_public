@@ -34,12 +34,12 @@ const TIP_LABEL = {
     "Star apparent magnitude/brightness/size as seen from each body orbit in the current system.",
   "Body apparent table":
     "Planetary object visibility from the selected home world. Phase functions vary by body " +
-    "type (WS8 types 1-4). Planet Bond albedo is auto-converted to geometric albedo via an " +
+    "type (types 1\u20134). Bond albedo is auto-converted to geometric albedo via an " +
     "approximate phase integral. Star luminosity scales planet brightness via a " +
     "-2.5 log10(L) correction. Phase angles above 160\u00b0 are flagged as too " +
-    "extreme to observe (WS8 convention). You can override current distance per object.",
+    "extreme to observe. Distance per object can be overridden.",
   "Body type":
-    "Phase function classification from WS8. " +
+    "Phase function classification. " +
     "Type 1 (Rocky, airless): Bowell HG system, G=0.28. " +
     "Type 2 (Rocky w/ atmosphere): empirical polynomial. " +
     "Type 3 (Gas giant, R \u2265 1.5 R\u2295): piecewise polynomial with opposition surge. " +
@@ -48,11 +48,9 @@ const TIP_LABEL = {
     "Moon apparent outputs from the selected home world. " +
     "All moons assigned to the home world are shown automatically.",
   "Moon absolute magnitude":
-    "Deviation from WorldSmith 8 spreadsheet: WS8 has no moon apparent-magnitude page, so " +
-    "this calculation is web-only. The host star's luminosity is included via a -2.5\u00b7log10(L) " +
-    "correction (implemented as dividing by \u221aL inside the log argument). This scales the moon's " +
-    "absolute magnitude for the brightness of the host star \u2014 brighter stars illuminate moons " +
-    "more strongly, making them appear brighter from the home world.",
+    "Moon absolute magnitude includes a -2.5\u00b7log10(L) correction for the host star\u2019s " +
+    "luminosity (implemented as dividing by \u221aL inside the log argument). Brighter stars " +
+    "illuminate moons more strongly, making them appear brighter from the home world.",
   "Angular diameter":
     "Apparent angular size of the object as seen from the home world. " +
     "Shown in degrees (\u00b0) for very large objects, arcminutes (\u2032) for medium, " +
@@ -70,6 +68,24 @@ const TIP_LABEL = {
     "and planets at full scale on the right.\n\n" +
     "Very small objects are enlarged on a logarithmic scale so their " +
     "relative size differences remain visible.",
+  "Star absolute magnitude":
+    "Absolute visual magnitude of the host star (magnitude at 10 pc).\n\n" +
+    "Lower values = brighter. The Sun is +4.83 M.",
+  "Home orbit":
+    "Orbital distance of the selected home world from the host star in AU.\n\n" +
+    "All apparent magnitudes and angular sizes are computed from this distance.",
+  "Home star magnitude":
+    "Apparent visual magnitude of the host star as seen from the home world.\n\n" +
+    "The Sun from Earth is \u22122.74 mag.",
+  "Brightest object":
+    "The planet or gas giant with the lowest (brightest) apparent magnitude " +
+    "as seen from the home world at the current phase.",
+  "Brightest moon":
+    "The moon with the lowest (brightest) apparent magnitude as seen from " +
+    "the home world at the selected moon phase angle.",
+  "Moon count":
+    "Total number of moons assigned to the home world.\n\n" +
+    "Moons are assigned on the Moons page.",
 };
 
 function gasGiantAlbedo(style) {
@@ -528,7 +544,7 @@ export function initApparentPage(mountEl) {
         (item) => `
       <div class="kpi-wrap">
         <div class="kpi">
-          <div class="kpi__label">${item.label}</div>
+          <div class="kpi__label">${item.label} ${tipIcon(TIP_LABEL[item.label] || "")}</div>
           <div class="kpi__value">${item.value}</div>
           <div class="kpi__meta">${item.meta}</div>
         </div>

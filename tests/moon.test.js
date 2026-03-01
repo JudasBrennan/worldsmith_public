@@ -39,60 +39,60 @@ const BASE = {
   moon: EARTH_MOON,
 };
 
-test("Earth-Moon sidereal period is approximately 27.3 days", () => {
+test("calcMoonExact → Earth-Moon → sidereal period ~27.3 days", () => {
   const m = calcMoonExact(BASE);
   approxEqual(m.orbit.orbitalPeriodSiderealDays, 27.32, 0.5, "sidereal period");
 });
 
-test("Earth-Moon synodic period is approximately 29.5 days", () => {
+test("calcMoonExact → Earth-Moon → synodic period ~29.5 days", () => {
   const m = calcMoonExact(BASE);
   approxEqual(m.orbit.orbitalPeriodSynodicDays, 29.5, 1, "synodic period");
 });
 
-test("Moon is tidally locked to Earth (within 4.6 Gyr)", () => {
+test("calcMoonExact → Earth-Moon → Moon tidally locked", () => {
   const m = calcMoonExact(BASE);
   assert.equal(m.tides.moonLockedToPlanet, "Yes");
 });
 
-test("Earth is not tidally locked to Moon", () => {
+test("calcMoonExact → Earth-Moon → Earth not locked to Moon", () => {
   const m = calcMoonExact(BASE);
   assert.match(m.tides.planetLockedToMoon, /Maybe/);
 });
 
-test("prograde inclination gives Prograde orbital direction", () => {
+test("calcMoonExact → prograde inclination → Prograde direction", () => {
   const m = calcMoonExact(BASE);
   assert.equal(m.orbit.orbitalDirection, "Prograde");
 });
 
-test("retrograde inclination (> 90°) gives Retrograde direction", () => {
+test("calcMoonExact → retrograde inclination >90° → Retrograde direction", () => {
   const m = calcMoonExact({ ...BASE, moon: { ...EARTH_MOON, inclinationDeg: 120 } });
   assert.equal(m.orbit.orbitalDirection, "Retrograde");
 });
 
-test("exactly 90° inclination gives Undefined direction", () => {
+test("calcMoonExact → inclination 90° → Undefined direction", () => {
   const m = calcMoonExact({ ...BASE, moon: { ...EARTH_MOON, inclinationDeg: 90 } });
   assert.equal(m.orbit.orbitalDirection, "Undefined");
 });
 
-test("Moon tidal contribution is dominant (>50% for Earth-Moon)", () => {
+test("calcMoonExact → Earth-Moon → tidal contribution >50%", () => {
   const m = calcMoonExact(BASE);
   assert.ok(m.tides.moonContributionPct > 50, "Moon should dominate tides");
 });
 
-test("moon zone inner < semi-major axis < outer", () => {
+test("calcMoonExact → Earth-Moon → zone inner < SMA < outer", () => {
   const m = calcMoonExact(BASE);
   assert.ok(m.orbit.moonZoneInnerKm < m.inputs.semiMajorAxisKm);
   assert.ok(m.inputs.semiMajorAxisKm < m.orbit.moonZoneOuterKm);
 });
 
-test("moon physical properties are positive finite numbers", () => {
+test("calcMoonExact → Earth-Moon → physical properties positive finite", () => {
   const m = calcMoonExact(BASE);
   assert.ok(Number.isFinite(m.physical.radiusMoon) && m.physical.radiusMoon > 0);
   assert.ok(Number.isFinite(m.physical.gravityG) && m.physical.gravityG > 0);
   assert.ok(Number.isFinite(m.physical.escapeVelocityKmS) && m.physical.escapeVelocityKmS > 0);
 });
 
-test("moon semi-major axis guard fires when input is below inner zone", () => {
+test("calcMoonExact → SMA below inner zone → guard fires", () => {
   // Use a tiny orbit that would be inside the Roche limit
   const m = calcMoonExact({ ...BASE, moon: { ...EARTH_MOON, semiMajorAxisKm: 1000 } });
   assert.equal(m.orbit.semiMajorAxisGuard, "raised_to_avoid_collision");
@@ -124,7 +124,7 @@ const IO_MOON = {
   inclinationDeg: 0.05,
 };
 
-test("parentOverride: Io-like moon around Jupiter has reasonable sidereal period", () => {
+test("parentOverride → Io around Jupiter → sidereal period ~1.77 days", () => {
   const m = calcMoonExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -135,7 +135,7 @@ test("parentOverride: Io-like moon around Jupiter has reasonable sidereal period
   approxEqual(m.orbit.orbitalPeriodSiderealDays, 1.77, 0.3, "Io sidereal period");
 });
 
-test("parentOverride: moon zones are much larger for Jupiter than Earth", () => {
+test("parentOverride → Jupiter → moon zones much larger than Earth", () => {
   const m = calcMoonExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -147,7 +147,7 @@ test("parentOverride: moon zones are much larger for Jupiter than Earth", () => 
   assert.ok(m.orbit.moonZoneInnerKm > 0, "Jupiter moon zone inner should be positive");
 });
 
-test("parentOverride: all outputs are finite", () => {
+test("parentOverride → Io around Jupiter → all outputs finite", () => {
   const m = calcMoonExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -163,7 +163,7 @@ test("parentOverride: all outputs are finite", () => {
 
 // ── Composition from density ──
 
-test("compositionFromDensity classifies all density brackets", () => {
+test("compositionFromDensity → each density bracket → correct class", () => {
   assert.equal(compositionFromDensity(5.5).compositionClass, "Iron-rich");
   assert.equal(compositionFromDensity(3.53).compositionClass, "Rocky");
   assert.equal(compositionFromDensity(3.01).compositionClass, "Mixed rock/ice");
@@ -171,7 +171,7 @@ test("compositionFromDensity classifies all density brackets", () => {
   assert.equal(compositionFromDensity(0.7).compositionClass, "Very icy");
 });
 
-test("composition: rigidity interpolates smoothly (non-decreasing)", () => {
+test("compositionFromDensity → density sweep → rigidity non-decreasing", () => {
   let prev = compositionFromDensity(0.5).mu;
   for (let rho = 0.6; rho <= 8.0; rho += 0.1) {
     const { mu } = compositionFromDensity(rho);
@@ -194,7 +194,7 @@ const EUROPA_MOON = {
   inclinationDeg: 0.466,
 };
 
-test("Io tidal heating is ~10^14 W (order of magnitude)", () => {
+test("tidalHeating → Io → ~10^14 W order of magnitude", () => {
   const m = calcMoonExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -205,7 +205,7 @@ test("Io tidal heating is ~10^14 W (order of magnitude)", () => {
   assert.ok(m.tides.tidalHeatingW < 1e15, `Io heating ${m.tides.tidalHeatingW} should be <1e15 W`);
 });
 
-test("Io surface heat flux is in the right order of magnitude", () => {
+test("tidalHeating → Io surface flux → correct order of magnitude", () => {
   // Equilibrium formula gives ~0.3 W/m²; observed ~2 W/m² is enhanced
   // by the Laplace resonance (partially molten interior lowers Q).
   const m = calcMoonExact({
@@ -218,7 +218,7 @@ test("Io surface heat flux is in the right order of magnitude", () => {
   assert.ok(m.tides.tidalHeatingWm2 < 5, `Io flux ${m.tides.tidalHeatingWm2} should be <5`);
 });
 
-test("Europa tidal heating is lower than Io", () => {
+test("tidalHeating → Europa vs Io → Europa lower", () => {
   const io = calcMoonExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -235,7 +235,7 @@ test("Europa tidal heating is lower than Io", () => {
   assert.ok(europa.tides.tidalHeatingW > 0, "Europa heating should be positive");
 });
 
-test("Earth-Moon tidal heating is negligible", () => {
+test("tidalHeating → Earth-Moon → negligible", () => {
   const m = calcMoonExact(BASE);
   assert.ok(
     m.tides.tidalHeatingWm2 < 0.001,
@@ -250,7 +250,7 @@ test("zero eccentricity → zero tidal heating", () => {
 
 // ── Higher-order eccentricity ──
 
-test("high eccentricity (e=0.3) produces much more heating than e² truncation", () => {
+test("tidalHeating → high eccentricity e=0.3 → enhanced beyond e² truncation", () => {
   const m = calcMoonExact({
     ...BASE,
     moon: { ...EARTH_MOON, eccentricity: 0.3, inclinationDeg: 0 },
@@ -268,7 +268,7 @@ test("high eccentricity (e=0.3) produces much more heating than e² truncation",
 
 // ── Tidal recession ──
 
-test("Earth-Moon recession is approximately 3.8 cm/yr outward", () => {
+test("recession → Earth-Moon → ~3.8 cm/yr outward", () => {
   const m = calcMoonExact(BASE);
   assert.ok(m.tides.recessionCmYr > 1, `recession ${m.tides.recessionCmYr} should be >1 cm/yr`);
   assert.ok(m.tides.recessionCmYr < 10, `recession ${m.tides.recessionCmYr} should be <10 cm/yr`);
@@ -283,14 +283,14 @@ test("slow-spinning planet → inward recession (Phobos-like)", () => {
   assert.ok(m.tides.recessionCmYr < 0, "should migrate inward");
 });
 
-test("recession display string includes direction", () => {
+test("recession → Earth-Moon display → includes direction", () => {
   const m = calcMoonExact(BASE);
   assert.ok(m.display.recession.includes("outward"), `got: ${m.display.recession}`);
 });
 
 // ── Composition override ──
 
-test("compositionOverride 'Icy' on rocky-density moon uses icy Q", () => {
+test("compositionOverride → Icy on rocky-density moon → uses icy Q", () => {
   const auto = calcMoonExact(BASE);
   const icy = calcMoonExact({
     ...BASE,
@@ -311,7 +311,7 @@ test("compositionOverride null → falls back to density-derived", () => {
 
 // ── Calibrated composition classes ──
 
-test("compositionOverride 'Partially molten' uses μ=10 GPa, Q=10", () => {
+test("compositionOverride → Partially molten → μ=10 GPa, Q=10", () => {
   const m = calcMoonExact({
     ...BASE,
     moon: { ...EARTH_MOON, compositionOverride: "Partially molten" },
@@ -321,7 +321,7 @@ test("compositionOverride 'Partially molten' uses μ=10 GPa, Q=10", () => {
   approxEqual(m.tides.rigidityMoonGPa, 10, 0.01, "rigidity");
 });
 
-test("compositionOverride 'Subsurface ocean' uses μ=0.3 GPa, Q=2", () => {
+test("compositionOverride → Subsurface ocean → μ=0.3 GPa, Q=2", () => {
   const m = calcMoonExact({
     ...BASE,
     moon: { ...EARTH_MOON, compositionOverride: "Subsurface ocean" },
@@ -331,7 +331,7 @@ test("compositionOverride 'Subsurface ocean' uses μ=0.3 GPa, Q=2", () => {
   approxEqual(m.tides.rigidityMoonGPa, 0.3, 0.01, "rigidity");
 });
 
-test("Io with 'Partially molten' matches observed ~10^14 W", () => {
+test("compositionOverride → Io Partially molten → matches ~10^14 W", () => {
   const m = calcMoonExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -342,7 +342,7 @@ test("Io with 'Partially molten' matches observed ~10^14 W", () => {
   assert.ok(m.tides.tidalHeatingW < 2e14, `Io heating ${m.tides.tidalHeatingW} should be <2e14`);
 });
 
-test("Enceladus-like with 'Subsurface ocean' matches observed ~1.6e10 W", () => {
+test("compositionOverride → Enceladus Subsurface ocean → matches ~1.6e10 W", () => {
   const ENCELADUS_MOON = {
     massMoon: 0.001472,
     densityGcm3: 1.61,

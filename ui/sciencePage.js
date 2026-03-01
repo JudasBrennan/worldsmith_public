@@ -8,6 +8,7 @@ import {
 import { calcBodyAbsoluteMagnitude } from "../engine/apparent.js";
 import { computeFlareParams } from "../engine/stellarActivity.js";
 import { continuedFractionApproximants } from "../engine/calendar.js";
+import { maxPeakHeight, maxShieldHeight, airyRootDepth } from "../engine/tectonics.js";
 
 /* ── KaTeX lazy loader ──────────────────────────────────────── */
 
@@ -194,6 +195,74 @@ function buildStellarPhysics() {
   ].join("");
 }
 
+function buildStellarEvolution() {
+  return [
+    formula(
+      "Metallicity Conversion",
+      `<div class="sci-formula__eq">${eq("Z = Z_\\odot \\cdot 10^{[\\text{Fe/H}]}")}</div>
+      <p>Converts spectroscopic iron abundance to total metal mass fraction, where ${iq("Z_\\odot = 0.02")}.</p>
+      ${vars([
+        ["Z", "Total metal mass fraction"],
+        ["[\\text{Fe/H}]", "Iron abundance relative to Solar (dex), clamped to [&minus;3, +1]"],
+      ])}`,
+    ),
+
+    formula(
+      "ZAMS Luminosity",
+      `<div class="sci-formula__eq">${eq("L_{\\text{ZAMS}} = \\frac{a_0 M^{5.5} + a_1 M^{11}}{a_2 + M^3 + a_3 M^5 + a_4 M^7 + a_5 M^8 + a_6 M^{9.5}}")}</div>
+      <p>Rational polynomial fit to zero-age main-sequence luminosity. Each coefficient ${iq("a_i")} is itself a
+      polynomial in ${iq("\\zeta = \\log_{10}(Z/0.02)")}, encoding metallicity dependence.</p>
+      ${cite("Tout, Pols, Eggleton &amp; Han (1996), MNRAS 281, 257")}`,
+    ),
+
+    formula(
+      "ZAMS Radius",
+      `<div class="sci-formula__eq">${eq("R_{\\text{ZAMS}} = \\frac{a_0 M^{2.5} + a_1 M^{6.5} + a_2 M^{11} + a_3 M^{19} + a_4 M^{19.5}}{a_5 + a_6 M^2 + a_7 M^{8.5} + M^{18.5} + a_8 M^{19.5}}")}</div>
+      <p>Matching rational polynomial for ZAMS radius, with metallicity-dependent coefficients.</p>
+      ${cite("Tout et al. (1996), MNRAS 281, 257")}`,
+    ),
+
+    formula(
+      "Main-Sequence Lifetime",
+      `<div class="sci-formula__eq">${eq("t_{\\text{BGB}} = \\frac{a_0 + a_1 M^4 + a_2 M^{5.5} + M^7}{a_3 M^2 + a_4 M^7} \\;\\text{Myr}")}</div>
+      <div class="sci-formula__eq">${eq("t_{\\text{MS}} \\approx 0.95 \\, t_{\\text{BGB}}")}</div>
+      <p>Time from zero-age to the base of the giant branch. The main-sequence lifetime is
+      approximately 95% of this. Coefficients are polynomials in ${iq("\\zeta")}.</p>
+      ${cite("Hurley, Pols &amp; Tout (2000), MNRAS 315, 543 &mdash; eq. 4")}`,
+    ),
+
+    formula(
+      "Terminal MS Luminosity",
+      `<div class="sci-formula__eq">${eq("L_{\\text{TMS}} = \\frac{a_{11} M^3 + a_{12} M^4 + a_{13} M^{a_{16}+1.8}}{a_{14} + a_{15} M^5 + M^{a_{16}}}")}</div>
+      <p>Luminosity at the end of the main sequence (terminal-age). Anchors the evolved luminosity track.</p>
+      ${cite("Hurley et al. (2000) &mdash; eq. 8")}`,
+    ),
+
+    formula(
+      "Terminal MS Radius",
+      `<p>Piecewise fit: low-mass stars (${iq("M \\le a_{17}")}) and high-mass stars are computed
+      with different rational polynomials, smoothly interpolated across the boundary.</p>
+      ${cite("Hurley et al. (2000) &mdash; eq. 9")}`,
+    ),
+
+    formula(
+      "Evolved Luminosity &amp; Radius",
+      `<div class="sci-formula__eq">${eq("\\log(L/L_{\\text{ZAMS}}) = \\alpha_L \\tau + \\beta_L \\tau^\\eta + \\gamma \\tau^2")}</div>
+      <div class="sci-formula__eq">${eq("\\log(R/R_{\\text{ZAMS}}) = \\alpha_R \\tau + \\gamma_R \\tau^3")}</div>
+      ${vars([
+        ["\\tau", "Fractional age = age / t_MS (0 at ZAMS, 1 at TMS)"],
+        ["\\alpha_L,\\, \\alpha_R", "Evolution rates (Hurley eqs. 19&ndash;20)"],
+        ["\\beta_L", "Curvature term; mass-dependent (eq. 20)"],
+        ["\\eta", "10 (M &le; 1), 20 (M &ge; 1.1), interpolated between"],
+        ["\\gamma", "Chosen so L(1) = L_TMS exactly"],
+      ])}
+      <p>The parametric forms reproduce full stellar-evolution tracks from ZAMS to the terminal main sequence,
+      with smooth luminosity and radius growth that accelerates near turn-off.</p>
+      ${cite("Hurley, Pols &amp; Tout (2000), MNRAS 315, 543")}`,
+    ),
+  ].join("");
+}
+
 function buildPlanetaryPhysics() {
   return [
     formula(
@@ -330,6 +399,147 @@ function buildPlanetaryPhysics() {
           ["&lt; 3 h", "5 (very rapid)"],
         ],
       )}`,
+    ),
+  ].join("");
+}
+
+function buildGasGiantPhysics() {
+  return [
+    formula(
+      "Mass&ndash;Radius Relation",
+      `<p>Two-regime power law calibrated to Solar System giants:</p>
+      <div class="sci-formula__eq">${eq("R_\\oplus = \\begin{cases} 0.861\\,M_\\oplus^{\\,0.53} & M < 131.6\\,M_\\oplus \\\\ C_J\\,M_\\oplus^{\\,-0.044} & M \\ge 131.6\\,M_\\oplus \\end{cases}")}</div>
+      <p>The Neptunian regime has radius growing with mass; the Jovian regime has radius
+      <em>shrinking</em> due to degeneracy pressure. The boundary at 131.6 ${iq("M_\\oplus")}
+      (0.414 ${iq("M_J")}) enforces continuity. ${iq("C_J")} is derived from the boundary condition.</p>
+      ${cite("Chen &amp; Kipping (2017), ApJ 834, 17")}`,
+    ),
+
+    formula(
+      "Sudarsky Classification",
+      `<p>Temperature-based atmospheric classification with bond albedos:</p>
+      ${dataTable(
+        ["Class", "T<sub>eq</sub> (K)", "Cloud deck", "Albedo"],
+        [
+          ["I", "&le; 150", "NH&#8323; ice", "0.57"],
+          ["II", "150&ndash;250", "H&#8322;O", "0.81"],
+          ["III", "250&ndash;800", "Cloudless", "0.12"],
+          ["IV", "800&ndash;1400", "Alkali metals", "0.10"],
+          ["V", "&gt; 1400", "Silicate/iron", "0.55"],
+        ],
+      )}
+      <p>Ice giants (${iq("M < 0.15\\,M_J")}) at ${iq("T_{\\text{eq}} < 100")} K override to methane haze (albedo 0.3).</p>
+      ${cite("Sudarsky, Burrows &amp; Pinto (2000), ApJ 538, 885")}`,
+    ),
+
+    formula(
+      "Cloud Condensation Layers",
+      `<p>Species condense out of the atmosphere at characteristic temperatures:</p>
+      ${dataTable(
+        ["Species", "T<sub>cond</sub> (K)", "Pressure level"],
+        [
+          ["Iron (Fe)", "1800", "0.01 bar"],
+          ["Silicate (MgSiO&#8323;)", "1400", "0.1 bar"],
+          ["H&#8322;O", "300", "5 bar"],
+          ["NH&#8324;SH", "200", "2 bar"],
+          ["NH&#8323;", "150", "0.7 bar"],
+          ["CH&#8324; (ice giants)", "80", "1.5 bar"],
+        ],
+      )}
+      ${cite("Lodders &amp; Fegley (2002); Visscher, Moses &amp; Fegley (2010)")}`,
+    ),
+
+    formula(
+      "Atmospheric Metallicity",
+      `<div class="sci-formula__eq">${eq("\\log_{10}(Z/Z_\\odot) = 0.66 - 0.68\\,\\log_{10}(M/M_J)")}</div>
+      <p>Lower-mass giants are more metal-enriched. Jupiter &asymp; 4.6&times;, Saturn &asymp; 10&times;,
+      Neptune &asymp; 33&times; solar. Clamped to [1, 200] &times; solar.</p>
+      ${cite("Thorngren &amp; Fortney (2019), ApJL 874, L31")}`,
+    ),
+
+    formula(
+      "Internal Heat Ratio",
+      `<p>Ratio of total emitted flux to absorbed flux, interpolated by mass:</p>
+      ${dataTable(
+        ["Mass range", "Ratio", "Analogue"],
+        [
+          ["&lt; 0.05 M<sub>J</sub>", "1.06", "Uranus"],
+          ["0.1&ndash;0.2 M<sub>J</sub>", "2.6", "Neptune"],
+          ["0.2&ndash;0.5 M<sub>J</sub>", "2.6 &rarr; 1.67", "Saturn &rarr; Jupiter"],
+          ["0.5&ndash;1.5 M<sub>J</sub>", "1.67", "Jupiter"],
+        ],
+      )}
+      <p>Effective temperature: ${iq("T_{\\text{eff}} = (T_{\\text{eq}}^4 \\cdot \\text{IHR})^{1/4}")}.</p>`,
+    ),
+
+    formula(
+      "Magnetic Field",
+      `<div class="sci-formula__eq">${eq("B_{\\text{surf}} \\propto M^{1/3} \\cdot P_{\\text{rot}}^{-1/3}")}</div>
+      <p>Dipole moment scaling from convective dynamo theory. Jupiter reference:
+      ${iq("B_J = 4.28")} G, ${iq("P_J = 9.925")} h.</p>
+      <div class="sci-formula__eq">${eq("R_{\\text{mp}} = 75\\,R_p \\cdot (B/B_J)^{1/3} \\cdot (r/5.2)^{1/3}")}</div>
+      <p>Magnetopause standoff distance in planetary radii.</p>
+      ${cite("Christensen, Holzwarth &amp; Reiners (2009), Nature 457")}`,
+    ),
+
+    formula(
+      "Atmospheric Dynamics",
+      `<div class="sci-formula__eq">${eq("L_{\\text{Rh}} = \\pi\\sqrt{U/\\beta}, \\quad \\beta = 2\\Omega/R")}</div>
+      <div class="sci-formula__eq">${eq("N_{\\text{bands}} = \\pi R / L_{\\text{Rh}}")}</div>
+      <p>Wind speed baseline: ${iq("U = 150\\sqrt{T_{\\text{eff}}/125}")} m/s. Band count clamped to [2, 30].
+      Gas giants have prograde equatorial jets; ice giants have retrograde.</p>
+      ${cite("Rhines (1975), JFM 69; Vasavada &amp; Showman (2005)")}`,
+    ),
+
+    formula(
+      "Oblateness (Darwin&ndash;Radau)",
+      `<div class="sci-formula__eq">${eq("f = \\frac{2.5\\,q}{1 + 6.25\\,(1 - 1.5\\xi)^2}, \\quad q = \\frac{\\omega^2 R^3}{GM}")}</div>
+      ${vars([
+        ["f", "Geometric flattening (equatorial bulge)"],
+        ["q", "Rotation parameter"],
+        ["\\xi", "Normalised moment of inertia (Saturn 0.239, Jupiter 0.269)"],
+        ["J_2", "(2f &minus; q) / 3"],
+      ])}
+      <p>Equatorial radius: ${iq("R_{\\text{eq}} = R(1 + f/3)")}; polar: ${iq("R_{\\text{pol}} = R(1 - 2f/3)")}.</p>`,
+    ),
+
+    formula(
+      "XUV-Driven Mass Loss",
+      `<div class="sci-formula__eq">${eq("\\dot{M} = \\frac{\\varepsilon\\,\\pi\\,R_p^3\\,F_{\\text{XUV}}}{G\\,M_p}")}</div>
+      <div class="sci-formula__eq">${eq("F_{\\text{XUV}} = F_\\odot\\,L_\\star\\,(t/t_\\odot)^{-1.23}\\,/\\,r^2")}</div>
+      ${vars([
+        ["\\varepsilon", "Heating efficiency = 0.15"],
+        ["F_\\odot", "Solar XUV at 1 AU = 4.64 erg cm&sup2; s&sup1;"],
+        ["t_\\odot", "Solar age = 4.6 Gyr"],
+      ])}
+      <p>Roche lobe from Eggleton (1983): ${iq("R_L = 0.462\\,a\\,(M_p/3M_\\star)^{1/3}")}.</p>
+      ${cite("Ribas et al. (2005), ApJ 622; Eggleton (1983), ApJ 268")}`,
+    ),
+
+    formula(
+      "Heavy Element / Core Mass",
+      `<div class="sci-formula__eq">${eq("M_Z = 49.3\\,M_J^{\\,0.61}\\;M_\\oplus")}</div>
+      <p>Total heavy-element content from transit + RV constraints. Estimated core mass:
+      ${iq("M_{\\text{core}} = \\min(M_Z/2,\\; 25\\,M_\\oplus)")}.</p>
+      ${cite("Thorngren, Fortney, Murray-Clay &amp; Lopez (2016), ApJ 831, 64")}`,
+    ),
+
+    formula(
+      "Radius Inflation",
+      `<div class="sci-formula__eq">${eq("R_{\\text{inflated}} = R \\cdot \\left(1 + 0.1\\,(5/t)^{0.35}\\right)")}</div>
+      <p>Young giants are larger due to Kelvin-Helmholtz contraction. Hot Jupiters
+      (${iq("T_{\\text{eq}} > 1000")} K) receive an additional 0.1&ndash;0.3 ${iq("R_J")}
+      proximity bonus from stellar irradiation.</p>
+      ${cite("Fortney, Marley &amp; Barnes (2007), ApJ 659")}`,
+    ),
+
+    formula(
+      "Ring Properties",
+      `<p>Ring mass model with a Gaussian enhancement peaked at Saturn&rsquo;s mass:</p>
+      <div class="sci-formula__eq">${eq("M_{\\text{ring}} = 10^{12}\\sqrt{M_J} + 3{\\times}10^{19}\\,\\exp\\!\\left(-\\frac{(\\log M - \\log M_{\\text{Sat}})^2}{2\\sigma^2}\\right)\\;\\text{kg}")}</div>
+      <p>Optical depth: ${iq("\\tau = \\Sigma / 67")} kg/m&sup2; (Saturn B-ring reference).
+      Classification: dense (${iq("\\tau > 1")}), moderate (0.1&ndash;1), tenuous (${iq("\\tau \\le 0.1")}).
+      Ring composition: icy (${iq("T < 150")} K), mixed (150&ndash;300 K), rocky (&gt; 300 K).</p>`,
     ),
   ].join("");
 }
@@ -519,6 +729,38 @@ function buildOrbitalMechanics() {
       ])}
       <p>When the planet spins faster than the moon orbits (${iq("\\Omega_p > n")}), the planet&rsquo;s tidal bulge leads the moon and transfers angular momentum outward &mdash; the orbit expands (Earth&ndash;Moon: +3.8 cm/yr). When ${iq("\\Omega_p < n")}, angular momentum is lost and the moon spirals inward (Phobos).</p>
       ${cite("Leconte et al. (2010); constant-time-lag tidal model")}`,
+    ),
+  ].join("");
+}
+
+function buildLagrangePoints() {
+  return [
+    formula(
+      "Hill Sphere",
+      `<div class="sci-formula__eq">${eq("r_H = a \\left(\\frac{m}{3M_\\star}\\right)^{1/3}")}</div>
+      <p>Radius of gravitational dominance. Objects within the Hill sphere are bound to the body
+      rather than the star.</p>`,
+    ),
+
+    formula(
+      "L1 and L2",
+      `<div class="sci-formula__eq">${eq("L_1 = a - r_H, \\quad L_2 = a + r_H")}</div>
+      <p>Collinear Lagrange points on the star&ndash;body line, located at approximately one Hill radius
+      sunward (L1) and anti-sunward (L2) of the body.</p>`,
+    ),
+
+    formula(
+      "L3",
+      `<div class="sci-formula__eq">${eq("L_3 = a\\left(1 + \\frac{5m}{12M_\\star}\\right)")}</div>
+      <p>Located on the far side of the star, 180&deg; from the body. The mass-ratio correction is
+      negligible for planetary masses.</p>`,
+    ),
+
+    formula(
+      "L4 and L5 (Trojans)",
+      `<div class="sci-formula__eq">${eq("r = a, \\quad \\theta = \\theta_{\\text{body}} \\pm 60°")}</div>
+      <p>Equilateral triangle points leading (+60&deg;, L4) and trailing (&minus;60&deg;, L5) the body
+      in its orbit. Stable when ${iq("m/M_\\star < 1/25")}.</p>`,
     ),
   ].join("");
 }
@@ -725,6 +967,90 @@ function buildAtmosphereColour() {
   ].join("");
 }
 
+function buildClimateClassification() {
+  return [
+    formula(
+      "Temperature at Latitude",
+      `<div class="sci-formula__eq">${eq("T(\\phi) = T_{\\text{eq}} - G\\,\\sin^2\\phi")}</div>
+      <div class="sci-formula__eq">${eq("T_{\\text{eq}} = T_{\\text{global}} + G/3")}</div>
+      ${vars([
+        ["\\phi", "Latitude (radians)"],
+        ["T_{\\text{eq}}", "Equatorial mean temperature"],
+        ["G", "Equator-to-pole temperature gradient (K)"],
+      ])}`,
+    ),
+
+    formula(
+      "Equator&ndash;Pole Gradient",
+      `<div class="sci-formula__eq">${eq("G = \\frac{60}{1 + 0.8\\,P/\\sqrt{g}}")}</div>
+      <p>Higher surface pressure and lower gravity increase atmospheric heat redistribution,
+      reducing the gradient. ${iq("P")} in atm, ${iq("g")} in m/s&sup2;. Clamped to [1, 80] K.</p>`,
+    ),
+
+    formula(
+      "Seasonal Amplitude",
+      `<div class="sci-formula__eq">${eq("A = \\frac{15\\,\\sin\\phi \\cdot (\\varepsilon / 23.44°)}{1 + 0.3\\,P/\\sqrt{g}}\\;°\\text{C}")}</div>
+      <p>Peak-to-mean seasonal temperature swing at each latitude. Scales linearly with axial tilt
+      ${iq("\\varepsilon")} relative to Earth&rsquo;s 23.44&deg;; damped by atmospheric mass.</p>`,
+    ),
+
+    formula(
+      "Moisture Index",
+      `<p>Zonal model based on atmospheric circulation cells:</p>
+      ${dataTable(
+        ["Zone", "Base moisture"],
+        [
+          ["Hadley equatorial (lat &lt; 0.7&times;cell)", "0.9 &minus; 0.75&times;fraction"],
+          ["Hadley subsidence edge", "0.15"],
+          ["Ferrel warm-coast", "0.70"],
+          ["Ferrel cold-coast", "0.45"],
+          ["Ferrel general", "0.55"],
+          ["Polar", "0.20"],
+        ],
+      )}
+      <p>Scaled by water regime (0.1 for dry, 1.0 for ocean worlds) and surface H&#8322;O fraction.</p>`,
+    ),
+
+    formula(
+      "K&ouml;ppen Decision Tree",
+      `<p>Classification from warmest-month (${iq("T_w")}), coldest-month (${iq("T_c")}), and moisture index (${iq("m")}):</p>
+      ${dataTable(
+        ["Class", "Condition"],
+        [
+          ["EF (ice cap)", "T<sub>w</sub> &lt; 0 &deg;C"],
+          ["ET (tundra)", "0 &le; T<sub>w</sub> &lt; 10 &deg;C"],
+          ["BW (desert)", "m &lt; 0.25"],
+          ["BS (steppe)", "0.25 &le; m &lt; 0.45"],
+          ["Af (tropical wet)", "T<sub>c</sub> &ge; 18 &deg;C, m &ge; 0.75"],
+          ["Am (monsoon)", "T<sub>c</sub> &ge; 18 &deg;C, 0.55 &le; m &lt; 0.75"],
+          ["Aw (savanna)", "T<sub>c</sub> &ge; 18 &deg;C, m &lt; 0.55"],
+          ["D (continental)", "T<sub>c</sub> &lt; &minus;3 &deg;C, T<sub>w</sub> &ge; 10"],
+          ["C (temperate)", "Remainder with T<sub>w</sub> &ge; 10 &deg;C"],
+        ],
+      )}
+      <p>Temperature subtypes: a (T<sub>w</sub> &ge; 22), b (&ge; 15), c (default), d (T<sub>c</sub> &lt; &minus;38).</p>
+      ${cite("Köppen (1884); Peel, Finlayson &amp; McMahon (2007)")}`,
+    ),
+
+    formula(
+      "Tidally Locked Zones",
+      `<p>For synchronously rotating planets, three climate zones replace latitude bands:</p>
+      <div class="sci-formula__eq">${eq("T_{\\text{sub}} = T_g\\,(1 + 0.3 / (1 + 0.5P))")}</div>
+      <div class="sci-formula__eq">${eq("T_{\\text{term}} = T_g\\,(0.85 + 0.15\\,\\min(P/2,\\,1))")}</div>
+      <div class="sci-formula__eq">${eq("T_{\\text{anti}} = T_g\\,(0.5 + 0.3\\,\\min(P/2,\\,1))")}</div>
+      <p>Higher surface pressure (${iq("P")} in atm) increases heat redistribution, warming the terminator
+      and antistellar point while cooling the substellar point.</p>`,
+    ),
+
+    formula(
+      "Environmental Lapse Rate",
+      `<div class="sci-formula__eq">${eq("\\frac{dT}{dz} = -6.5\\;°\\text{C/km}")}</div>
+      <p>ISA standard tropospheric lapse rate, applied to altitude-adjusted temperatures for
+      elevated terrain. Used for all climate zone calculations.</p>`,
+    ),
+  ].join("");
+}
+
 function buildStellarActivity() {
   return [
     formula(
@@ -777,19 +1103,53 @@ function buildStellarActivity() {
       ${dataTable(
         ["Flare energy (erg)", "P(CME)"],
         [
-          ["&lt; 10&sup3;&sup1;", "0.2"],
-          ["10&sup3;&sup1; &ndash; 10&sup3;&sup2;", "0.5"],
-          ["10&sup3;&sup2; &ndash; 10&sup3;&sup3;", "0.8"],
-          ["&gt; 10&sup3;&sup3;", "0.95"],
+          ["&lt; 10&sup3;&sup2;", "0.005"],
+          ["10&sup3;&sup2; &ndash; 10&sup3;&sup3;", "0.12"],
+          ["10&sup3;&sup3; &ndash; 10&sup3;&sup4;", "0.4"],
+          ["&gt; 10&sup3;&sup4;", "0.75"],
         ],
       )}
-      ${cite("Yashiro et al. (2006) flare-CME association rates")}`,
+      <p>Base probability is modulated by a soft-suppression factor at high N&#8323;&#8322; and a saturation limiter
+      that prevents CME rate from exceeding the activity-cycle target.</p>
+      ${cite("Yashiro et al. (2006) flare-CME association rates; probabilities WorldSmith-calibrated")}`,
     ),
 
     formula(
       "CME Rate from Activity Cycle",
       `<div class="sci-formula__eq">${eq("\\text{rate} = 0.5 + 5.5t \\text{ CME/day}")}</div>
       <p>Linear interpolation from solar minimum (0.5/day) to maximum (6.0/day), ${iq("t \\in [0,1]")}.</p>`,
+    ),
+
+    formula(
+      "Flare Rate Reference Table (N&#8323;&#8322;)",
+      `<p>Flares per day above ${iq("10^{32}")} erg, binned by spectral class and stellar age:</p>
+      ${dataTable(
+        ["Spectral bin", "Old", "Mid", "Young", "&alpha;"],
+        [
+          ["FGK (T &ge; 3900 K)", "0.05", "0.25", "1.0", "1.8"],
+          ["Early M (3200&ndash;3900 K)", "0.5", "2.0", "8.0", "2.0"],
+          ["Late M (&lt; 3200 K)", "2.0", "8.0", "30.0", "2.2"],
+        ],
+      )}
+      <p>Age band boundaries differ by spectral type: FGK old &ge; 2 Gyr, early-M old &ge; 4 Gyr,
+      late-M old &ge; 6 Gyr. The power-law index ${iq("\\alpha")} steepens for cooler stars,
+      meaning their energy distribution is more bottom-heavy.</p>
+      ${cite("Günther et al. (2020) TESS superflare rates; binning WorldSmith")}`,
+    ),
+
+    formula(
+      "Flare Cycle Multiplier",
+      `<p>Flare rate is modulated by an 11-year-analogue activity cycle. At cycle phase ${iq("\\phi \\in [0,1]")}:</p>
+      ${dataTable(
+        ["Spectral bin", "Min (&phi;=0)", "Mid (&phi;=0.5)", "Max (&phi;=1)"],
+        [
+          ["FGK", "0.35", "1.0", "1.65"],
+          ["Early M", "0.6", "1.0", "1.4"],
+          ["Late M", "0.75", "1.0", "1.25"],
+        ],
+      )}
+      <p>Cooler stars have a smaller cycle amplitude, consistent with
+      observations that M-dwarf activity varies less over magnetic cycles.</p>`,
     ),
   ].join("");
 }
@@ -898,10 +1258,37 @@ function buildLocalCluster() {
     ),
 
     formula(
+      "Metallicity Gradient",
+      `<div class="sci-formula__eq">${eq("[\\text{Fe/H}] = [\\text{Fe/H}]_\\odot + \\Delta R \\cdot g_R + |z| \\cdot g_z + \\delta_{\\text{class}} + \\mathcal{N}(0,\\,\\sigma)")}</div>
+      ${vars([
+        ["g_R", "Radial gradient: &minus;0.06 dex/kpc (Luck &amp; Lambert 2011)"],
+        ["g_z", "Vertical gradient: &minus;0.30 dex/kpc (Schlesinger et al. 2014)"],
+        ["\\delta_{\\text{class}}", "Spectral-class shift (e.g. white dwarfs &minus;0.15 dex)"],
+        ["\\sigma", "Scatter &sigma; = 0.20 dex"],
+      ])}
+      <p>Clamped to [&minus;3.0,&thinsp;+0.5]. ${iq("\\Delta R")} is the radial offset from the solar galactocentric distance.</p>
+      ${cite("Luck &amp; Lambert (2011); Schlesinger et al. (2014)")}`,
+    ),
+
+    formula(
       "Multiplicity (Stars per System)",
       `<div class="sci-formula__eq">${eq("\\bar{n} = 1 + f_b + 2f_t + 3f_q")}</div>
       <p>Average stars per system from binary (${iq("f_b")}), triple (${iq("f_t")}), and quadruple (${iq("f_q")}) fractions, weighted by spectral class.</p>
-      ${cite("Duchene &amp; Kraus (2013) multiplicity survey")}`,
+      ${dataTable(
+        ["Class", "Binary", "Triple", "Quadruple"],
+        [
+          ["O", "0.70", "0.12", "0.05"],
+          ["B", "0.50", "0.09", "0.04"],
+          ["A", "0.45", "0.08", "0.03"],
+          ["F", "0.46", "0.08", "0.03"],
+          ["G", "0.46", "0.08", "0.03"],
+          ["K", "0.35", "0.05", "0.02"],
+          ["M", "0.27", "0.03", "0.01"],
+          ["WD", "0.25", "0.02", "0.005"],
+          ["L/T/Y", "0.15", "0.01", "0.003"],
+        ],
+      )}
+      ${cite("Duch&ecirc;ne &amp; Kraus (2013) multiplicity survey")}`,
     ),
 
     formula(
@@ -914,6 +1301,79 @@ function buildLocalCluster() {
       "Disk Z-Scale",
       `<div class="sci-formula__eq">${eq("z = \\max\\!\\left(0.15,\\; 1 - \\frac{R - 50}{1000}\\right) \\quad (R > 50 \\text{ ly})")}</div>
       <p>Galactic disk flattening for large neighbourhood radii. At 50 ly the neighbourhood is spherical; at 500 ly z &asymp; 0.55; floors at 0.15.</p>`,
+    ),
+  ].join("");
+}
+
+function buildPopulationDynamics() {
+  return [
+    formula(
+      "Ocean Fraction by Water Regime",
+      `${dataTable(
+        ["Water regime", "Ocean fraction"],
+        [
+          ["Dry", "0%"],
+          ["Shallow oceans", "50%"],
+          ["Extensive oceans", "71%"],
+          ["Global ocean", "90%"],
+          ["Deep ocean", "95%"],
+          ["Ice world", "0%"],
+        ],
+      )}
+      <p>Determines the land area available for settlement: ${iq("A_{\\text{land}} = 4\\pi R^2 \\cdot (1 - f_{\\text{ocean}})")}.</p>`,
+    ),
+
+    formula(
+      "Habitability Fraction",
+      `<p>Fraction of land area that is habitable, computed by latitude-weighted spherical area:</p>
+      <div class="sci-formula__eq">${eq("f_{\\text{hab}} = \\frac{\\sum_{\\text{habitable}} |\\sin\\phi_2 - \\sin\\phi_1|}{\\sum_{\\text{all}} |\\sin\\phi_2 - \\sin\\phi_1|}")}</div>
+      <p>K&ouml;ppen classes E (polar) and X (uninhabitable) are excluded.</p>`,
+    ),
+
+    formula(
+      "Carrying Capacity",
+      `<div class="sci-formula__eq">${eq("K = A \\cdot d \\cdot \\frac{1 + (C_e - 1)\\,f_c}{1 + (C_e - 1) \\cdot 0.77}")}</div>
+      ${vars([
+        ["A", "Habitable land area (km&sup2;)"],
+        ["d", "Tech-era population density (people/km&sup2;)"],
+        ["C_e", "Crop efficiency = 4&times; (crops feed more than livestock)"],
+        ["f_c", "Crop fraction; 0.77 = Earth reference"],
+      ])}
+      ${dataTable(
+        ["Era", "Density (km&sup2;)", "Growth (%/yr)"],
+        [
+          ["Hunter-Gatherer", "0.05", "0.5"],
+          ["Neolithic", "2", "0.8"],
+          ["Bronze Age", "8", "1.0"],
+          ["Iron Age", "15", "1.0"],
+          ["Medieval", "30", "1.0"],
+          ["Early Industrial", "80", "1.5"],
+          ["Industrial", "200", "2.0"],
+          ["Post-Industrial", "400", "0.5"],
+          ["Sci-Fi High", "1000", "0.3"],
+        ],
+      )}`,
+    ),
+
+    formula(
+      "Logistic Growth (Verhulst)",
+      `<div class="sci-formula__eq">${eq("P(t) = \\frac{K}{1 + \\frac{K - P_0}{P_0}\\,e^{-rt}}")}</div>
+      ${vars([
+        ["K", "Carrying capacity"],
+        ["P_0", "Initial population"],
+        ["r", "Growth rate (per year)"],
+        ["t", "Time (years)"],
+      ])}
+      <p>Doubling time: ${iq("t_d = \\ln 2 / r")}. Saturation: ${iq("P/K \\times 100\\%")}.</p>
+      ${cite("Verhulst (1838), Correspondance math&eacute;matique et physique")}`,
+    ),
+
+    formula(
+      "Zipf Rank&ndash;Size Distribution",
+      `<div class="sci-formula__eq">${eq("P(\\text{rank}) = \\frac{P(1)}{\\text{rank}^q}, \\quad P(1) = \\frac{P_{\\text{total}}}{H(n,q)}")}</div>
+      <p>${iq("H(n,q) = \\sum_{i=1}^{n} 1/i^q")} is the generalised harmonic number. The exponent
+      ${iq("q")} controls inequality: ${iq("q=1")} gives classic Zipf&rsquo;s law.</p>
+      ${cite("Zipf (1949), Human Behavior and the Principle of Least Effort")}`,
     ),
   ].join("");
 }
@@ -999,6 +1459,167 @@ function buildInteriorComposition() {
     ),
 
     formula(
+      "Composition Classification",
+      `<p>Planets are classified by core mass fraction (CMF) and water mass fraction (WMF):</p>
+      ${dataTable(
+        ["Class", "Condition"],
+        [
+          ["Ice world", "WMF &gt; 0.1"],
+          ["Ocean world", "WMF &gt; 0.001"],
+          ["Iron world", "CMF &gt; 0.6"],
+          ["Mercury-like", "CMF &gt; 0.45"],
+          ["Earth-like", "CMF &ge; 0.25"],
+          ["Mars-like", "CMF &ge; 0.1"],
+          ["Coreless", "CMF &lt; 0.1"],
+        ],
+      )}
+      <p>Water regime labels: Dry (&lt; 0.01%), Shallow oceans (&lt; 0.1%), Extensive (&lt; 1%),
+      Global ocean (&lt; 10%), Deep ocean (&lt; 30%), Ice world (&ge; 30%).</p>`,
+    ),
+
+    formula(
+      "Mantle Outgassing Oxidation States",
+      `<p>Volcanic gas composition depends on mantle oxygen fugacity:</p>
+      ${dataTable(
+        ["State", "&Delta;IW", "Primary gases"],
+        [
+          ["Highly reduced", "&minus;4", "H&#8322; + CO"],
+          ["Moderately reduced", "&minus;2", "H&#8322; + CO&#8322; (mixed)"],
+          ["Earth-like", "+1", "CO&#8322; + H&#8322;O"],
+          ["Oxidised", "+3", "CO&#8322; + H&#8322;O + SO&#8322;"],
+        ],
+      )}
+      <p>The iron-w&uuml;stite (IW) buffer sets the reference. Earth is approximately IW+1.</p>
+      ${cite("Ortenzi et al. (2020), Sci. Rep. 10, 10907")}`,
+    ),
+  ].join("");
+}
+
+function buildTectonicsScience() {
+  return [
+    formula(
+      "Maximum Mountain Height",
+      `<div class="sci-formula__eq">${eq("H_{\\max} = \\frac{\\sigma_y}{\\rho \\cdot g} \\approx \\frac{9{,}267}{g} \\text{ m}")}</div>
+      <p>Tallest mountain a planet&rsquo;s crust can support before compressive failure at the base. The yield strength of silicate rock (~100 MPa) sets an upper bound that scales inversely with surface gravity.</p>
+      ${vars([
+        ["\\sigma_y", "Compressive yield strength of silicate rock (~100 MPa)"],
+        ["\\rho", "Crustal rock density (~2,800 kg/m&sup3;)"],
+        ["g", "Surface gravity (relative to Earth, where g = 9.81 m/s&sup2;)"],
+      ])}
+      <p>Earth: 9,267 m (Everest 8,849 m). Mars at 0.38 g: 24,387 m (Olympus Mons 21,900 m base-to-peak).</p>
+      ${cite("Weisskopf, V. F. (1975), &ldquo;Of Atoms, Mountains, and Stars&rdquo;, Science 187, 605&ndash;612")}`,
+    ),
+
+    formula(
+      "Ocean Floor Subsidence (PSM Plate Model)",
+      `<p>Seafloor depth increases with crustal age as the lithosphere cools after formation at a mid-ocean ridge. Two regimes:</p>
+      <div class="sci-formula__eq">${eq("d = d_r + 350\\sqrt{t} \\quad (t \\le 20 \\text{ Myr}, \\; \\text{half-space})")}</div>
+      <div class="sci-formula__eq">${eq("d = 6{,}400 - 3{,}073\\,e^{-t/62.8} \\quad (t > 20 \\text{ Myr}, \\; \\text{plate model})")}</div>
+      ${vars([
+        ["d_r", "Mid-ocean ridge depth (default 2,600 m below sea level, GDH1)"],
+        ["t", "Crustal age (Myr)"],
+        ["350", "Subsidence rate coefficient (m/Myr&frac12;)"],
+        ["6{,}400", "Asymptotic ocean depth (m)"],
+        ["3{,}073", "Intersection amplitude (WS-modified from PSM&rsquo;s 3,200 m)"],
+        ["62.8", "Thermal time constant (Myr)"],
+      ])}
+      <p>Young crust (&lt;20 Myr) follows half-space cooling (${iq("\\sqrt{t}")} diffusion). Older crust flattens toward an asymptotic depth as basal heating from the mantle balances surface cooling.</p>
+      ${cite("Parsons, B. &amp; Sclater, J. G. (1977), JGR 82, 803. Stein, C. &amp; Stein, S. (1992), Nature 359 (GDH1 model).")}`,
+    ),
+
+    formula(
+      "Airy Isostatic Root Depth",
+      `<div class="sci-formula__eq">${eq("d_{\\text{root}} = h \\cdot \\frac{\\rho_c}{\\rho_m - \\rho_c}")}</div>
+      ${vars([
+        ["h", "Mountain elevation above datum (m)"],
+        ["\\rho_c", "Crustal density (2,800 kg/m&sup3;)"],
+        ["\\rho_m", "Mantle density (3,300 kg/m&sup3;)"],
+      ])}
+      <p>Mountains float on denser mantle like icebergs in water. The Airy model keeps density constant but varies crustal thickness: higher elevations require deeper roots. For Earth, every 1 km of elevation produces a 5.6 km root.</p>
+      ${cite("Turcotte, D. L. &amp; Schubert, G. (2014), Geodynamics, Ch. 2")}`,
+    ),
+
+    formula(
+      "Pratt Isostatic Compensation",
+      `<div class="sci-formula__eq">${eq("\\rho(h) = \\rho_0 \\cdot \\frac{D}{D + h}")}</div>
+      ${vars([
+        ["h", "Elevation above datum (m)"],
+        ["D", "Compensation depth (default 100 km)"],
+        ["\\rho_0", "Base crustal density (2,800 kg/m&sup3;)"],
+      ])}
+      <p>Alternative to the Airy model: crust has uniform thickness but variable density. Higher terrain is less dense. Both models satisfy the same hydrostatic equilibrium condition but imply different internal structures.</p>
+      ${cite("Turcotte, D. L. &amp; Schubert, G. (2014), Geodynamics, Ch. 2")}`,
+    ),
+
+    formula(
+      "Volcanic Arc Distance",
+      `<div class="sci-formula__eq">${eq("d_{\\text{arc}} = \\frac{h_{\\text{slab}}}{\\tan(\\theta)}")}</div>
+      ${vars([
+        ["h_{\\text{slab}}", "Depth to slab top beneath volcanic front (110 km global mean)"],
+        ["\\theta", "Subduction angle (10&ndash;90&deg;)"],
+      ])}
+      <p>The volcanic arc forms above the point where the descending slab reaches ~110 km depth, triggering partial melting due to dehydration of hydrous minerals. Shallow subduction (Laramide-style, ~15&deg;) pushes the arc hundreds of km inland; steep subduction (Andean, ~45&deg;) places it closer to the trench.</p>
+      ${cite("Syracuse, E. &amp; Abers, G. (2006), G&sup3;, 7 &mdash; global mean 105&plusmn;19 km")}`,
+    ),
+
+    formula(
+      "Linear Erosion",
+      `<div class="sci-formula__eq">${eq("H(t) = H_0 - \\varepsilon \\cdot t")}</div>
+      ${vars([
+        ["H_0", "Initial mountain height (m)"],
+        ["\\varepsilon", "Erosion rate (default 5 m/Myr)"],
+        ["t", "Elapsed time (Myr)"],
+      ])}
+      <p>Simple linear denudation. The global median outcrop erosion rate from cosmogenic nuclide measurements is ~5.4 m/Myr, though individual rates span 0.1&ndash;50+ m/Myr depending on lithology, climate, and tectonic uplift.</p>
+      ${cite("Cosmogenic nuclide compilation &mdash; global outcrop median 5.4 m/Myr")}`,
+    ),
+
+    formula(
+      "Spreading Rate Categories",
+      `<p>Seafloor spreading velocity at mid-ocean ridges, classified by tectonic regime:</p>
+      ${dataTable(
+        ["Regime", "Rate (mm/yr)", "Label"],
+        [
+          ["Mobile lid", "20&ndash;200", "Active spreading"],
+          ["Episodic overturn", "5&ndash;50", "Episodic spreading"],
+          ["Plutonic-squishy", "2&ndash;20", "Sluggish spreading"],
+          ["Stagnant lid", "0", "No spreading"],
+        ],
+      )}
+      <p>Earth&rsquo;s present full spreading rates range from ~10 mm/yr (ultraslow, Arctic Gakkel Ridge) to ~200 mm/yr (ultrafast, East Pacific Rise). Evidence from Dalton et al. (2022) suggests a global slowdown since 15 Ma.</p>
+      ${cite("Dalton, C. A. et al. (2022), GRL &mdash; global plate speed evolution since 200 Ma")}`,
+    ),
+
+    formula(
+      "Shield Volcano Height Scaling",
+      `<div class="sci-formula__eq">${eq("H_{\\text{shield}} = \\frac{10{,}000}{g} \\times f_{\\text{lid}}")}</div>
+      ${vars([
+        ["10{,}000", "Earth reference shield height (m), Mauna Kea base-to-peak"],
+        ["g", "Surface gravity (Earth = 1)"],
+        ["f_{\\text{lid}}", "Stagnant-lid factor: 1.5 if stagnant lid, 1.0 otherwise"],
+      ])}
+      <p>Shield volcano height scales inversely with gravity: lower gravity allows magma columns to build taller before the base yields. Stagnant-lid planets lack plate recycling, allowing persistent hotspot volcanism to build larger edifices.</p>
+      <p>Validation: Mars at 0.38 g with stagnant lid gives 39,474 m. Olympus Mons is 21,900 m base-to-peak (the model gives a theoretical maximum, not typical height).</p>
+      ${cite("McGovern, P. J. &amp; Solomon, S. C. (1993, 1998), JGR &mdash; volcanic loading and lithospheric support")}`,
+    ),
+
+    formula(
+      "Continental Margin Dimensions",
+      `<p>Passive continental margins comprise four morphological zones:</p>
+      ${dataTable(
+        ["Zone", "Typical width", "Depth range", "Slope"],
+        [
+          ["Continental shelf", "80 km", "0&ndash;130 m", "~0.1&deg;"],
+          ["Continental slope", "varies", "130&ndash;3,000 m", "3&ndash;4&deg;"],
+          ["Continental rise", "200 km", "3,000&ndash;4,500 m", "~0.5&deg;"],
+          ["Abyssal plain", "indefinite", "4,500+ m", "~0&deg;"],
+        ],
+      )}
+      <p>The shelf break at ~130 m depth corresponds to Pleistocene sea-level lowstands, when shorelines were at the current shelf edge. Shelf width varies from &lt;10 km (active margins) to &gt;300 km (passive margins like eastern North America).</p>
+      ${cite("Standard geomorphology references; shelf break 130 m from Pleistocene lowstands")}`,
+    ),
+
+    formula(
       "Tectonic Regime Probability Distribution",
       `<div class="sci-formula__eq">${eq("P_i = \\frac{w_i}{\\sum_j w_j}, \\quad w_i = f_M(i) \\cdot f_t(i) \\cdot f_W(i) \\cdot f_C(i) \\cdot f_T(i)")}</div>
       <p>Estimates the probability of each tectonic regime (stagnant lid, mobile lid, episodic overturn, plutonic-squishy lid) from five planetary parameters. Each factor is a smooth Gaussian preference curve centred on the optimal parameter range for that regime. Factors are multiplied together and normalised to sum to 1.0.</p>
@@ -1011,6 +1632,168 @@ function buildInteriorComposition() {
       ])}
       <p>Key regimes: <b>Mobile lid</b> peaks at 0.5&ndash;3 M&oplus;, 2&ndash;6 Gyr, WMF 0.001&ndash;0.1. <b>Stagnant lid</b> dominates below 0.3 M&oplus; or above 5 M&oplus; + old age. <b>Episodic</b> favours young, massive planets. <b>Plutonic-squishy</b> favours young, moderate-mass planets.</p>
       ${cite("Valencia, D. et al. (2007), ApJL 670, L45; O&rsquo;Neill, C. &amp; Lenardic, A. (2007), GRL 34; Noack, L. &amp; Breuer, D. (2014), P&amp;SS 98; Korenaga, J. (2010), ApJL 725, L43")}`,
+    ),
+
+    formula(
+      "Composition-Dependent Peak Heights",
+      `${dataTable(
+        ["Composition class", "H<sub>max</sub> (m)"],
+        [
+          ["Iron world", "12,000"],
+          ["Mercury-like", "11,000"],
+          ["Earth-like", "9,267"],
+          ["Mars-like", "8,500"],
+          ["Ocean world", "7,000"],
+          ["Ice world", "3,000"],
+          ["Coreless", "7,000"],
+        ],
+      )}
+      <p>Yield-stress-limited peak height divided by surface gravity. Ice worlds have much lower yield stress (10 MPa vs 300 MPa for basalt).</p>`,
+    ),
+
+    formula(
+      "Elastic Lithosphere Thickness",
+      `<div class="sci-formula__eq">${eq("T_e = 20\\,\\sqrt{t_{\\text{Gyr}}} \\cdot M_\\oplus^{0.3}\\;\\text{km}")}</div>
+      <p>Thickens with age (cooling) and mass (higher pressure). Tidal heating thins the lithosphere:
+      ${iq("T_e \\times \\max(0.2,\\; 1 - 0.3\\log_{10}(\\dot{E}_{\\text{tidal}}))")} when tidal heating &gt; 0.1&times; Earth.
+      Clamped to [5, 300] km.</p>`,
+    ),
+
+    formula(
+      "Volcanic Activity",
+      `<div class="sci-formula__eq">${eq("a = e^{-0.15\\,t} + 0.5\\,\\min(1,\\; \\dot{E}_{\\text{tidal}}/2)")}</div>
+      <p>Activity relative to Earth (1.0). Decays exponentially with planetary age as internal heat
+      diminishes, but tidal heating can sustain volcanism indefinitely. Clamped to [0.01, 2.0].</p>`,
+    ),
+
+    formula(
+      "Climate-Adjusted Erosion",
+      `<div class="sci-formula__eq">${eq("\\varepsilon = 5 \\cdot \\max(0.2,\\; T/288) \\cdot \\max(0.1,\\; 1 + f_{\\text{H}_2\\text{O}})\\;\\text{m/Myr}")}</div>
+      <p>Baseline 5 m/Myr (global median from cosmogenic nuclides) scaled by temperature and
+      moisture. Warmer, wetter planets erode faster. Clamped to [0.5, 50] m/Myr.</p>`,
+    ),
+
+    `<div class="sci-formula">
+      <h3 class="sci-formula__name">Interactive: Gravity &rarr; Mountain &amp; Volcano Heights</h3>
+      <p>Adjust gravity to see the maximum mountain height (yield-strength limit) and maximum shield volcano height (1/g scaling).</p>
+      <div class="sci-try">
+        <div class="sci-try__title">Try it</div>
+        <div class="sci-try__row">
+          <label>Surface gravity <span class="unit">g</span></label>
+          <input id="sci-tec-grav" type="number" value="1" min="0.05" max="5" step="0.01" />
+          <input id="sci-tec-grav-slider" type="range" />
+        </div>
+        <div class="sci-try__output">
+          <span class="sci-try__label">Max mountain</span>
+          <span class="sci-try__value" id="sci-tec-mtn">&mdash;</span>
+        </div>
+        <div class="sci-try__output">
+          <span class="sci-try__label">Max shield volcano</span>
+          <span class="sci-try__value" id="sci-tec-shield">&mdash;</span>
+        </div>
+        <div class="sci-try__output">
+          <span class="sci-try__label">Airy root (5 km peak)</span>
+          <span class="sci-try__value" id="sci-tec-root">&mdash;</span>
+        </div>
+      </div>
+    </div>`,
+  ].join("");
+}
+
+function buildDebrisDisks() {
+  return [
+    formula(
+      "Mean-Motion Resonance Positions",
+      `<div class="sci-formula__eq">${eq("a_{\\text{res}} = a_p\\,(p/q)^{2/3}")}</div>
+      <p>Orbital distances where a body&rsquo;s period is a rational multiple of a giant planet&rsquo;s.
+      Resonances sculpt disk edges and gaps:</p>
+      ${dataTable(
+        ["Resonance", "(p/q)<sup>2/3</sup>"],
+        [
+          ["3:2 exterior", "1.310"],
+          ["2:1 exterior", "1.587"],
+          ["5:2 exterior", "1.842"],
+          ["1:2 interior", "0.630"],
+          ["1:4 interior", "0.397"],
+          ["1:8 interior", "0.250"],
+        ],
+      )}`,
+    ),
+
+    formula(
+      "Condensation Sequence",
+      `<p>Species condense from a cooling solar-composition nebula at characteristic temperatures:</p>
+      ${dataTable(
+        ["Species", "T<sub>cond</sub> (K)", "Mass %"],
+        [
+          ["Corundum (Al&#8322;O&#8323;)", "1700", "0.4"],
+          ["Iron-nickel", "1450", "7"],
+          ["Enstatite (MgSiO&#8323;)", "1350", "12"],
+          ["Forsterite (Mg&#8322;SiO&#8324;)", "1300", "14"],
+          ["Feldspar", "1200", "6"],
+          ["Troilite (FeS)", "700", "4"],
+          ["Organics", "300", "6"],
+          ["Water ice", "170", "33"],
+          ["NH&#8323; hydrate", "130", "2"],
+          ["CO&#8322; ice", "70", "5"],
+          ["CH&#8324; ice", "31", "4"],
+          ["CO ice", "25", "3"],
+          ["N&#8322; ice", "22", "2"],
+        ],
+      )}
+      ${cite("Lodders (2003), ApJ 591, 1220")}`,
+    ),
+
+    formula(
+      "Dust Equilibrium Temperature",
+      `<div class="sci-formula__eq">${eq("T = 279\\,\\frac{\\sqrt{L_\\star}}{\\sqrt{r_{\\text{AU}}}}\\;\\text{K}")}</div>
+      <p>Blackbody equilibrium temperature for a grain at distance ${iq("r")} from a star
+      of luminosity ${iq("L_\\star")} (solar units).</p>`,
+    ),
+
+    formula(
+      "Fractional Luminosity",
+      `<div class="sci-formula__eq">${eq("f_{\\max} = 2.4{\\times}10^{-8}\\,\\frac{r^{7/3}\\,(\\Delta r / r)}{t_{\\text{age}}}")}</div>
+      <p>Maximum disk-to-star luminosity ratio from collisional steady state. Capped at 0.01
+      (physical limit). ${iq("t_{\\text{age}}")} in Gyr, ${iq("r")} in AU.</p>
+      ${cite("Wyatt et al. (2007), ApJ 658, 569")}`,
+    ),
+
+    formula(
+      "Blowout Grain Size",
+      `<div class="sci-formula__eq">${eq("s_{\\text{blow}} = 0.57\\,L_\\star / M_\\star\\;\\mu\\text{m}")}</div>
+      <p>Minimum grain size that remains bound; smaller grains are ejected by radiation pressure.
+      Typical surviving grains are ${iq("\\sim 10\\,s_{\\text{blow}}")}.</p>`,
+    ),
+
+    formula(
+      "Poynting&ndash;Robertson Drag Timescale",
+      `<div class="sci-formula__eq">${eq("t_{\\text{PR}} = 700\\,\\frac{s\\,r^2}{L_\\star}\\;\\text{yr}")}</div>
+      <p>Time for a grain of size ${iq("s")} (&mu;m) at distance ${iq("r")} (AU) to spiral into the star
+      due to radiation drag. If ${iq("t_{\\text{PR}} > t_{\\text{coll}}")}, collisions dominate.</p>`,
+    ),
+
+    formula(
+      "Collisional Lifetime",
+      `<div class="sci-formula__eq">${eq("t_{\\text{coll}} = \\frac{P_{\\text{orb}}}{4\\pi\\tau}")}</div>
+      <p>Mean time between destructive collisions. ${iq("\\tau")} is the normal optical depth of the disk.
+      Collision velocity: ${iq("v_{\\text{col}} = e\\,v_{\\text{Kep}}\\sqrt{2}")}; regimes: accretionary (&lt; 10 m/s),
+      erosive (10&ndash;100), catastrophic (&gt; 100).</p>`,
+    ),
+
+    formula(
+      "Chaotic Zone",
+      `<div class="sci-formula__eq">${eq("\\delta a = 1.3\\,a\\left(\\frac{M_p}{M_\\star}\\right)^{2/7}")}</div>
+      <p>Half-width of the dynamically unstable region around a giant planet. Debris within
+      this zone is rapidly ejected or accreted.</p>
+      ${cite("Wisdom (1980), AJ 85, 1122")}`,
+    ),
+
+    formula(
+      "IR Excess at 24 &mu;m",
+      `<div class="sci-formula__eq">${eq("\\text{excess} = f \\cdot \\frac{B_\\nu(T_{\\text{disk}},\\,24\\,\\mu\\text{m})}{B_\\nu(T_\\star,\\,24\\,\\mu\\text{m})}")}</div>
+      <p>Ratio of disk to stellar flux at 24 &mu;m via Planck functions.
+      Detectable if &gt; 0.1 (easily), marginal 0.01&ndash;0.1, undetectable &lt; 0.01.</p>`,
     ),
   ].join("");
 }
@@ -1326,6 +2109,113 @@ function buildDivergences() {
       MIST grid lifetimes within 20% for 0.5&ndash;2 M&#9737; and is widely used in planetary science
       for order-of-magnitude lifetime estimates.</p>`,
     ),
+
+    item(
+      "Ocean Subsidence Intersection Constant (WS-modified)",
+      `<p>The plate-model intersection amplitude uses 3,073 m instead of Parsons &amp; Sclater&rsquo;s
+      published 3,200 m. This is a WorldSmith hybrid calibration chosen so the half-space and
+      plate-model regimes intersect smoothly at 20 Myr.</p>
+      <p><b>Why diverge?</b> The original PSM (1977) constants were derived independently for each
+      regime. A strict join at 20 Myr with the published 3,200 m amplitude produces a ~50 m
+      discontinuity. The adjusted value 3,073 eliminates this artefact while staying within
+      the published uncertainty range.</p>
+      ${cite("Parsons &amp; Sclater (1977), JGR 82, 803. Adjustment: WorldSmith calibration.")}`,
+    ),
+
+    item(
+      "Shield Volcano 1/g Scaling (Simplified)",
+      `<p>The shield volcano height formula ${iq("H = 10{,}000/g \\times f_{\\text{lid}}")} uses a
+      simple inverse-gravity scaling with a single reference point (Earth, 10 km) and a 1.5&times;
+      stagnant-lid multiplier. Published models (McGovern &amp; Solomon 1993, 1998) consider
+      lithospheric flexure, magma supply rates, and elastic thickness.</p>
+      <p><b>Why diverge?</b> Full volcanic loading models require knowledge of lithospheric
+      rheology and thermal structure. The 1/g law captures the dominant physics: yield strength
+      limits column height, and gravity is the primary control. The stagnant-lid factor accounts
+      for the observation that plate tectonics limits volcanic edifice lifetime. Mars validates
+      the approach: 0.38 g &times; 1.5 gives 39.5 km theoretical max vs. 21.9 km observed for
+      Olympus Mons (the model gives an upper bound, not a typical height).</p>`,
+    ),
+
+    item(
+      "Continental Margin Fixed Dimensions (Simplified)",
+      `<p>The continental margin profile uses fixed default parameters (shelf 80 km &times; 130 m,
+      slope 3.5&deg;, rise 200 km) that represent Earth averages. Real margins vary enormously:
+      shelf width ranges from &lt;10 km (active margins) to &gt;300 km (passive margins).</p>
+      <p><b>Why diverge?</b> A physics-based margin model would need sediment supply,
+      subsidence history, sea-level curves, and tectonic setting. The fixed defaults provide a
+      reasonable starting point for worldbuilding, with user-adjustable parameters for
+      customisation. The 130 m shelf break depth is well-established from Pleistocene
+      glacioeustatic lowstands.</p>`,
+    ),
+
+    item(
+      "Gas Giant Internal Heat Ratio Ramps (WS-derived)",
+      `<p>The mass-dependent ramp for internal heat ratio (1.0 at Uranus-mass to 1.67 at
+      Jupiter-mass) is a WorldSmith interpolation. Published values exist only for individual
+      Solar System giants (Jupiter 1.67, Saturn 1.78, Uranus &lt; 1.06, Neptune 2.6).</p>
+      <p><b>Why diverge?</b> No published model provides a continuous function of internal heat
+      ratio vs. mass for arbitrary gas giants. The ramp captures the qualitative trend that more
+      massive giants retain more primordial heat. Neptune&rsquo;s anomalously high value is not
+      well explained and is treated as an outlier.</p>`,
+    ),
+
+    item(
+      "Gas Giant Ring Mass Gaussian Model (WS-derived)",
+      `<p>The ring mass model ${iq("M_{\\text{ring}} = 3 \\times 10^{19} \\, e^{-0.5(M/M_J - 1)^2}")} kg
+      with Gaussian optical depth is a WorldSmith parameterisation. Published ring models focus on
+      dynamics and structure of known ring systems, not on predicting ring properties from planet mass.</p>
+      <p><b>Why diverge?</b> Ring formation and evolution depend on satellite disruption history,
+      meteoroid bombardment, and viscous spreading&mdash;processes too complex for a parametric model.
+      The Gaussian peaked at 1 ${iq("M_J")} reflects that Saturn-mass planets have the most prominent
+      rings in the Solar System.</p>`,
+    ),
+
+    item(
+      "Gas Giant Oblateness MOI Interpolation (WS-derived)",
+      `<p>The moment-of-inertia factor is interpolated between 0.25 (rock-like core) and 0.22
+      (centrally condensed gas giant) based on mass. Published interior models compute MOI from
+      self-consistent density profiles with equations of state for hydrogen and helium.</p>
+      <p><b>Why diverge?</b> Full interior structure models (e.g. Hubbard &amp; Militzer 2016)
+      require numerical integration of the hydrostatic equation with an H/He EOS. The interpolation
+      captures the trend that more massive giants are more centrally condensed, giving reasonable
+      oblateness values for the Darwin-Radau relation.</p>`,
+    ),
+
+    item(
+      "Population Tech Era Density/Growth Tables (WS-derived)",
+      `<p>The population density and growth rate values for each technological era (Hunter-Gatherer
+      through Sci-Fi High) are WorldSmith estimates. Published historical demography provides data
+      for Earth&rsquo;s specific trajectory, not generic per-era densities.</p>
+      <p><b>Why diverge?</b> Earth&rsquo;s population history is a single data point shaped by
+      geography, disease, and culture. The era-based table provides plausible defaults for
+      worldbuilding by abstracting the dominant technological constraint on carrying capacity.
+      Values are order-of-magnitude consistent with Earth history but should not be treated as
+      predictions.</p>`,
+    ),
+
+    item(
+      "Climate Moisture Index Zone Model (WS-derived)",
+      `<p>The three-zone moisture model (tropical Hadley: 0.9, midlatitude Ferrel: 0.5, polar: 0.2)
+      with transitions at 30&deg; and 60&deg; latitude is a WorldSmith simplification. Published
+      climate models compute precipitation from GCM-resolved atmospheric dynamics.</p>
+      <p><b>Why diverge?</b> Running a GCM is not feasible in real time. The three-zone model
+      captures the first-order pattern: ITCZ convergence drives tropical rainfall, subtropical
+      subsidence creates deserts, and midlatitude storm tracks provide moderate precipitation.
+      The zone boundaries are approximate and shift with rotation rate and obliquity.</p>`,
+    ),
+
+    item(
+      "Climate Tidally-Locked Temperature Model (WS-derived)",
+      `<p>The substellar/terminator/antistellar temperature model with redistribution efficiency
+      ${iq("\\varepsilon")} is a WorldSmith parameterisation. Published tidally locked climate models
+      (e.g. Pierrehumbert 2011, Leconte et al. 2013) use 3D GCMs that resolve atmospheric heat
+      transport.</p>
+      <p><b>Why diverge?</b> The analytic model provides instant temperature estimates for the
+      three characteristic zones of a tidally locked planet. The redistribution efficiency
+      ${iq("\\varepsilon")} encapsulates atmospheric heat transport in a single parameter, varying
+      from 0 (no atmosphere) to 1 (perfect redistribution). Real atmospheres show complex spatial
+      patterns that depend on composition, pressure, and stellar spectrum.</p>`,
+    ),
   ].join("");
 }
 
@@ -1584,75 +2474,72 @@ function wireCalculators(root) {
     [ghzR, ghzLoc].forEach((el) => el.addEventListener("input", update));
     update();
   }
+
+  /* 8 — Tectonics: Gravity → Mountain & Volcano Heights */
+  const tecGrav = root.querySelector("#sci-tec-grav");
+  const tecGravSlider = root.querySelector("#sci-tec-grav-slider");
+  const tecMtn = root.querySelector("#sci-tec-mtn");
+  const tecShield = root.querySelector("#sci-tec-shield");
+  const tecRoot = root.querySelector("#sci-tec-root");
+  if (tecGrav && tecGravSlider && tecMtn && tecShield && tecRoot) {
+    const update = () => {
+      const g = Number(tecGrav.value);
+      if (g > 0) {
+        tecMtn.textContent = `${fmt(maxPeakHeight(g), 0)} m`;
+        tecShield.textContent = `${fmt(maxShieldHeight(g), 0)} m`;
+        tecRoot.textContent = `${fmt(airyRootDepth(5000), 0)} m`;
+      }
+    };
+    bindNumberAndSlider({
+      numberEl: tecGrav,
+      sliderEl: tecGravSlider,
+      min: 0.05,
+      max: 5,
+      step: 0.01,
+      mode: "log",
+    });
+    tecGrav.addEventListener("input", update);
+    tecGravSlider.addEventListener("input", () => {
+      tecGrav.dispatchEvent(new Event("input"));
+    });
+    update();
+  }
 }
 
 /* ── Main init ───────────────────────────────────────────────── */
 
 const SECTIONS = [
-  {
-    id: "stellar",
-    title: "Stellar Physics",
-    count: 8,
-    builder: buildStellarPhysics,
-  },
-  {
-    id: "planetary",
-    title: "Planetary Physics",
-    count: 12,
-    builder: buildPlanetaryPhysics,
-  },
+  { id: "stellar", title: "Stellar Physics", count: 8, builder: buildStellarPhysics },
+  { id: "evolution", title: "Stellar Evolution", count: 7, builder: buildStellarEvolution },
+  { id: "planetary", title: "Planetary Physics", count: 11, builder: buildPlanetaryPhysics },
+  { id: "gasgiant", title: "Gas Giant Physics", count: 12, builder: buildGasGiantPhysics },
   {
     id: "interior",
     title: "Interior &amp; Composition",
-    count: 6,
+    count: 7,
     builder: buildInteriorComposition,
   },
   {
-    id: "orbital",
-    title: "Orbital Mechanics",
-    count: 11,
-    builder: buildOrbitalMechanics,
+    id: "tectonics",
+    title: "Tectonics &amp; Geodynamics",
+    count: 14,
+    builder: buildTectonicsScience,
   },
-  {
-    id: "photometry",
-    title: "Photometry &amp; Magnitudes",
-    count: 8,
-    builder: buildPhotometry,
-  },
-  {
-    id: "atmosphere",
-    title: "Atmosphere &amp; Colour",
-    count: 9,
-    builder: buildAtmosphereColour,
-  },
-  {
-    id: "activity",
-    title: "Stellar Activity",
-    count: 5,
-    builder: buildStellarActivity,
-  },
-  {
-    id: "calendar",
-    title: "Calendar Systems",
-    count: 5,
-    builder: buildCalendarSystems,
-  },
-  {
-    id: "cluster",
-    title: "Local Cluster",
-    count: 6,
-    builder: buildLocalCluster,
-  },
-  {
-    id: "system",
-    title: "System Architecture",
-    count: 3,
-    builder: buildSystemArchitecture,
-  },
+  { id: "orbital", title: "Orbital Mechanics", count: 13, builder: buildOrbitalMechanics },
+  { id: "lagrange", title: "Lagrange Points", count: 4, builder: buildLagrangePoints },
+  { id: "photometry", title: "Photometry &amp; Magnitudes", count: 8, builder: buildPhotometry },
+  { id: "atmosphere", title: "Atmosphere &amp; Colour", count: 9, builder: buildAtmosphereColour },
+  { id: "climate", title: "Climate Classification", count: 7, builder: buildClimateClassification },
+  { id: "activity", title: "Stellar Activity", count: 7, builder: buildStellarActivity },
+  { id: "calendar", title: "Calendar Systems", count: 5, builder: buildCalendarSystems },
+  { id: "cluster", title: "Local Cluster", count: 7, builder: buildLocalCluster },
+  { id: "population", title: "Population Dynamics", count: 5, builder: buildPopulationDynamics },
+  { id: "system", title: "System Architecture", count: 3, builder: buildSystemArchitecture },
+  { id: "debris", title: "Debris Disks", count: 9, builder: buildDebrisDisks },
   {
     id: "divergences",
     title: "Divergences from Published Science",
-    count: 22,
+    count: 33,
     builder: buildDivergences,
   },
 ];

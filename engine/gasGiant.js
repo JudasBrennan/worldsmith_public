@@ -28,6 +28,9 @@ const SATURN_MASS_MJUP = 0.2994;
 const F_XUV_SUN_1AU = 4.64; // erg/cm²/s, present-day solar XUV at 1 AU (Ribas 2005)
 const SUN_AGE_GYR = 4.6;
 const HEATING_EFFICIENCY = 0.15; // energy-limited mass-loss efficiency ε
+const EARTH_GRAVITY_MS2 = 9.80665; // standard gravity (m/s²)
+const ICE_GIANT_MASS_MJUP = 0.15; // ice-giant / gas-giant boundary (~48 M⊕)
+const S_PER_GYR = 3.156e16; // seconds per gigayear
 
 /* ── Mass ↔ Radius (Chen & Kipping 2017) ────────────────────────── */
 
@@ -38,12 +41,13 @@ const HEATING_EFFICIENCY = 0.15; // energy-limited mass-loss efficiency ε
 const C_N = 0.861; // Neptunian coefficient (calibrated to Neptune)
 const EXP_N = 0.53; // Neptunian exponent
 const BOUNDARY_ME = 131.6; // Neptunian-Jovian transition (0.414 Mjup)
-const C_J_RAW = C_N * BOUNDARY_ME ** EXP_N * BOUNDARY_ME ** 0.044; // continuity
+const EXP_J = -0.044; // Jovian exponent (Chen & Kipping 2017, Table 1)
+const C_J_RAW = C_N * BOUNDARY_ME ** EXP_N * BOUNDARY_ME ** -EXP_J; // continuity
 
 function massToRadiusEarth(massEarth) {
   const m = Math.max(1, massEarth);
   if (m < BOUNDARY_ME) return C_N * m ** EXP_N;
-  return C_J_RAW * m ** -0.044;
+  return C_J_RAW * m ** EXP_J;
 }
 
 function radiusToMassEarth(radiusEarth) {
@@ -72,6 +76,7 @@ export function radiusToMassMjup(radiusRj) {
 
 /* ── Sudarsky classification ─────────────────────────────────────── */
 
+// Temperature class boundaries and properties (Sudarsky et al. 2000, ApJ 538).
 const SUDARSKY = [
   {
     cls: "I",
@@ -117,7 +122,7 @@ const SUDARSKY = [
 
 function classifySudarsky(teqK, massMjup) {
   // Ice-giant override: low mass + cold → methane-dominated appearance
-  if (massMjup < 0.15 && teqK < 100) {
+  if (massMjup < ICE_GIANT_MASS_MJUP && teqK < 100) {
     return {
       cls: "I-ice",
       cloud: "Methane",
@@ -129,7 +134,7 @@ function classifySudarsky(teqK, massMjup) {
   }
   for (const s of SUDARSKY) {
     if (teqK <= s.maxTeq) {
-      return { ...s, subtype: massMjup < 0.15 ? "Ice giant" : "Gas giant" };
+      return { ...s, subtype: massMjup < ICE_GIANT_MASS_MJUP ? "Ice giant" : "Gas giant" };
     }
   }
   return { ...SUDARSKY[4], subtype: "Gas giant" };
@@ -137,6 +142,8 @@ function classifySudarsky(teqK, massMjup) {
 
 /* ── Cloud layers ────────────────────────────────────────────────── */
 
+// Condensation layers by temperature threshold; thresholds from
+// Lodders & Fegley (2002) and Visscher et al. (2010).
 const CLOUD_DEFS = [
   {
     name: "Iron",
@@ -241,7 +248,7 @@ const SOLAR_CO_PCT = 0.05; // CO dominates over CH₄ at T > 1000 K
 
 function getAtmosphere(massMjup, teqK, metallicity) {
   const Z = clamp(metallicity, 0.1, 200);
-  const isIceGiant = massMjup < 0.15;
+  const isIceGiant = massMjup < ICE_GIANT_MASS_MJUP;
   const isHot = teqK > 1000;
 
   // Base H₂:He number ratio (varies by regime)
@@ -284,7 +291,7 @@ function getAtmosphere(massMjup, teqK, metallicity) {
 
 /* ── Internal heat ───────────────────────────────────────────────── */
 
-// Ratio of total emitted power to absorbed stellar power.
+// Empirical piecewise fit: ratio of total emitted power to absorbed stellar power.
 // Interpolated from Solar System giants.
 // Jupiter ~1.67, Saturn ~2.5, Neptune ~2.6, Uranus ~1.06
 function internalHeatRatio(massMjup) {
@@ -335,12 +342,12 @@ function calcMagnetic(massMjup, radiusKm, rotationS, orbitAu) {
 /* ── Atmospheric dynamics ────────────────────────────────────────── */
 
 function calcDynamics(massMjup, radiusKm, rotationHours, tEffK) {
-  const isIceGiant = massMjup < 0.15;
+  const isIceGiant = massMjup < ICE_GIANT_MASS_MJUP;
   const omega = (2 * Math.PI) / (rotationHours * 3600); // rad/s
   const rM = radiusKm * 1000;
 
-  // Rhines scale: L_Rh = π × √(U / β), β = 2Ω/R
-  // Approximate wind speed: scale from Jupiter (150 m/s)
+  // Rhines scale (Rhines 1975): L_Rh = π × √(U / β), β = 2Ω/R
+  // Wind speed scaled from Jupiter: 150 m/s at T_eff = 125 K
   const uWind = 150 * Math.sqrt(Math.max(tEffK, 50) / 125);
   const beta = (2 * omega) / rM;
   const lRhines = beta > 0 ? Math.PI * Math.sqrt(uWind / beta) : rM;
@@ -374,7 +381,7 @@ function calcOblateness(massMjup, radiusKm, rotationHours, densityGcm3) {
   // Gas giants: log-mass interpolation (Saturn 0.239 ↔ Jupiter 0.269)
   // Ice giants: density-dependent  (Uranus 0.276, Neptune 0.225)
   let xi;
-  if (massMjup >= 0.15) {
+  if (massMjup >= ICE_GIANT_MASS_MJUP) {
     const logM = Math.log10(massMjup);
     const logSat = Math.log10(0.3);
     const t = clamp((logM - logSat) / -logSat, 0, 1.5);
@@ -404,14 +411,14 @@ function calcMassLoss(massMjup, radiusKm, orbitAu, starMassMsol, starLuminosityL
   const massKg = massMjup * JUPITER_MASS_KG;
   const rM = radiusKm * 1000;
   const age = Math.max(0.1, starAgeGyr);
-  // XUV flux: Ribas et al. 2005 power-law decay, scaled by luminosity
+  // XUV flux: Ribas et al. 2005, ApJ 622 — power-law decay F_XUV ∝ t^−1.23
   const fXuv1Au = F_XUV_SUN_1AU * starLuminosityLsol * (age / SUN_AGE_GYR) ** -1.23;
   const fXuvAtOrbit = fXuv1Au / orbitAu ** 2; // erg/cm²/s
   const fXuvSI = fXuvAtOrbit * 1e-3; // W/m²
   // Energy-limited escape: dM/dt = ε π R³ F_XUV / (G M)
   const massLossKgS = (HEATING_EFFICIENCY * Math.PI * rM ** 3 * fXuvSI) / (G * massKg);
-  const evapTimescaleGyr = massKg / Math.max(massLossKgS, 1e-30) / 3.156e16;
-  // Roche lobe radius (Eggleton 1983 simplified): R_L ≈ 0.462·a·(q/3)^(1/3)
+  const evapTimescaleGyr = massKg / Math.max(massLossKgS, 1e-30) / S_PER_GYR;
+  // Roche lobe radius (Eggleton 1983, ApJ 268): R_L ≈ 0.462·a·(q/3)^(1/3)
   const starMassMjup = starMassMsol * MSOL_PER_MJUP;
   const rocheLobeKm = 0.462 * orbitAu * (massMjup / (3 * starMassMjup)) ** (1 / 3) * AU_KM;
   const rocheOverflow = radiusKm > rocheLobeKm;
@@ -427,7 +434,7 @@ function calcMassLoss(massMjup, radiusKm, orbitAu, starMassMsol, starLuminosityL
 /* ── Interior / core ─────────────────────────────────────────────── */
 
 function calcInterior(massMjup) {
-  // Thorngren et al. 2016: total heavy element mass
+  // Thorngren et al. 2016, ApJ 831, 64: M_Z = 49.3 × M_J^0.61 (M⊕)
   const totalHeavy = 49.3 * massMjup ** 0.61;
   const coreMass = Math.min(totalHeavy * 0.5, 25);
   const totalMassEarth = massMjup * EARTH_MASS_PER_MJUP;
@@ -443,9 +450,10 @@ function calcInterior(massMjup) {
 
 function calcAgeRadiusCorrection(massMjup, radiusRj, starAgeGyr, teqK) {
   const age = Math.max(0.1, starAgeGyr);
-  // Fortney et al. 2007 simplified cooling
+  // Fortney et al. 2007, ApJ 659: simplified Kelvin-Helmholtz cooling
+  // ~10% inflation at 5 Gyr reference age, decaying as t^-0.35
   const inflationFactor = 1 + 0.1 * (5 / age) ** 0.35;
-  // Hot Jupiter proximity inflation
+  // Hot Jupiter proximity inflation: 0.1–0.3 Rj bonus for T_eq > 1000 K
   let proximityBonus = 0;
   if (teqK > 1000) {
     proximityBonus = 0.1 + 0.2 * clamp((teqK - 1000) / 1000, 0, 1);
@@ -489,15 +497,15 @@ function calcRingProperties(massMjup, teqK, rocheLimitRockKm, rocheLimitIceKm) {
   // (Canup 2010; Crida & Charnoz 2012).  σ = 0.12 in log₁₀(M) keeps
   // the enhancement narrow enough that Jupiter (1 Mjup) stays Tenuous
   // while Saturn (0.3 Mjup) reaches Dense.
-  const baseMassKg = 1e12 * Math.sqrt(massMjup);
+  const baseMassKg = 1e12 * Math.sqrt(massMjup); // minimal captured-debris baseline
   const logM = Math.log10(Math.max(0.01, massMjup));
   const logMPeak = Math.log10(SATURN_MASS_MJUP); // ≈ −0.524
-  const sigma = 0.12;
+  const sigma = 0.12; // log₁₀(M) Gaussian width
   const enhancement = Math.exp(-((logM - logMPeak) ** 2) / (2 * sigma * sigma));
-  const estimatedMassKg = baseMassKg + 3e19 * enhancement;
+  const estimatedMassKg = baseMassKg + 3e19 * enhancement; // 3e19 ≈ Saturn ring mass
   const areaKm2 = Math.PI * (rocheLimitIceKm ** 2 - rocheLimitRockKm ** 2);
   const surfaceDensity = areaKm2 > 0 ? estimatedMassKg / (areaKm2 * 1e6) : 0;
-  const opticalDepth = surfaceDensity / 67;
+  const opticalDepth = surfaceDensity / 67; // 67 kg/m² ≈ Saturn B-ring surface density
   let opticalDepthClass;
   if (opticalDepth > 1) opticalDepthClass = "Dense";
   else if (opticalDepth > 0.1) opticalDepthClass = "Moderate";
@@ -563,10 +571,10 @@ export function calcGasGiant({
   /* ── Resolve mass ↔ radius ─────────────────────────────────────── */
 
   const orbit = clamp(toFinite(orbitAu, 5.2), 0.01, 1e6);
-  const rot = clamp(toFinite(rotationPeriodHours, 10), 1, 100);
-  const sMass = clamp(toFinite(starMassMsol, 1), 0.075, 100);
+  const rot = clamp(toFinite(rotationPeriodHours, 10), 1, 100); // 1–100 h spin period
+  const sMass = clamp(toFinite(starMassMsol, 1), 0.075, 100); // H-burning min to ~100 M☉
   const sLum = Math.max(0.0001, toFinite(starLuminosityLsol, 1));
-  const sAge = clamp(toFinite(starAgeGyr, 4.6), 0.01, 15);
+  const sAge = clamp(toFinite(starAgeGyr, 4.6), 0.01, 15); // 10 Myr to 15 Gyr
   void starRadiusRsol;
 
   let massMjup, radiusRj;
@@ -609,20 +617,21 @@ export function calcGasGiant({
   const densityKgM3 = massKg / volumeM3;
   const densityGcm3 = densityKgM3 / 1000;
   const gravityMs2 = (G * massKg) / radiusM ** 2;
-  const gravityG = gravityMs2 / 9.80665;
+  const gravityG = gravityMs2 / EARTH_GRAVITY_MS2;
   const escapeVelocityMs = Math.sqrt((2 * G * massKg) / radiusM);
   const escapeVelocityKms = escapeVelocityMs / 1000;
 
   /* ── Temperature ───────────────────────────────────────────────── */
 
   // First-pass equilibrium temp (used for Sudarsky classification)
+  // 279 K = (L☉/(16πσ AU²))^0.25, zero-albedo equilibrium coefficient
   const teqFirst = (279 * Math.sqrt(sLum)) / Math.sqrt(orbit);
   // Sudarsky class uses the zero-albedo temperature (teqFirst) since the
   // classification itself determines the albedo — avoids iterative instability.
   const sudFinal = classifySudarsky(teqFirst, massMjup);
   const bondAlbedo = sudFinal.bondAlbedo;
 
-  // Corrected equilibrium temperature with albedo
+  // Corrected equilibrium temperature with albedo (same 279 K coefficient)
   const teqK = (279 * (1 - bondAlbedo) ** 0.25 * Math.sqrt(sLum)) / Math.sqrt(orbit);
   const ihRatio = internalHeatRatio(massMjup);
   const tEffK = (teqK ** 4 * ihRatio) ** 0.25;
@@ -630,7 +639,7 @@ export function calcGasGiant({
 
   /* ── Classification ───────────────────────────────────────────── */
 
-  const isIceGiant = massMjup < 0.15;
+  const isIceGiant = massMjup < ICE_GIANT_MASS_MJUP;
 
   /* ── Metallicity ──────────────────────────────────────────────── */
 
@@ -665,9 +674,10 @@ export function calcGasGiant({
   const hillSphereAu = orbit * (massRatio / 3) ** (1 / 3);
   const hillSphereKm = hillSphereAu * AU_KM;
 
+  // 2.44 = rigid-body Roche limit coefficient (Chandrasekhar 1969)
   const rocheLimitIceKm = 2.44 * radiusKm * (densityGcm3 / 0.9) ** (1 / 3);
   const rocheLimitRockKm = 2.44 * radiusKm * (densityGcm3 / 3.0) ** (1 / 3);
-  const chaoticZoneHalfAu = orbit * 1.3 * massRatio ** (2 / 7);
+  const chaoticZoneHalfAu = orbit * 1.3 * massRatio ** (2 / 7); // Wisdom (1980) chaotic zone half-width
 
   /* ── Dynamics ──────────────────────────────────────────────────── */
 
@@ -685,7 +695,7 @@ export function calcGasGiant({
   // Equatorial gravity (GM/R_eq² — matches NASA convention)
   const eqRadiusM = oblateness.equatorialRadiusKm * 1000;
   const equatorialGravityMs2 = (G * massKg) / eqRadiusM ** 2;
-  const equatorialGravityG = equatorialGravityMs2 / 9.80665;
+  const equatorialGravityG = equatorialGravityMs2 / EARTH_GRAVITY_MS2;
 
   /* ── Orbital ───────────────────────────────────────────────────── */
 

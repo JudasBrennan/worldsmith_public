@@ -111,6 +111,26 @@ function summariseWorld(w) {
     }
   }
 
+  // Tectonics summary
+  const tec = w.tectonics && typeof w.tectonics === "object" ? w.tectonics : null;
+  const tecRanges = tec ? (Array.isArray(tec.mountainRanges) ? tec.mountainRanges.length : 0) : 0;
+  const tecVolcanoes = tec
+    ? Array.isArray(tec.shieldVolcanoes)
+      ? tec.shieldVolcanoes.length
+      : 0
+    : 0;
+  const tecRifts = tec ? (Array.isArray(tec.riftValleys) ? tec.riftValleys.length : 0) : 0;
+  const tecInactive = tec ? (Array.isArray(tec.inactiveRanges) ? tec.inactiveRanges.length : 0) : 0;
+
+  // Population summary
+  const pop = w.population && typeof w.population === "object" ? w.population : null;
+
+  // Climate summary
+  const clim = w.climate && typeof w.climate === "object" ? w.climate : null;
+
+  // Calendar summary
+  const cal = w.calendar && typeof w.calendar === "object" ? w.calendar : null;
+
   return {
     spec,
     starMass: Number.isFinite(starMass) ? starMass : null,
@@ -123,6 +143,16 @@ function summariseWorld(w) {
     gas: Number.isFinite(outermostGas) ? outermostGas : null,
     debrisCount: debrisRanges.length,
     debrisRanges,
+    hasTectonics: !!tec,
+    tecRanges,
+    tecVolcanoes,
+    tecRifts,
+    tecInactive,
+    hasPopulation: !!pop,
+    popTechEra: pop?.techEra || null,
+    hasClimate: !!clim,
+    climAltitude: clim ? Number(clim.altitudeM) || 0 : 0,
+    hasCalendar: !!cal,
   };
 }
 
@@ -175,7 +205,7 @@ export function initImportExportPage(root) {
               <button id="btn-download" type="button">Download JSON</button>
               <button id="btn-copy" type="button">Copy to clipboard</button>
               <button id="btn-refresh" type="button">Refresh view</button>
-              <button id="btn-clear-data" type="button" class="danger">Clear saved data</button>
+              <button id="btn-clear-data" type="button" class="small danger">Clear saved data</button>
             </div>
 
             <div style="height:10px"></div>
@@ -324,6 +354,12 @@ export function initImportExportPage(root) {
     importPreviewEl.style.display = "block";
     importActionsEl.style.display = "flex";
 
+    const tecParts = [];
+    if (m.tecRanges) tecParts.push(`${m.tecRanges} range(s)`);
+    if (m.tecInactive) tecParts.push(`${m.tecInactive} inactive`);
+    if (m.tecVolcanoes) tecParts.push(`${m.tecVolcanoes} volcano(es)`);
+    if (m.tecRifts) tecParts.push(`${m.tecRifts} rift(s)`);
+
     importPreviewEl.innerHTML = `
       <div class="io-preview-grid">
         <div><strong>Star</strong></div>
@@ -340,6 +376,18 @@ export function initImportExportPage(root) {
 
         <div><strong>Debris disks</strong></div>
         <div>${safeDebris}</div>
+
+        <div><strong>Tectonics</strong></div>
+        <div>${m.hasTectonics ? tecParts.join(", ") || "defaults" : "-"}</div>
+
+        <div><strong>Population</strong></div>
+        <div>${m.hasPopulation ? escapeHtml(m.popTechEra || "configured") : "-"}</div>
+
+        <div><strong>Climate</strong></div>
+        <div>${m.hasClimate ? (m.climAltitude ? `altitude ${m.climAltitude} m` : "sea level") : "-"}</div>
+
+        <div><strong>Calendar</strong></div>
+        <div>${m.hasCalendar ? "included" : "-"}</div>
       </div>
       <div class="hint" style="margin-top:8px">Import will replace your current saved world. A backup will be created automatically first.</div>
     `;

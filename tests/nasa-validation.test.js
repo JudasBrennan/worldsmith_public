@@ -70,7 +70,7 @@ const OPPOSITION_DATA = [
 
 /* ── Absolute magnitude: engine H vs JPL V(1,0) ─────────────── */
 
-test("absolute magnitude (H) matches JPL V(1,0) for Solar System planets", () => {
+test("calcBodyAbsoluteMagnitude → Solar System planets → matches JPL V(1,0)", () => {
   console.log("\n  Absolute magnitude (H) vs JPL V(1,0):");
   console.log(`  ${padEnd("Planet", 10)} ${pad("Engine", 8)} ${pad("JPL", 8)} ${pad("\u0394", 8)}`);
   console.log(`  ${"-".repeat(36)}`);
@@ -89,7 +89,7 @@ test("absolute magnitude (H) matches JPL V(1,0) for Solar System planets", () =>
 
 /* ── Sun at 1 AU ─────────────────────────────────────────────── */
 
-test("Sun from Earth: magnitude \u2248 \u221226.74, angular diameter \u2248 31.8 arcmin", () => {
+test("calcStarApparentAtOrbit → Sun at 1 AU → mag \u2248 \u221226.74, ang \u2248 31.8\u2032", () => {
   const abs = calcStarAbsoluteMagnitude(1);
   const result = calcStarApparentAtOrbit({
     starAbsoluteMagnitude: abs,
@@ -107,7 +107,7 @@ test("Sun from Earth: magnitude \u2248 \u221226.74, angular diameter \u2248 31.8
 
 /* ── Full Moon from Earth ────────────────────────────────────── */
 
-test("Full Moon: magnitude \u2248 \u221212.74, angular diameter \u2248 31.1 arcmin", () => {
+test("calcMoonApparentFromHome → Full Moon → mag \u2248 \u221212.74, ang \u2248 31.1\u2032", () => {
   const moon = calcMoonApparentFromHome({
     starLuminosityLsol: 1,
     homeOrbitAu: 1,
@@ -132,7 +132,7 @@ test("Full Moon: magnitude \u2248 \u221212.74, angular diameter \u2248 31.1 arcm
 
 /* ── Planets at opposition ───────────────────────────────────── */
 
-test("planets at opposition match observed magnitudes and angular sizes", () => {
+test("calcBodyApparentFromHome → planets at opposition → match observed mag and size", () => {
   console.log("\n  Planets at opposition vs observed:");
   console.log(
     `  ${padEnd("Planet", 10)} ${pad("Mag", 7)} ${pad("NASA", 7)} ${pad("\u0394", 6)} \u2502 ${pad("Ang\u2033", 7)} ${pad("NASA\u2033", 7)} ${pad("\u0394\u2033", 6)}  Note`,
@@ -168,7 +168,7 @@ test("planets at opposition match observed magnitudes and angular sizes", () => 
 
 /* ── Galilean moons from Jupiter surface ─────────────────────── */
 
-test("Galilean moons from Jupiter: bright and finite", () => {
+test("calcMoonApparentFromHome → Galilean moons from Jupiter → bright and finite", () => {
   const jupiterOrbitAu = 5.2026;
   const galileans = [
     { name: "Io", radiusMoon: 1.048, smaKm: 421800, geoAlbedo: 0.63 },
@@ -211,7 +211,7 @@ test("Galilean moons from Jupiter: bright and finite", () => {
 
 /* ── Combined summary table ──────────────────────────────────── */
 
-test("combined NASA validation summary", () => {
+test("apparent magnitude engine → all targets → within NASA tolerances", () => {
   const abs = calcStarAbsoluteMagnitude(1);
   const sun = calcStarApparentAtOrbit({
     starAbsoluteMagnitude: abs,

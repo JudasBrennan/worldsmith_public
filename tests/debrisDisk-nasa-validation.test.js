@@ -121,7 +121,7 @@ function fmtNum(n) {
   return n.toFixed(4);
 }
 
-test("NASA debris disk validation \u2014 summary table", () => {
+test("NASA validation → summary table → prints comparison", () => {
   const W = 110;
   const sep = "\u2500".repeat(W);
   console.log("\n" + "\u2550".repeat(W));
@@ -193,22 +193,22 @@ for (const [name, cfg] of Object.entries(BELTS)) {
   const m = models[name];
   const n = cfg.nasa;
 
-  test(`${name}: midpoint temperature within 1%`, () => {
+  test(`${name} → midpoint temperature → within 1%`, () => {
     const err = pctErr(m.temperature.midK, n.midTempK);
     assert.ok(err <= 1, `${m.temperature.midK} vs ${n.midTempK}: ${err.toFixed(2)}%`);
   });
 
-  test(`${name}: inner temperature within 1%`, () => {
+  test(`${name} → inner temperature → within 1%`, () => {
     const err = pctErr(m.temperature.innerK, n.innerTempK);
     assert.ok(err <= 1, `${m.temperature.innerK} vs ${n.innerTempK}: ${err.toFixed(2)}%`);
   });
 
-  test(`${name}: outer temperature within 1%`, () => {
+  test(`${name} → outer temperature → within 1%`, () => {
     const err = pctErr(m.temperature.outerK, n.outerTempK);
     assert.ok(err <= 1, `${m.temperature.outerK} vs ${n.outerTempK}: ${err.toFixed(2)}%`);
   });
 
-  test(`${name}: orbital period within 1%`, () => {
+  test(`${name} → orbital period → within 1%`, () => {
     const err = pctErr(m.orbital.orbitalPeriodYears, n.orbitalPeriodYr);
     assert.ok(
       err <= 1,
@@ -216,27 +216,27 @@ for (const [name, cfg] of Object.entries(BELTS)) {
     );
   });
 
-  test(`${name}: frost line relation is ${n.frostRelation}`, () => {
+  test(`${name} → frost line → ${n.frostRelation}`, () => {
     assert.equal(m.placement.relativeToFrostLine, n.frostRelation);
   });
 
-  test(`${name}: composition class is ${n.compositionClass}`, () => {
+  test(`${name} → composition class → ${n.compositionClass}`, () => {
     assert.equal(m.composition.className, n.compositionClass);
   });
 
-  test(`${name}: classification label is ${n.classificationLabel}`, () => {
+  test(`${name} → classification label → ${n.classificationLabel}`, () => {
     assert.equal(m.classification.label, n.classificationLabel);
   });
 }
 
 // Kuiper belt specific
-test("Kuiper Belt: dominant process is collision-dominated", () => {
+test("Kuiper Belt → dominant process → collision-dominated", () => {
   assert.equal(models["Kuiper Belt"].timescales.dominantProcess, "Collision-dominated");
 });
 
 // ── Condensation sequence spot checks ───────────────────────────────
 
-test("Asteroid Belt: silicates present, water ice absent at inner edge", () => {
+test("Asteroid Belt → inner edge → silicates present, water ice absent", () => {
   const m = models["Asteroid Belt"];
   const forsterite = m.composition.species.find((s) => s.name === "Forsterite");
   const water = m.composition.species.find((s) => s.name === "Water ice");
@@ -244,13 +244,13 @@ test("Asteroid Belt: silicates present, water ice absent at inner edge", () => {
   assert.ok(!water.presentAtInner, "Water ice at ~194 K should NOT condense (170 K threshold)");
 });
 
-test("Asteroid Belt: water ice present at outer edge", () => {
+test("Asteroid Belt → outer edge → water ice present", () => {
   const m = models["Asteroid Belt"];
   const water = m.composition.species.find((s) => s.name === "Water ice");
   assert.ok(water.presentAtOuter, "Water ice at ~154 K should condense");
 });
 
-test("Kuiper Belt: water ice, CO₂ ice, and CH₄ ice all present", () => {
+test("Kuiper Belt → condensation → water/CO2 ice present, CH4 absent", () => {
   const m = models["Kuiper Belt"];
   const water = m.composition.species.find((s) => s.name === "Water ice");
   const co2 = m.composition.species.find((s) => s.name === "CO\u2082 ice");
@@ -263,7 +263,7 @@ test("Kuiper Belt: water ice, CO₂ ice, and CH₄ ice all present", () => {
   );
 });
 
-test("Kuiper Belt: ice-to-rock ratio > 0.5", () => {
+test("Kuiper Belt → ice-to-rock ratio → >0.5", () => {
   const m = models["Kuiper Belt"];
   assert.ok(
     m.composition.iceToRockRatio > 0.5,
@@ -273,11 +273,11 @@ test("Kuiper Belt: ice-to-rock ratio > 0.5", () => {
 
 // ── Stability checks ───────────────────────────────────────────────
 
-test("Asteroid Belt (2.06\u20133.27 AU): stable (no giant overlap)", () => {
+test("Asteroid Belt → stability → no giant overlap", () => {
   assert.equal(models["Asteroid Belt"].stability.isStable, true);
 });
 
-test("Kuiper Belt (39.4\u201347.8 AU): stable (no giant overlap)", () => {
+test("Kuiper Belt → stability → no giant overlap", () => {
   assert.equal(models["Kuiper Belt"].stability.isStable, true);
 });
 
@@ -286,13 +286,13 @@ test("Kuiper Belt (39.4\u201347.8 AU): stable (no giant overlap)", () => {
 // We just verify the engine produces physically plausible values
 // and the Kuiper belt estimate is much larger than the asteroid belt.
 
-test("Mass sanity: Kuiper belt estimate >> asteroid belt estimate", () => {
+test("mass → Kuiper belt vs asteroid belt → KB >> AB", () => {
   const abMass = models["Asteroid Belt"].mass.estimatedMassEarth;
   const kbMass = models["Kuiper Belt"].mass.estimatedMassEarth;
   assert.ok(kbMass > abMass * 5, `KB ${kbMass} should be >> AB ${abMass}`);
 });
 
-test("Mass sanity: asteroid belt estimate sub-Earth", () => {
+test("mass → asteroid belt estimate → sub-Earth", () => {
   const m = models["Asteroid Belt"].mass.estimatedMassEarth;
   assert.ok(m < 1 && m > 1e-8, `AB mass = ${m} M\u2295`);
 });

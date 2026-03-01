@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <linearGradient id="g-clim" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9DC2FF" />
+      <stop offset="1" stop-color="#6EA8FF" />
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="8.5" stroke="url(#g-clim)" stroke-width="1.5" />
+  <path d="M4.8 7.5h14.4" stroke="#e05555" stroke-width="1.2" stroke-linecap="round" opacity="0.8" />
+  <path d="M3.6 12h16.8" stroke="#4caf6e" stroke-width="1.2" stroke-linecap="round" opacity="0.8" />
+  <path d="M4.8 16.5h14.4" stroke="#5b8fd4" stroke-width="1.2" stroke-linecap="round" opacity="0.8" />
+</svg>

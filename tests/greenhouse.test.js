@@ -6,7 +6,7 @@ import { approxEqual } from "./testHelpers.js";
 
 /* ── computeGreenhouseTau calibration ──────────────────────────── */
 
-test("Earth greenhouse tau ≈ 0.70", () => {
+test("computeGreenhouseTau → Earth conditions → tau ≈ 0.70", () => {
   const tau = computeGreenhouseTau({
     pressureAtm: 1.0,
     co2Pct: 0.04,
@@ -16,7 +16,7 @@ test("Earth greenhouse tau ≈ 0.70", () => {
   approxEqual(tau, 0.7, 0.02, "Earth tau");
 });
 
-test("Venus greenhouse tau ≈ 126", () => {
+test("computeGreenhouseTau → Venus conditions → tau ≈ 126", () => {
   const tau = computeGreenhouseTau({
     pressureAtm: 92,
     co2Pct: 96.5,
@@ -26,7 +26,7 @@ test("Venus greenhouse tau ≈ 126", () => {
   approxEqual(tau, 126, 2, "Venus tau");
 });
 
-test("Mars greenhouse tau ≈ 0.029", () => {
+test("computeGreenhouseTau → Mars conditions → tau ≈ 0.029", () => {
   const tau = computeGreenhouseTau({
     pressureAtm: 0.006,
     co2Pct: 95.3,
@@ -69,7 +69,7 @@ test("H₂-N₂ CIA: 10% H₂, 90% N₂, 1 bar → tau ≈ 0.27", () => {
   approxEqual(tau, 0.27, 0.05, "H2-N2 CIA tau");
 });
 
-test("Expert gases at 0 match core-only result", () => {
+test("computeGreenhouseTau → expert gases at zero → matches core-only result", () => {
   const core = computeGreenhouseTau({
     pressureAtm: 1.0,
     co2Pct: 0.04,
@@ -124,7 +124,7 @@ test("Core mode: Earth gases → T ≈ 288 K", () => {
 
 /* ── Manual mode backward compatibility ────────────────────────── */
 
-test("Manual mode uses manual GHE unchanged", () => {
+test("calcPlanetExact → manual mode → preserves manual GHE", () => {
   const manualGHE = 1.19;
   const p = calcPlanetExact({
     starMassMsol: 1,
@@ -155,7 +155,7 @@ test("Manual mode uses manual GHE unchanged", () => {
 
 /* ── Gas balance ───────────────────────────────────────────────── */
 
-test("Gas balance: all 9 gases sum correctly, N₂ = remainder", () => {
+test("calcPlanetExact → full mode 9 gases → N₂ = remainder sums to 100%", () => {
   const p = calcPlanetExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -192,7 +192,7 @@ test("Gas balance: all 9 gases sum correctly, N₂ = remainder", () => {
 
 /* ── CO₂-H₂O band overlap suppression ──────────────────────────── */
 
-test("Venus with real H₂O (0.003%) stays near calibrated tau", () => {
+test("computeGreenhouseTau → Venus + trace H₂O → tau stays near calibrated value", () => {
   const tau = computeGreenhouseTau({
     pressureAtm: 92,
     co2Pct: 96.5,
@@ -203,7 +203,7 @@ test("Venus with real H₂O (0.003%) stays near calibrated tau", () => {
   approxEqual(tau, 127, 2, "Venus tau with H2O");
 });
 
-test("H₂O contribution suppressed in CO₂-dominated atmosphere", () => {
+test("computeGreenhouseTau → CO₂-dominated atmosphere → H₂O heavily suppressed", () => {
   // Pure CO₂ atmosphere — H₂O should be almost entirely suppressed
   const co2Only = computeGreenhouseTau({
     pressureAtm: 92,
@@ -221,7 +221,7 @@ test("H₂O contribution suppressed in CO₂-dominated atmosphere", () => {
   assert.ok(withH2O - co2Only < 1, "H₂O contribution should be heavily suppressed");
 });
 
-test("H₂O not suppressed in low-CO₂ atmosphere", () => {
+test("computeGreenhouseTau → low CO₂ → H₂O retains most contribution", () => {
   // Earth-like low CO₂ — H₂O should retain most of its contribution
   const co2Only = computeGreenhouseTau({
     pressureAtm: 1,
@@ -241,7 +241,7 @@ test("H₂O not suppressed in low-CO₂ atmosphere", () => {
 
 /* ── Full mode adds expert gas terms ───────────────────────────── */
 
-test("Full mode: SO₂ increases greenhouse tau", () => {
+test("computeGreenhouseTau → full mode + SO₂ → tau increases", () => {
   const base = computeGreenhouseTau({
     pressureAtm: 1.0,
     co2Pct: 0.04,
@@ -261,7 +261,7 @@ test("Full mode: SO₂ increases greenhouse tau", () => {
   assert.ok(withSO2 > base, "SO₂ should increase tau");
 });
 
-test("Full mode: NH₃ increases greenhouse tau", () => {
+test("computeGreenhouseTau → full mode + NH₃ → tau increases", () => {
   const base = computeGreenhouseTau({
     pressureAtm: 1.0,
     co2Pct: 0.04,
@@ -281,7 +281,7 @@ test("Full mode: NH₃ increases greenhouse tau", () => {
   assert.ok(withNH3 > base, "NH₃ should increase tau");
 });
 
-test("Full mode: SO₂ suppressed under high CO₂ (Venus)", () => {
+test("computeGreenhouseTau → Venus-level CO₂ → SO₂ heavily suppressed", () => {
   // At Venus conditions (τ_core ≈ 127), SO₂ should be heavily suppressed
   const tauCore = computeGreenhouseTau({
     pressureAtm: 92,
@@ -303,7 +303,7 @@ test("Full mode: SO₂ suppressed under high CO₂ (Venus)", () => {
   assert.ok(tauFull > tauCore, "SO₂ should still add some tau");
 });
 
-test("Full mode: SO₂ retains most effect at low CO₂", () => {
+test("computeGreenhouseTau → low CO₂ → SO₂ retains most effect", () => {
   // At Earth-like conditions (τ_core ≈ 0.7), SO₂ should be barely suppressed
   const base = computeGreenhouseTau({
     pressureAtm: 1.0,
@@ -325,7 +325,7 @@ test("Full mode: SO₂ retains most effect at low CO₂", () => {
   assert.ok(withSO2 - base > 0.2, "SO₂ should retain most contribution at low CO₂");
 });
 
-test("He has no greenhouse contribution", () => {
+test("calcPlanetExact → He added → tau unchanged", () => {
   // He doesn't affect computeGreenhouseTau (only affects molecular weight)
   const without = computeGreenhouseTau({
     pressureAtm: 1.0,

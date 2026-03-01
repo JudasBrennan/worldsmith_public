@@ -105,7 +105,7 @@ function makeLegacyRawWorld() {
   };
 }
 
-test("validateEnvelope accepts legacy raw world objects", () => {
+test("validateEnvelope → legacy raw world → accepted", () => {
   const legacy = makeLegacyRawWorld();
   const result = validateEnvelope(legacy);
 
@@ -114,7 +114,7 @@ test("validateEnvelope accepts legacy raw world objects", () => {
   assert.equal(result.world.star.name, "Legacy Star");
 });
 
-test("importWorld migrates old gas giants and adds bounded radiusRj", () => {
+test("importWorld → old gas giants → migrated with bounded radiusRj", () => {
   const legacy = makeLegacyRawWorld();
   legacy.system.gasGiants = {
     order: ["ga", "gb"],
@@ -135,7 +135,7 @@ test("importWorld migrates old gas giants and adds bounded radiusRj", () => {
   assert.equal(byId.gb.style, "neptune"); // legacy "ice" normalised to "neptune"
 });
 
-test("gas giant radius aliases import correctly", () => {
+test("importWorld → gas giant radius aliases → mapped to radiusRj", () => {
   const world = {
     star: { name: "Alias Star", massMsol: 1, ageGyr: 4.6 },
     system: {
@@ -157,7 +157,7 @@ test("gas giant radius aliases import correctly", () => {
   assert.equal(gas.gb.radiusRj, 0.7);
 });
 
-test("export envelope round-trip stays valid and preserves required world data", () => {
+test("exportEnvelope → round-trip → stays valid and preserves world data", () => {
   const world = {
     star: { name: "Roundtrip Star", massMsol: 0.92, ageGyr: 5.1 },
     system: {
@@ -204,7 +204,7 @@ test("export envelope round-trip stays valid and preserves required world data",
   assert.equal(loaded.star.name, "Roundtrip Star");
 });
 
-test("Sol preset validates and imports expected major bodies", () => {
+test("Sol preset → validate + import → expected major bodies", () => {
   const solEnvelope = createSolPresetEnvelope();
   const validated = validateEnvelope(solEnvelope);
   assert.equal(validated.ok, true);
@@ -286,7 +286,7 @@ test("Sol preset validates and imports expected major bodies", () => {
   assert.equal(newYearsDay?.observance?.weekendRule, "next-weekday");
 });
 
-test("Realmspace preset validates and imports expected bodies", () => {
+test("Realmspace preset → validate + import → expected bodies", () => {
   const envelope = createRealmspacePresetEnvelope();
   const validated = validateEnvelope(envelope);
   assert.equal(validated.ok, true);
@@ -313,7 +313,7 @@ test("Realmspace preset validates and imports expected bodies", () => {
   assert.ok(moons.some((m) => m.name === "Selune" && m.planetId === "p_toril"));
 });
 
-test("new gas giant fields (massMjup, rotationPeriodHours, slotIndex, metallicity) survive round-trip", () => {
+test("gas giant fields → round-trip → massMjup, rotation, slotIndex, metallicity preserved", () => {
   const world = {
     star: { name: "Field Test Star", massMsol: 1, ageGyr: 4.6 },
     system: {
@@ -348,7 +348,7 @@ test("new gas giant fields (massMjup, rotationPeriodHours, slotIndex, metallicit
   assert.equal(gas[0].rings, true);
 });
 
-test("0 gas giants and 0 debris disks are allowed", () => {
+test("importWorld → 0 gas giants + 0 debris disks → allowed", () => {
   const world = {
     star: { name: "Empty Star", massMsol: 1, ageGyr: 4.6 },
     system: {
@@ -363,7 +363,7 @@ test("0 gas giants and 0 debris disks are allowed", () => {
   assert.equal(gas.length, 0);
 });
 
-test("clearAllSavedData removes world data and backups from local storage", () => {
+test("clearAllSavedData → after import + backup → removes all data", () => {
   importWorld(makeLegacyRawWorld());
   createBackup(5);
   const backupsBefore = listBackups();

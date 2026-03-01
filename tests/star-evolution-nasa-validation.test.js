@@ -186,7 +186,7 @@ const STARS = [
 //  Part 1 — Evolved L, R, T vs Observed (per-star assertions)
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("evolved stellar properties match observed values for benchmark MS stars", () => {
+test("evolvedLuminosity/Radius → benchmark MS stars → match observed L, R, T", () => {
   const header = [
     padEnd("Star", 16),
     pad("M", 5),
@@ -264,7 +264,7 @@ test("evolved stellar properties match observed values for benchmark MS stars", 
 //  Part 2 — ZAMS Values (young Sun problem)
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("ZAMS values match standard solar model predictions", () => {
+test("zamsLuminosity/Radius → Sun Z=0.02 → match standard solar model", () => {
   const Z = feHtoZ(0);
 
   // Standard solar model: young Sun ≈ 0.70 Lsol, ≈ 0.89 Rsol
@@ -287,7 +287,7 @@ test("ZAMS values match standard solar model predictions", () => {
 //  Part 3 — MS Lifetimes
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("MS lifetimes match astrophysical expectations", () => {
+test("msLifetimeGyr → various masses → match astrophysical expectations", () => {
   // Reference: Hurley et al. 2000; standard stellar evolution models
   const cases = [
     { m: 0.5, Z: 0.02, expected: 130, tolPct: 30, label: "0.5 Msol (red dwarf, >100 Gyr)" },
@@ -317,7 +317,7 @@ test("MS lifetimes match astrophysical expectations", () => {
 //  Part 4 — calcStar evolved mode full integration
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("calcStar evolved mode produces correct outputs for benchmark stars", () => {
+test("calcStar → evolved mode benchmarks → correct L, R, T for known stars", () => {
   console.log("\n  calcStar (evolved mode) — Full Integration:");
   console.log(
     `  ${padEnd("Star", 16)} ${pad("L", 7)} ${pad("R", 7)} ${pad("T(K)", 7)} ` +
@@ -363,7 +363,7 @@ test("calcStar evolved mode produces correct outputs for benchmark stars", () =>
 //  Part 5 — Evolved vs ZAMS mode comparison
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("evolved mode differs from ZAMS mode appropriately", () => {
+test("calcStar → evolved vs ZAMS mode → evolved L/R not drastically below", () => {
   console.log("\n  Evolved vs ZAMS Mode Comparison:");
   console.log(
     `  ${padEnd("Star", 16)} ${pad("L_evol", 8)} ${pad("L_zams", 8)} ${pad("ΔL%", 6)} ` +
@@ -485,7 +485,7 @@ const EARTH_PLANET = {
   h2oPct: 0.4,
 };
 
-test("planet insolation and HZ with evolved Sun vs ZAMS mode", () => {
+test("calcPlanetExact → evolved Sun vs ZAMS → near-solar insolation and temp", () => {
   const evolvedPlanet = calcPlanetExact({
     starMassMsol: 1.0,
     starAgeGyr: 4.567,
@@ -569,7 +569,7 @@ test("planet insolation and HZ with evolved Sun vs ZAMS mode", () => {
   assertPctWithin(evolvedPlanet.star.habitableZoneAu.inner, 0.95, 10, "HZ inner (evolved Sun)");
 });
 
-test("planet insolation scales correctly with evolved stellar luminosity", () => {
+test("calcPlanetExact → evolved 1.5 Msol → insolation scales with L ratio", () => {
   // A 1.5 Msol star at 2 Gyr with solar Z should be significantly brighter
   // than the same mass in ZAMS mode → planet insolation should differ
   const evolvedPlanet = calcPlanetExact({
@@ -606,7 +606,7 @@ test("planet insolation scales correctly with evolved stellar luminosity", () =>
   assertPctWithin(insolRatio, lRatio, 2, "Insolation ratio matches L ratio");
 });
 
-test("HZ boundaries shift outward for evolved brighter stars", () => {
+test("calcHabitableZoneAu → evolved vs ZAMS Sun → HZ shifts outward", () => {
   // Compare HZ for Sun at 4.567 Gyr evolved vs young ZAMS
   const Z = feHtoZ(0);
   const lEvolved = evolvedLuminosity(1.0, Z, 4.567);
@@ -638,7 +638,7 @@ test("HZ boundaries shift outward for evolved brighter stars", () => {
 //  Part 8 — Combined Summary Table
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("stellar evolution NASA validation summary", () => {
+test("calcStar → evolved mode all benchmarks → mean errors within limits", () => {
   const results = [];
 
   for (const s of STARS) {

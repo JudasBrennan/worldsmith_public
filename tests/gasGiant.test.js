@@ -18,7 +18,7 @@ const SOLAR = {
 
 /* ── Physical properties ─────────────────────────────────────────── */
 
-test("Jupiter baseline: density ~1.33, gravity ~2.6g, escape ~59.5 km/s", () => {
+test("calcGasGiant → Jupiter baseline → density ~1.33, gravity ~2.6g, escape ~59.5 km/s", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -31,7 +31,7 @@ test("Jupiter baseline: density ~1.33, gravity ~2.6g, escape ~59.5 km/s", () => 
   approxEqual(m.physical.escapeVelocityKms, 59.5, 1.5);
 });
 
-test("Saturn baseline: density ~0.69 (less than water)", () => {
+test("calcGasGiant → Saturn baseline → density ~0.69 (less than water)", () => {
   const m = calcGasGiant({
     massMjup: 0.299,
     radiusRj: 0.84,
@@ -60,7 +60,7 @@ test("radius-to-mass Neptunian inversion: 0.36 Rj → ~0.05 Mjup", () => {
   approxEqual(m, 0.05, 0.03);
 });
 
-test("missing mass derives from radius", () => {
+test("calcGasGiant → missing mass → derives from radius", () => {
   const m = calcGasGiant({
     massMjup: null,
     radiusRj: 1.0,
@@ -73,7 +73,7 @@ test("missing mass derives from radius", () => {
   assert.ok(m.physical.massMjup > 0);
 });
 
-test("missing radius derives from mass", () => {
+test("calcGasGiant → missing radius → derives from mass", () => {
   const m = calcGasGiant({
     massMjup: 1.0,
     radiusRj: null,
@@ -99,7 +99,7 @@ test("equilibrium temp: Jupiter at 5.2 AU → ~110 K", () => {
   approxEqual(m.thermal.equilibriumTempK, 110, 20);
 });
 
-test("effective temp > equilibrium for massive giants (internal heat)", () => {
+test("calcGasGiant → massive giant → T_eff exceeds T_eq (internal heat)", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -115,7 +115,7 @@ test("effective temp > equilibrium for massive giants (internal heat)", () => {
 
 /* ── Sudarsky classification ─────────────────────────────────────── */
 
-test("Sudarsky class I for Jupiter (T_eq ~110 K)", () => {
+test("Sudarsky → Jupiter T_eq ~110 K → class I", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -126,7 +126,7 @@ test("Sudarsky class I for Jupiter (T_eq ~110 K)", () => {
   assert.equal(m.classification.sudarsky, "I");
 });
 
-test("Sudarsky class V for hot Jupiter at 0.03 AU", () => {
+test("Sudarsky → hot Jupiter at 0.03 AU → class V", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1.3,
@@ -140,7 +140,7 @@ test("Sudarsky class V for hot Jupiter at 0.03 AU", () => {
 
 /* ── Cloud layers ────────────────────────────────────────────────── */
 
-test("Jupiter-like has NH3 + NH4SH + H2O clouds", () => {
+test("clouds → Jupiter-like → NH3 + NH4SH + H2O layers", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -154,7 +154,7 @@ test("Jupiter-like has NH3 + NH4SH + H2O clouds", () => {
   assert.ok(names.includes("H₂O"), "Should have water clouds");
 });
 
-test("hot Jupiter has silicate clouds but no ammonia", () => {
+test("clouds → hot Jupiter → silicate present, no ammonia", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1.3,
@@ -169,7 +169,7 @@ test("hot Jupiter has silicate clouds but no ammonia", () => {
 
 /* ── Atmospheric composition ─────────────────────────────────────── */
 
-test("gas giant atmosphere ~86% H2, ~14% He", () => {
+test("atmosphere → gas giant → ~86% H2, ~14% He", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -181,7 +181,7 @@ test("gas giant atmosphere ~86% H2, ~14% He", () => {
   approxEqual(m.atmosphere.hePct, 14, 2);
 });
 
-test("ice giant atmosphere ~80% H2, ~18% He, ~2% CH4", () => {
+test("atmosphere → ice giant → ~80% H2, ~18% He, ~2% CH4", () => {
   const m = calcGasGiant({
     massMjup: 0.054,
     radiusRj: 0.35,
@@ -232,7 +232,7 @@ test("chaotic zone: Jupiter → ~0.93 AU half-width (Wisdom 1980)", () => {
 
 /* ── Magnetic field ──────────────────────────────────────────────── */
 
-test("magnetic field scales with mass", () => {
+test("magnetic field → heavier giant → stronger field", () => {
   const light = calcGasGiant({
     massMjup: 0.3,
     radiusRj: 0.9,
@@ -255,7 +255,7 @@ test("magnetic field scales with mass", () => {
 
 /* ── Atmospheric dynamics ────────────────────────────────────────── */
 
-test("band count increases with faster rotation", () => {
+test("dynamics → faster rotation → more bands", () => {
   const slow = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -276,7 +276,7 @@ test("band count increases with faster rotation", () => {
   );
 });
 
-test("wind direction: eastward for gas giant, westward for ice giant", () => {
+test("dynamics → gas giant eastward, ice giant → westward", () => {
   const giant = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -310,7 +310,7 @@ test("orbital period: Jupiter at 5.2 AU → ~11.86 years", () => {
 
 /* ── Appearance ──────────────────────────────────────────────────── */
 
-test("colour hex is valid 7-char string", () => {
+test("appearance → colourHex → valid 7-char hex string", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -323,17 +323,17 @@ test("colour hex is valid 7-char string", () => {
 
 /* ── Metallicity ────────────────────────────────────────────────── */
 
-test("estimateMetallicity: Jupiter ~4–5× solar", () => {
+test("estimateMetallicity → Jupiter → ~4–5× solar", () => {
   const z = estimateMetallicity(1.0);
   assert.ok(z >= 3 && z <= 6, `Jupiter metallicity ${z} should be ~4-5× solar`);
 });
 
-test("estimateMetallicity: Saturn ~10× solar", () => {
+test("estimateMetallicity → Saturn → ~10× solar", () => {
   const z = estimateMetallicity(0.299);
   assert.ok(z >= 7 && z <= 14, `Saturn metallicity ${z} should be ~10× solar`);
 });
 
-test("estimateMetallicity: Neptune ~30–40× solar", () => {
+test("estimateMetallicity → Neptune → ~30–40× solar", () => {
   const z = estimateMetallicity(0.054);
   assert.ok(z >= 25 && z <= 50, `Neptune metallicity ${z} should be ~30-40× solar`);
 });
@@ -347,7 +347,7 @@ test("estimateMetallicity: inverse mass trend (lighter → higher Z)", () => {
   );
 });
 
-test("default metallicity is derived from mass when not specified", () => {
+test("metallicity → not specified → derived from mass", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -360,7 +360,7 @@ test("default metallicity is derived from mass when not specified", () => {
   assert.ok(m.atmosphere.metallicitySolar > 0, "atmosphere metallicity should be set");
 });
 
-test("derived metallicity scales with host-star [Fe/H] when metallicity input is blank", () => {
+test("metallicity → host-star [Fe/H] varies → derived metallicity scales", () => {
   const poor = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -395,7 +395,7 @@ test("derived metallicity scales with host-star [Fe/H] when metallicity input is
   );
 });
 
-test("user-specified metallicity is used when provided", () => {
+test("metallicity → user-specified → overrides derived value", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -409,7 +409,7 @@ test("user-specified metallicity is used when provided", () => {
   assert.equal(m.atmosphere.metallicitySolar, 20);
 });
 
-test("higher metallicity increases trace gas abundances", () => {
+test("metallicity → higher value → increases trace gases, decreases H2", () => {
   const low = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -430,7 +430,7 @@ test("higher metallicity increases trace gas abundances", () => {
   assert.ok(high.atmosphere.h2Pct < low.atmosphere.h2Pct, "H2 should decrease with metallicity");
 });
 
-test("hot Jupiter atmosphere has CO instead of CH4", () => {
+test("atmosphere → hot Jupiter → CO dominant, no CH4", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1.3,
@@ -444,7 +444,7 @@ test("hot Jupiter atmosphere has CO instead of CH4", () => {
   assert.equal(m.atmosphere.dominantTrace, "CO");
 });
 
-test("metallicity display string is formatted", () => {
+test("display → metallicity → formatted string with 'solar'", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -458,7 +458,7 @@ test("metallicity display string is formatted", () => {
 
 /* ── Oblateness ─────────────────────────────────────────────────── */
 
-test("Jupiter oblateness: f ≈ 0.065", () => {
+test("oblateness → Jupiter → f ≈ 0.065", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -469,7 +469,7 @@ test("Jupiter oblateness: f ≈ 0.065", () => {
   approxEqual(m.oblateness.flattening, 0.065, 0.005, "Jupiter flattening");
 });
 
-test("Saturn oblateness > Jupiter (lower density, fast spin)", () => {
+test("oblateness → Saturn vs Jupiter → Saturn higher (lower density)", () => {
   const jup = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -490,7 +490,7 @@ test("Saturn oblateness > Jupiter (lower density, fast spin)", () => {
   );
 });
 
-test("equatorial radius > polar radius", () => {
+test("oblateness → any giant → equatorial radius > polar radius", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -512,7 +512,7 @@ test("slow rotation → near-zero oblateness", () => {
   assert.ok(m.oblateness.flattening < 0.01, `f = ${m.oblateness.flattening} should be near zero`);
 });
 
-test("equatorial gravity < mean gravity (due to larger radius)", () => {
+test("gravity → oblate giant → equatorial < mean (larger radius)", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -528,7 +528,7 @@ test("equatorial gravity < mean gravity (due to larger radius)", () => {
 
 /* ── Mass loss ──────────────────────────────────────────────────── */
 
-test("hot Jupiter at 0.03 AU: significant mass loss", () => {
+test("massLoss → hot Jupiter at 0.03 AU → significant (>10⁶ kg/s)", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1.3,
@@ -540,7 +540,7 @@ test("hot Jupiter at 0.03 AU: significant mass loss", () => {
   assert.ok(m.massLoss.evaporationTimescaleGyr > 100, "Should not fully evaporate");
 });
 
-test("Jupiter at 5.2 AU: negligible mass loss", () => {
+test("massLoss → Jupiter at 5.2 AU → negligible", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -551,7 +551,7 @@ test("Jupiter at 5.2 AU: negligible mass loss", () => {
   assert.ok(m.massLoss.massLossRateKgS < 1e3, "Jupiter should have negligible mass loss");
 });
 
-test("Roche lobe overflow flag is boolean", () => {
+test("massLoss → rocheLobeOverflow → boolean, false for Jupiter", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -592,7 +592,7 @@ test("younger star → more XUV → more mass loss", () => {
 
 /* ── Interior / core ────────────────────────────────────────────── */
 
-test("Jupiter heavy elements: ~30–60 M⊕ (Thorngren 2016)", () => {
+test("interior → Jupiter → ~30–60 M⊕ heavy elements (Thorngren 2016)", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -606,7 +606,7 @@ test("Jupiter heavy elements: ~30–60 M⊕ (Thorngren 2016)", () => {
   );
 });
 
-test("core mass capped at 25 M⊕", () => {
+test("interior → massive planet → core capped at 25 M⊕", () => {
   const m = calcGasGiant({
     massMjup: 10,
     radiusRj: 1.1,
@@ -617,7 +617,7 @@ test("core mass capped at 25 M⊕", () => {
   assert.ok(m.interior.estimatedCoreMassMearth <= 25, "Core should be capped at 25 M⊕");
 });
 
-test("heavier planet → more heavy elements", () => {
+test("interior → heavier planet → more heavy elements", () => {
   const light = calcGasGiant({
     massMjup: 0.3,
     radiusRj: 0.9,
@@ -681,7 +681,7 @@ test("old system → baseline radius", () => {
   approxEqual(m.physical.radiusInflationFactor, 1.1, 0.05, "5 Gyr inflation factor");
 });
 
-test("hot Jupiter proximity inflation adds to suggested radius", () => {
+test("radius → hot Jupiter proximity → inflation added to suggested", () => {
   const cold = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -728,7 +728,7 @@ test("hot giant → rocky rings", () => {
   assert.equal(m.ringProperties.ringType, "Rocky");
 });
 
-test("ring mass peaks near Saturn mass (0.3 Mjup)", () => {
+test("rings → Saturn mass (0.3 Mjup) → peak ring mass, Dense depth", () => {
   const saturn = calcGasGiant({
     massMjup: 0.3,
     radiusRj: 0.9,
@@ -753,7 +753,7 @@ test("ring mass peaks near Saturn mass (0.3 Mjup)", () => {
 
 /* ── Tidal effects ──────────────────────────────────────────────── */
 
-test("hot Jupiter at 0.03 AU: tidally locked", () => {
+test("tidal → hot Jupiter at 0.03 AU → tidally locked", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1.3,
@@ -764,7 +764,7 @@ test("hot Jupiter at 0.03 AU: tidally locked", () => {
   assert.equal(m.tidal.isTidallyLocked, true, "Hot Jupiter should be tidally locked");
 });
 
-test("Jupiter at 5.2 AU: not tidally locked", () => {
+test("tidal → Jupiter at 5.2 AU → not tidally locked", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -775,7 +775,7 @@ test("Jupiter at 5.2 AU: not tidally locked", () => {
   assert.equal(m.tidal.isTidallyLocked, false, "Jupiter should not be tidally locked");
 });
 
-test("closer orbit → shorter locking timescale", () => {
+test("tidal → closer orbit → shorter locking timescale", () => {
   const close = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,
@@ -796,7 +796,7 @@ test("closer orbit → shorter locking timescale", () => {
   );
 });
 
-test("circularisation timescale is positive", () => {
+test("tidal → circularisation timescale → positive value", () => {
   const m = calcGasGiant({
     massMjup: 1,
     radiusRj: 1,

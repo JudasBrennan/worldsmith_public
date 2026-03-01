@@ -27,33 +27,33 @@ const EARTH_LIKE = {
   },
 };
 
-test("Earth-like planet has plausible surface temperature", () => {
+test("surfaceTempK → Earth-like → 280–300 K", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(p.derived.surfaceTempK >= 280, "surface temp should be >= 280 K");
   assert.ok(p.derived.surfaceTempK <= 300, "surface temp should be <= 300 K");
 });
 
-test("Earth-like planet density is around 5.5 g/cm³", () => {
+test("densityGcm3 → Earth-like → ~5.5 g/cm³", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   approxEqual(p.derived.densityGcm3, 5.51, 0.1, "Earth density");
 });
 
-test("Earth-like planet radius is close to 1 Earth radius", () => {
+test("radiusEarth → Earth-like → ~1.0 R⊕", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   approxEqual(p.derived.radiusEarth, 1.0, 0.05, "Earth radius");
 });
 
-test("Earth-like planet gravity is close to 1g", () => {
+test("gravityG → Earth-like → ~1.0 g", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   approxEqual(p.derived.gravityG, 1.0, 0.1, "Earth gravity");
 });
 
-test("prograde orbit gives Prograde direction", () => {
+test("orbitalDirection → inclination < 90° → Prograde", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.orbitalDirection, "Prograde");
 });
 
-test("retrograde orbit (inclination > 90) gives Retrograde direction", () => {
+test("orbitalDirection → inclination > 90° → Retrograde", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, inclinationDeg: 120 },
@@ -61,7 +61,7 @@ test("retrograde orbit (inclination > 90) gives Retrograde direction", () => {
   assert.equal(p.derived.orbitalDirection, "Retrograde");
 });
 
-test("exactly 90° inclination gives Undefined direction", () => {
+test("orbitalDirection → inclination = 90° → Undefined", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, inclinationDeg: 90 },
@@ -69,7 +69,7 @@ test("exactly 90° inclination gives Undefined direction", () => {
   assert.equal(p.derived.orbitalDirection, "Undefined");
 });
 
-test("orbital period scales with semi-major axis (Kepler's third law)", () => {
+test("orbitalPeriod → 4 AU vs 1 AU → ratio ~8 (Kepler third law)", () => {
   const p1 = calcPlanetExact(EARTH_LIKE);
   const p4 = calcPlanetExact({
     ...EARTH_LIKE,
@@ -80,7 +80,7 @@ test("orbital period scales with semi-major axis (Kepler's third law)", () => {
   approxEqual(ratio, 8, 0.01, "Kepler T ratio");
 });
 
-test("N2 percentage is zero when gas totals exceed 100%", () => {
+test("n2Pct → gas totals exceed 100% → clamped to zero", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, o2Pct: 60, co2Pct: 30, arPct: 20 },
@@ -89,7 +89,7 @@ test("N2 percentage is zero when gas totals exceed 100%", () => {
   assert.equal(p.derived.gasMixClamped, true);
 });
 
-test("atmosphere cell count varies with rotation period", () => {
+test("circulationCellCount → slow vs fast rotation → 1 vs 7", () => {
   const slow = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, rotationPeriodHours: 100 },
@@ -102,13 +102,13 @@ test("atmosphere cell count varies with rotation period", () => {
   assert.equal(fast.derived.circulationCellCount, "7");
 });
 
-test("sky colour is a valid hex string", () => {
+test("skyColourHex → Earth-like → valid hex strings", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.match(p.derived.skyColourDayHex, /^#[0-9a-f]{6}$/);
   assert.match(p.derived.skyColourHorizonHex, /^#[0-9a-f]{6}$/);
 });
 
-test("5-cell circulation regime for very fast rotation (< 3 hours)", () => {
+test("circulationCellCount → P < 3 h → 5 cells", () => {
   const veryFast = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, rotationPeriodHours: 2 },
@@ -117,7 +117,7 @@ test("5-cell circulation regime for very fast rotation (< 3 hours)", () => {
   assert.equal(veryFast.derived.circulationCellRanges.length, 5);
 });
 
-test("3-cell circulation regime for moderate rotation (6-48 hours)", () => {
+test("circulationCellCount → P = 24 h → 3 cells", () => {
   const moderate = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, rotationPeriodHours: 24 },
@@ -127,12 +127,12 @@ test("3-cell circulation regime for moderate rotation (6-48 hours)", () => {
 
 // --- New derived properties ---
 
-test("Earth-like planet is in the habitable zone", () => {
+test("inHabitableZone → Earth-like → true", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.inHabitableZone, true);
 });
 
-test("planet far from star is not in habitable zone", () => {
+test("inHabitableZone → 50 AU → false", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, semiMajorAxisAu: 50 },
@@ -140,12 +140,12 @@ test("planet far from star is not in habitable zone", () => {
   assert.equal(p.derived.inHabitableZone, false);
 });
 
-test("Earth-like insolation is close to 1.0", () => {
+test("insolationEarth → Earth-like → ~1.0", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   approxEqual(p.derived.insolationEarth, 1.0, 0.15, "insolation");
 });
 
-test("insolation scales inversely with distance squared", () => {
+test("insolationEarth → 2 AU vs 1 AU → ratio ~4 (inverse-square)", () => {
   const p1 = calcPlanetExact(EARTH_LIKE);
   const p2 = calcPlanetExact({
     ...EARTH_LIKE,
@@ -159,7 +159,7 @@ test("insolation scales inversely with distance squared", () => {
   );
 });
 
-test("Earth-like planet is not tidally locked", () => {
+test("tidallyLockedToStar → Earth-like → false", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.tidallyLockedToStar, false);
   // Lock time should exceed the system age (4.6 Gyr)
@@ -169,7 +169,7 @@ test("Earth-like planet is not tidally locked", () => {
   );
 });
 
-test("close-in M-dwarf planet is tidally locked with 1:1 resonance", () => {
+test("tidalLock → close-in M-dwarf → 1:1 resonance", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.15,
     starAgeGyr: 8,
@@ -180,7 +180,7 @@ test("close-in M-dwarf planet is tidally locked with 1:1 resonance", () => {
   assert.equal(p.derived.spinOrbitResonance, "1:1");
 });
 
-test("high-eccentricity tidally-evolved planet predicts 3:2 resonance", () => {
+test("spinOrbitResonance → high eccentricity + evolved → 3:2", () => {
   const p = calcPlanetExact({
     starMassMsol: 1,
     starAgeGyr: 10,
@@ -205,7 +205,7 @@ test("high-eccentricity tidally-evolved planet predicts 3:2 resonance", () => {
   );
 });
 
-test("thick atmosphere prevents tidal locking (Venus-like)", () => {
+test("atmospherePreventsLocking → thick atm (Venus-like) → true", () => {
   const p = calcPlanetExact({
     starMassMsol: 1,
     starAgeGyr: 4.6,
@@ -227,7 +227,7 @@ test("thick atmosphere prevents tidal locking (Venus-like)", () => {
   assert.equal(p.derived.spinOrbitResonance, null);
 });
 
-test("thin atmosphere does not prevent tidal locking", () => {
+test("atmospherePreventsLocking → thin atm + M-dwarf → false", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.15,
     starAgeGyr: 8,
@@ -244,7 +244,7 @@ test("thin atmosphere does not prevent tidal locking", () => {
 
 // --- Moon tidal heating on planet ---
 
-test("Earth + Moon solid-body tidal heating is small but nonzero", () => {
+test("planetTidalHeating → Earth + Moon → small but nonzero (~4 GW)", () => {
   const earthMoon = [{ massMoon: 1.0, semiMajorAxisKm: 384748, eccentricity: 0.055 }];
   const withMoon = calcPlanetExact({ ...EARTH_LIKE, moons: earthMoon });
   const without = calcPlanetExact(EARTH_LIKE);
@@ -263,14 +263,14 @@ test("Earth + Moon solid-body tidal heating is small but nonzero", () => {
   assert.ok(without.derived.dynamoActive, "Earth without Moon should have active dynamo");
 });
 
-test("no moons produces zero tidal heating", () => {
+test("planetTidalHeating → no moons → zero", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.planetTidalHeatingW, 0);
   assert.equal(p.derived.planetTidalFraction, 0);
   assert.ok(p.derived.dynamoActive);
 });
 
-test("massive close moon keeps otherwise-dead core alive", () => {
+test("dynamoActive → massive close moon on dead core → revived", () => {
   const deadPlanet = {
     ...EARTH_LIKE,
     starAgeGyr: 15,
@@ -289,7 +289,7 @@ test("massive close moon keeps otherwise-dead core alive", () => {
   assert.ok(revived.derived.dynamoActive, "massive tidal heating should keep dynamo alive");
 });
 
-test("circular orbit moon contributes zero tidal heating", () => {
+test("planetTidalHeating → circular orbit moon (e=0) → zero", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     moons: [{ massMoon: 1.0, semiMajorAxisKm: 384748, eccentricity: 0 }],
@@ -298,7 +298,7 @@ test("circular orbit moon contributes zero tidal heating", () => {
   assert.equal(p.derived.planetTidalFraction, 0);
 });
 
-test("multiple moons sum tidal heating contributions", () => {
+test("planetTidalHeating → two moons → greater than one moon", () => {
   const oneMoon = calcPlanetExact({
     ...EARTH_LIKE,
     moons: [{ massMoon: 1.0, semiMajorAxisKm: 384748, eccentricity: 0.055 }],
@@ -316,12 +316,12 @@ test("multiple moons sum tidal heating contributions", () => {
   );
 });
 
-test("Earth-like planet has liquid water possible", () => {
+test("liquidWaterPossible → Earth-like → true", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.liquidWaterPossible, true);
 });
 
-test("very hot planet does not have liquid water", () => {
+test("liquidWaterPossible → very hot planet → false", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, semiMajorAxisAu: 0.05, greenhouseEffect: 5 },
@@ -330,7 +330,7 @@ test("very hot planet does not have liquid water", () => {
   assert.equal(p.derived.liquidWaterPossible, false);
 });
 
-test("airless planet does not have liquid water", () => {
+test("liquidWaterPossible → airless planet → false", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, pressureAtm: 0.001 },
@@ -341,13 +341,13 @@ test("airless planet does not have liquid water", () => {
 
 // --- Vegetation colours (2D PanoptesV-calibrated model) ---
 
-test("vegetation colour returns valid hex strings", () => {
+test("vegetationHex → Earth-like → valid hex strings", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.match(p.derived.vegetationPaleHex, /^#[0-9a-f]{6}$/);
   assert.match(p.derived.vegetationDeepHex, /^#[0-9a-f]{6}$/);
 });
 
-test("Earth-like vegetation at 1 atm is greenish (G-type, PanoptesV)", () => {
+test("vegetationPaleHex → G-type 1 atm → green > red", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   // PanoptesV G2/G5 at 1 atm: pale is yellow-green (green channel high)
   const pale = p.derived.vegetationPaleHex;
@@ -356,7 +356,7 @@ test("Earth-like vegetation at 1 atm is greenish (G-type, PanoptesV)", () => {
   assert.ok(g > r, `green > red for Earth-like vegetation: g=${g} r=${r}`);
 });
 
-test("G-type at 10 atm has red/purple tint (PanoptesV)", () => {
+test("vegetationPaleHex → G-type 10 atm → red > green", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, pressureAtm: 10 },
@@ -368,7 +368,7 @@ test("G-type at 10 atm has red/purple tint (PanoptesV)", () => {
   assert.ok(r > g, `G-type 10 atm: red > green: r=${r} g=${g}`);
 });
 
-test("G-type at 3 atm is olive/gold (PanoptesV)", () => {
+test("vegetationPaleHex → G-type 3 atm → warm (red > blue)", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, pressureAtm: 3 },
@@ -380,7 +380,7 @@ test("G-type at 3 atm is olive/gold (PanoptesV)", () => {
   assert.ok(r > b, `G-type 3 atm: should be warm (r > b): r=${r} b=${b}`);
 });
 
-test("M-dwarf vegetation has blue component (PanoptesV)", () => {
+test("vegetationDeepHex → M-dwarf → blue > red", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.18,
     starAgeGyr: 8,
@@ -393,7 +393,7 @@ test("M-dwarf vegetation has blue component (PanoptesV)", () => {
   assert.ok(b > r, `M-dwarf deep should have blue > red: b=${b} r=${r}`);
 });
 
-test("tidally locked M-dwarf planet has twilight vegetation colours", () => {
+test("vegetationTwilightHex → tidally locked M-dwarf → non-null hex", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.15,
     starAgeGyr: 8,
@@ -405,14 +405,14 @@ test("tidally locked M-dwarf planet has twilight vegetation colours", () => {
   assert.match(p.derived.vegetationTwilightPaleHex, /^#[0-9a-f]{6}$/);
 });
 
-test("non-locked planet has no twilight vegetation colours", () => {
+test("vegetationTwilightHex → non-locked planet → null", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.vegetationTwilightPaleHex, null);
   assert.equal(p.derived.vegetationTwilightDeepHex, null);
   assert.equal(p.derived.vegetationTwilightStops, null);
 });
 
-test("vegetation stops is a 6-element array of valid hex colours", () => {
+test("vegetationStops → Earth-like → 6 valid hex colours", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(Array.isArray(p.derived.vegetationStops), "stops should be an array");
   assert.equal(p.derived.vegetationStops.length, 6, "should have 6 stops");
@@ -421,7 +421,7 @@ test("vegetation stops is a 6-element array of valid hex colours", () => {
   }
 });
 
-test("vegetation stops span from pale to deep", () => {
+test("vegetationStops → Earth-like → first=pale, last=deep", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.derived.vegetationStops[0], p.derived.vegetationPaleHex);
   assert.equal(
@@ -430,7 +430,7 @@ test("vegetation stops span from pale to deep", () => {
   );
 });
 
-test("tidally locked planet has 6-element twilight stops", () => {
+test("vegetationTwilightStops → tidally locked → 6-element array", () => {
   const p = calcPlanetExact({
     starMassMsol: 0.15,
     starAgeGyr: 8,
@@ -441,7 +441,7 @@ test("tidally locked planet has 6-element twilight stops", () => {
   assert.equal(p.derived.vegetationTwilightStops[0], p.derived.vegetationTwilightPaleHex);
 });
 
-test("vegetation note describes the spectral regime", () => {
+test("vegetationNote → Earth-like → mentions Green", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(p.derived.vegetationNote.length > 0, "note should not be empty");
   assert.ok(p.derived.vegetationNote.includes("Green"), "Earth-like note should mention green");
@@ -449,7 +449,7 @@ test("vegetation note describes the spectral regime", () => {
 
 /* ── Phase A: Composition model ─────────────────────────────────── */
 
-test("Earth with WMF=0 gives unchanged density and radius", () => {
+test("composition → WMF=0 → unchanged density and radius", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, wmfPct: 0 },
@@ -458,7 +458,7 @@ test("Earth with WMF=0 gives unchanged density and radius", () => {
   approxEqual(p.derived.radiusEarth, 1.0, 0.05, "Earth radius (WMF=0)");
 });
 
-test("Earth with WMF=0.02% has barely changed radius (<0.5%)", () => {
+test("composition → WMF=0.02% → radius change < 0.5%", () => {
   const dry = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, wmfPct: 0 },
@@ -472,7 +472,7 @@ test("Earth with WMF=0.02% has barely changed radius (<0.5%)", () => {
   assert.ok(change < 0.005, `radius change should be < 0.5%, got ${(change * 100).toFixed(3)}%`);
 });
 
-test("Ocean world (WMF=10%) has larger radius and lower density than dry", () => {
+test("composition → WMF=10% → larger radius, lower density", () => {
   const dry = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, wmfPct: 0 },
@@ -488,7 +488,7 @@ test("Ocean world (WMF=10%) has larger radius and lower density than dry", () =>
   );
 });
 
-test("Ice world (WMF=40%) has significantly inflated radius", () => {
+test("composition → WMF=40% → radius >10% inflated", () => {
   const dry = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, wmfPct: 0 },
@@ -503,7 +503,7 @@ test("Ice world (WMF=40%) has significantly inflated radius", () => {
   );
 });
 
-test("composition class labels", () => {
+test("compositionClass → various CMF/WMF → correct labels", () => {
   const iron = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, cmfPct: 70 },
@@ -532,7 +532,7 @@ test("composition class labels", () => {
   assert.equal(iceWorld.derived.compositionClass, "Ice world");
 });
 
-test("water regime labels", () => {
+test("waterRegime → various WMF → correct labels", () => {
   const dry = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, wmfPct: 0 },
@@ -564,7 +564,7 @@ test("water regime labels", () => {
   assert.equal(ice.derived.waterRegime, "Ice world");
 });
 
-test("core radius fraction for Earth is ~0.57", () => {
+test("coreRadiusFraction → Earth-like → ~0.57", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   approxEqual(p.derived.coreRadiusFraction, 0.57, 0.03, "Earth CRF");
   assert.ok(
@@ -573,7 +573,7 @@ test("core radius fraction for Earth is ~0.57", () => {
   );
 });
 
-test("coreless planet (CMF=0) has CRF=0", () => {
+test("coreRadiusFraction → CMF=0 → zero", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, cmfPct: 0 },
@@ -582,7 +582,7 @@ test("coreless planet (CMF=0) has CRF=0", () => {
   assert.equal(p.derived.coreRadiusKm, 0);
 });
 
-test("suggested CMF from [Fe/H]=0 is ~32-34%", () => {
+test("suggestedCmfPct → [Fe/H]=0 → ~32–34%", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(
     p.derived.suggestedCmfPct >= 30,
@@ -596,7 +596,7 @@ test("suggested CMF from [Fe/H]=0 is ~32-34%", () => {
 
 /* ── Phase B: Magnetic field model ──────────────────────────────── */
 
-test("Earth analog has active dipolar dynamo ~1× Earth", () => {
+test("dynamo → Earth analog → active dipolar ~1× Earth", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(p.derived.dynamoActive, "Earth should have active dynamo");
   assert.equal(p.derived.fieldMorphology, "dipolar");
@@ -607,7 +607,7 @@ test("Earth analog has active dipolar dynamo ~1× Earth", () => {
   );
 });
 
-test("no-core planet (CMF=0.5%) has no dynamo", () => {
+test("dynamo → CMF=0.5% → inactive, no field", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, cmfPct: 0.5 },
@@ -617,7 +617,7 @@ test("no-core planet (CMF=0.5%) has no dynamo", () => {
   assert.equal(p.derived.surfaceFieldEarths, 0);
 });
 
-test("very old planet with small core has solidified core", () => {
+test("coreState → old planet + small core → solidified", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     starAgeGyr: 15,
@@ -627,7 +627,7 @@ test("very old planet with small core has solidified core", () => {
   assert.equal(p.derived.coreState, "solidified");
 });
 
-test("slow rotator (P=200h) has multipolar field", () => {
+test("fieldMorphology → P=200 h → multipolar, weaker", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, rotationPeriodHours: 200 },
@@ -643,7 +643,7 @@ test("slow rotator (P=200h) has multipolar field", () => {
   }
 });
 
-test("very slow rotator (P=5000h) has no measurable dynamo", () => {
+test("dynamo → P=5000 h → inactive, zero field", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, rotationPeriodHours: 5000, cmfPct: 33 },
@@ -654,7 +654,7 @@ test("very slow rotator (P=5000h) has no measurable dynamo", () => {
   assert.equal(p.derived.fieldLabel, "None");
 });
 
-test("Mercury-like rotation keeps field active and multipolar", () => {
+test("dynamo → Mercury-like rotation → active multipolar < 3%", () => {
   // Real Mercury: ~0.01× Earth.  Model: multipolar + thin-shell gives ~0.8%.
   const p = calcPlanetExact({
     ...EARTH_LIKE,
@@ -673,7 +673,7 @@ test("Mercury-like rotation keeps field active and multipolar", () => {
   );
 });
 
-test("Venus-like extremely slow rotator has no dynamo", () => {
+test("dynamo → Venus-like P=5832 h → inactive", () => {
   // Venus (P=5832h) exceeds the Rm cutoff — rotation too slow for dynamo.
   // Core is still partially solidified (preserved in output).
   const p = calcPlanetExact({
@@ -694,7 +694,7 @@ test("Venus-like extremely slow rotator has no dynamo", () => {
   );
 });
 
-test("more CMF gives stronger field (all else equal)", () => {
+test("surfaceFieldEarths → higher CMF → stronger field", () => {
   const lowCmf = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, cmfPct: 15 },
@@ -711,7 +711,7 @@ test("more CMF gives stronger field (all else equal)", () => {
   }
 });
 
-test("large super-Earth has stronger field than Earth", () => {
+test("surfaceFieldEarths → 5 M⊕ super-Earth → >= Earth", () => {
   const superEarth = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, massEarth: 5, cmfPct: 33 },
@@ -725,7 +725,7 @@ test("large super-Earth has stronger field than Earth", () => {
   }
 });
 
-test("field label categories", () => {
+test("fieldLabel → Earth-like → valid category string", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   const validLabels = ["Very strong", "Strong", "Moderate", "Weak", "Very weak", "None"];
   assert.ok(
@@ -736,7 +736,7 @@ test("field label categories", () => {
 
 /* ── Phase C: Mantle outgassing & tectonic regime ───────────────── */
 
-test("Earth-like oxidation gives CO₂ + H₂O outgassing", () => {
+test("primaryOutgassedSpecies → earth oxidation → CO₂ + H₂O", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, mantleOxidation: "earth" },
@@ -745,7 +745,7 @@ test("Earth-like oxidation gives CO₂ + H₂O outgassing", () => {
   assert.ok(p.derived.primaryOutgassedSpecies.includes("H"), "should contain H₂O");
 });
 
-test("highly reduced oxidation gives H₂ + CO outgassing", () => {
+test("primaryOutgassedSpecies → highly-reduced → H₂ + CO", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, mantleOxidation: "highly-reduced" },
@@ -755,13 +755,13 @@ test("highly reduced oxidation gives H₂ + CO outgassing", () => {
   assert.equal(p.derived.mantleOxidation, "Highly reduced");
 });
 
-test("tectonic advisory is generated", () => {
+test("tectonicAdvisory → Earth-like → non-empty string", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(typeof p.derived.tectonicAdvisory === "string", "advisory should be a string");
   assert.ok(p.derived.tectonicAdvisory.length > 0, "advisory should not be empty");
 });
 
-test("outgassing hint is generated for all oxidation states", () => {
+test("outgassingHint → all oxidation states → non-empty", () => {
   for (const ox of ["highly-reduced", "reduced", "earth", "oxidized"]) {
     const p = calcPlanetExact({
       ...EARTH_LIKE,
@@ -771,7 +771,7 @@ test("outgassing hint is generated for all oxidation states", () => {
   }
 });
 
-test("display strings include new composition fields", () => {
+test("display → Earth-like → composition fields populated", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.ok(p.display.compositionClass.length > 0, "compositionClass display");
   assert.ok(p.display.waterRegime.length > 0, "waterRegime display");
@@ -807,7 +807,7 @@ test("tectonicProbabilities: water world → spread distribution", () => {
   assert.ok(p.mobile < 0.7, "mobile should not dominate on water world");
 });
 
-test("tectonicProbabilities: probabilities sum to 1.0", () => {
+test("tectonicProbabilities → any input → probabilities sum to 1.0", () => {
   const p = tectonicProbabilities(1.0, 4.6, 0.0002, 0.33, 0);
   const sum = p.stagnant + p.mobile + p.episodic + p.plutonicSquishy;
   approxEqual(sum, 1.0, 0.01, "sum of probabilities");
@@ -819,13 +819,13 @@ test("tectonicProbabilities: young planet → episodic more likely", () => {
   assert.ok(young.episodic > old.episodic, "young planet has higher episodic probability");
 });
 
-test("tectonicProbabilities: tidal heating shifts away from stagnant", () => {
+test("tectonicProbabilities → tidal heating → shifts away from stagnant", () => {
   const noTidal = tectonicProbabilities(0.2, 5.0, 0.0, 0.33, 0);
   const withTidal = tectonicProbabilities(0.2, 5.0, 0.0, 0.33, 2.0);
   assert.ok(withTidal.stagnant < noTidal.stagnant, "tidal heating reduces stagnant probability");
 });
 
-test("calcPlanetExact: auto mode returns suggested regime", () => {
+test("calcPlanetExact → auto mode → returns suggested regime", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, tectonicRegime: "auto" },
@@ -834,7 +834,7 @@ test("calcPlanetExact: auto mode returns suggested regime", () => {
   assert.ok(p.derived.tectonicProbabilities.mobile > 0, "should have mobile probability");
 });
 
-test("calcPlanetExact: manual override preserves chosen regime", () => {
+test("calcPlanetExact → manual override → preserves chosen regime", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     planet: { ...EARTH_LIKE.planet, tectonicRegime: "stagnant" },
@@ -842,7 +842,7 @@ test("calcPlanetExact: manual override preserves chosen regime", () => {
   assert.equal(p.derived.tectonicRegime, "stagnant");
 });
 
-test("calcPlanetExact: star luminosity override propagates to planet", () => {
+test("calcPlanetExact → luminosity override 4× → hotter planet, 4× insolation", () => {
   const base = calcPlanetExact(EARTH_LIKE);
   // Override luminosity to 4× solar — planet should receive 4× the insolation
   const bright = calcPlanetExact({
@@ -862,7 +862,7 @@ test("calcPlanetExact: star luminosity override propagates to planet", () => {
   );
 });
 
-test("calcPlanetExact: star R+L override → star model uses overridden values", () => {
+test("calcPlanetExact → R+L override → T derived via Stefan-Boltzmann", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     starRadiusRsolOverride: 1.5,
@@ -877,7 +877,7 @@ test("calcPlanetExact: star R+L override → star model uses overridden values",
   approxEqual(p.star.tempK, expectedT, 1, "derived temperature from R+L");
 });
 
-test("calcPlanetExact: star R+T override → luminosity derived via SB", () => {
+test("calcPlanetExact → R+T override → luminosity derived via SB", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     starRadiusRsolOverride: 1.5,
@@ -894,7 +894,7 @@ test("calcPlanetExact: star R+T override → luminosity derived via SB", () => {
   approxEqual(ratio, expectedL, 0.01, "insolation uses SB-derived luminosity");
 });
 
-test("calcPlanetExact: star L+T override → radius derived via SB", () => {
+test("calcPlanetExact → L+T override → radius derived via SB", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     starLuminosityLsolOverride: 2,
@@ -907,12 +907,12 @@ test("calcPlanetExact: star L+T override → radius derived via SB", () => {
   assert.equal(p.star.resolutionMode, "L+T→R");
 });
 
-test("calcPlanetExact: no overrides → mass-derived star", () => {
+test("calcPlanetExact → no overrides → mass-derived star", () => {
   const p = calcPlanetExact(EARTH_LIKE);
   assert.equal(p.star.resolutionMode, "mass-derived");
 });
 
-test("calcPlanetExact: null/undefined overrides are ignored", () => {
+test("calcPlanetExact → null/undefined overrides → mass-derived", () => {
   const p = calcPlanetExact({
     ...EARTH_LIKE,
     starRadiusRsolOverride: null,
@@ -922,7 +922,7 @@ test("calcPlanetExact: null/undefined overrides are ignored", () => {
   assert.equal(p.star.resolutionMode, "mass-derived");
 });
 
-test("calcPlanetExact: HZ shifts with luminosity override", () => {
+test("calcPlanetExact → luminosity override 4× → HZ shifts outward", () => {
   const base = calcPlanetExact(EARTH_LIKE);
   const bright = calcPlanetExact({
     ...EARTH_LIKE,

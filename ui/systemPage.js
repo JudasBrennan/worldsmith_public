@@ -28,26 +28,26 @@ import {
 } from "./store.js";
 
 const TIP_LABEL = {
-  "Star Mass": "Input your star's mass, in solar masses, here. Our sun = 1 Msol.",
+  "Star Mass": "Star mass in solar masses (read-only; set on the Star page).\n\nSun = 1 Msol.",
   "Habitable Zone":
-    "A planet orbiting within this region receives Earth-like stellar heating.\n\nWorldSmith Web uses an updated temperature-dependent habitable-zone model (S_in/S_out vary with effective temperature), based on Chromant's Desmos correction.\n\nThis intentionally deviates from the spreadsheet's fixed sqrt(L/1.1) and sqrt(L/0.53) approach, which generally places the outer edge too close in.",
-  "Star Luminosity": "The amount of light your star emits in solar luminosities. Our sun = 1 Lsol.",
-  "Star Radius": "How big your star is. Our sun = 1 Rsol",
-  "Star Density": "The density of your star. Our sun = 1 Dsol",
+    "A planet orbiting within this region receives Earth-like stellar heating.\n\nUses a temperature-dependent model where the inner/outer flux thresholds (S_in/S_out) vary with stellar effective temperature, based on Chromant\u2019s Desmos correction.",
+  "Star Luminosity": "Stellar luminosity in solar luminosities.\n\nSun = 1 Lsol.",
+  "Star Radius": "Stellar radius in solar radii.\n\nSun = 1 Rsol.",
+  "Star Density": "Mean stellar density in solar densities.\n\nSun = 1 Dsol.",
   "Habitable Zone (Inner)":
-    "The inner boundary, in AU, of your system's habitable zone using the updated temperature-dependent HZ model (not the spreadsheet's fixed constants).\n\n1 AU = ~150,000,000 km.",
+    "Inner boundary of the habitable zone in AU, from the temperature-dependent HZ model.\n\n1 AU = ~150,000,000 km.",
   "Habitable Zone (Outer)":
-    "The outer boundary, in AU, of your system's habitable zone using the updated temperature-dependent HZ model (not the spreadsheet's fixed constants).\n\nThis boundary is typically farther out than the spreadsheet result.\n\n1 AU = ~150,000,000 km.",
+    "Outer boundary of the habitable zone in AU, from the temperature-dependent HZ model.\n\n1 AU = ~150,000,000 km.",
   "H2O Frost Line":
-    "The distance from your star where is it cold enough for volatile compounds like water, ammonia, methane, carbon dioxide etc to exist as ices.\n\nGas planets may only be placed beyond the frost line.",
+    "Distance from the star beyond which volatile compounds (water, ammonia, methane, CO\u2082) can exist as ices.\n\nGas giants may only be placed beyond the frost line.",
   "Spacing Factor":
-    "The spreadsheet uses Bode's Law to logarithmically space potential planetary orbits. The value you input here modifies the logarithmic spacing.\n\nFor our solar system the value is 0.3.",
+    "Logarithmic spacing factor for Bode\u2019s-law orbit generation. Higher values spread orbits farther apart.\n\nSolar System value: 0.3.",
   "System Inner Limit":
-    "The inner limit of your planetary system, given by the Roche limit. Planets cannot orbit closer to your star than this.",
+    "Inner limit of the planetary system, set by the Roche limit. No planet can orbit closer than this distance.",
   "Orbit 1":
-    "Enter in the orbit of your first planet out from your star, in AU, here. It must orbit beyond the System Inner Limit.",
+    "Semi-major axis of the first (innermost) orbit slot in AU. Must be beyond the System Inner Limit.",
   "Orbit 2":
-    "The spreadsheet then computes a list of additional stable orbits for your planetary system.\n\nGreen orbit slots represent stable orbits that fall within your habitable zone. Grey orbit slots represent orbits beyond your system's H2O frost line.\n\nHabitable Earth-like planets may be placed on green orbits.\n\nGas giants may only be placed on grey orbits. The first grey orbit will be home to your system's largest gas giant. The orbit immediately inwards of this orbit will likely be either empty or an asteroid belt.\n\nIf any orbit falls within 0.15 AU of an adjacent orbit, a planet cannot be placed in that orbit. In all other cases, orbits may be filled or left empty at your discretion.",
+    "Additional stable orbit slots generated from the Bode\u2019s-law spacing.\n\nGreen slots fall within the habitable zone and suit Earth-like planets. Grey slots lie beyond the H\u2082O frost line and suit gas giants. The first grey orbit is typically the primary gas giant\u2019s slot.\n\nSlots within 0.15 AU of an adjacent orbit are too close for a stable planet. All other slots may be filled or left empty.",
   "Debris Disk": "Debris disk regions in your system. Managed on the Other Objects tab.",
   "Planets in system":
     "Assign created inner planets to valid orbital slots. Each slot can hold at most one planet.",

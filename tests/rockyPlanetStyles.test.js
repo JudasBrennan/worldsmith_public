@@ -44,14 +44,14 @@ function makeInputs(overrides = {}) {
 
 // ── Palette from composition class ───────────────────────────────
 
-test("Earth-like composition -> tan/brown palette (untinted)", () => {
+test("palette → Earth-like composition → tan/brown untinted", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ albedoBond: undefined }));
   assert.equal(p.palette.c1, "#c4a882");
   assert.equal(p.palette.c2, "#8b6e4e");
   assert.equal(p.palette.c3, "#4a3726");
 });
 
-test("Mars-like composition -> rust palette (untinted)", () => {
+test("palette → Mars-like composition → rust untinted", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Mars-like" }),
     makeInputs({ albedoBond: undefined }),
@@ -59,7 +59,7 @@ test("Mars-like composition -> rust palette (untinted)", () => {
   assert.equal(p.palette.c1, "#c77b4a");
 });
 
-test("Mercury-like composition -> grey palette (untinted)", () => {
+test("palette → Mercury-like composition → grey untinted", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Mercury-like" }),
     makeInputs({ albedoBond: undefined }),
@@ -67,7 +67,7 @@ test("Mercury-like composition -> grey palette (untinted)", () => {
   assert.equal(p.palette.c1, "#b0b0b0");
 });
 
-test("Iron world -> dark grey-blue palette (untinted)", () => {
+test("palette → Iron world → dark grey-blue untinted", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Iron world" }),
     makeInputs({ albedoBond: undefined }),
@@ -75,7 +75,7 @@ test("Iron world -> dark grey-blue palette (untinted)", () => {
   assert.equal(p.palette.c1, "#6e7080");
 });
 
-test("Coreless -> pale tan palette (untinted)", () => {
+test("palette → Coreless → pale tan untinted", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Coreless" }),
     makeInputs({ albedoBond: undefined }),
@@ -83,7 +83,7 @@ test("Coreless -> pale tan palette (untinted)", () => {
   assert.equal(p.palette.c1, "#d4c4a8");
 });
 
-test("Ice world -> pale blue palette (untinted)", () => {
+test("palette → Ice world → pale blue untinted", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Ice world", waterRegime: "Ice world" }),
     makeInputs({ albedoBond: undefined }),
@@ -91,7 +91,7 @@ test("Ice world -> pale blue palette (untinted)", () => {
   assert.equal(p.palette.c1, "#d8e4f0");
 });
 
-test("Ocean world -> ocean blue palette (untinted)", () => {
+test("palette → Ocean world → ocean blue untinted", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Ocean world", waterRegime: "Global ocean" }),
     makeInputs({ albedoBond: undefined }),
@@ -99,7 +99,7 @@ test("Ocean world -> ocean blue palette (untinted)", () => {
   assert.equal(p.palette.c1, "#4a8cb0");
 });
 
-test("unknown composition falls back to Earth-like (untinted)", () => {
+test("palette → unknown composition → falls back to Earth-like", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ compositionClass: "Unknown" }),
     makeInputs({ albedoBond: undefined }),
@@ -109,17 +109,17 @@ test("unknown composition falls back to Earth-like (untinted)", () => {
 
 // ── Ocean coverage from water regime ─────────────────────────────
 
-test("Dry water regime -> zero ocean coverage", () => {
+test("ocean → Dry regime → zero coverage", () => {
   const p = computeRockyVisualProfile(makeDerived({ waterRegime: "Dry" }), makeInputs());
   assert.equal(p.ocean.coverage, 0);
 });
 
-test("Shallow oceans -> 0.3 coverage", () => {
+test("ocean → Shallow oceans → 0.3 coverage", () => {
   const p = computeRockyVisualProfile(makeDerived({ waterRegime: "Shallow oceans" }), makeInputs());
   assert.equal(p.ocean.coverage, 0.3);
 });
 
-test("Extensive oceans -> 0.65 coverage", () => {
+test("ocean → Extensive oceans → 0.65 coverage", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ waterRegime: "Extensive oceans" }),
     makeInputs(),
@@ -127,17 +127,17 @@ test("Extensive oceans -> 0.65 coverage", () => {
   assert.equal(p.ocean.coverage, 0.65);
 });
 
-test("Global ocean -> 0.95 coverage", () => {
+test("ocean → Global ocean → 0.95 coverage", () => {
   const p = computeRockyVisualProfile(makeDerived({ waterRegime: "Global ocean" }), makeInputs());
   assert.equal(p.ocean.coverage, 0.95);
 });
 
-test("Deep ocean -> 1.0 coverage", () => {
+test("ocean → Deep ocean → 1.0 coverage", () => {
   const p = computeRockyVisualProfile(makeDerived({ waterRegime: "Deep ocean" }), makeInputs());
   assert.equal(p.ocean.coverage, 1.0);
 });
 
-test("Ice world regime -> zero ocean, full ice caps", () => {
+test("ocean → Ice world regime → zero ocean + full ice caps", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ waterRegime: "Ice world", compositionClass: "Ice world" }),
     makeInputs(),
@@ -147,19 +147,19 @@ test("Ice world regime -> zero ocean, full ice caps", () => {
   assert.equal(p.iceCaps.south, 1);
 });
 
-test("ocean frozen when T < 273K", () => {
+test("ocean → T < 273 K → frozen", () => {
   const p = computeRockyVisualProfile(makeDerived({ surfaceTempK: 250 }), makeInputs());
   assert.equal(p.ocean.frozen, true);
 });
 
-test("ocean not frozen when T >= 273K", () => {
+test("ocean → T >= 273 K → not frozen", () => {
   const p = computeRockyVisualProfile(makeDerived({ surfaceTempK: 288 }), makeInputs());
   assert.equal(p.ocean.frozen, false);
 });
 
 // ── Ice caps from temperature ────────────────────────────────────
 
-test("very cold planet (<200K) -> large ice caps", () => {
+test("iceCaps → very cold planet < 200 K → large caps", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ surfaceTempK: 150 }),
     makeInputs({ axialTiltDeg: 0 }),
@@ -168,7 +168,7 @@ test("very cold planet (<200K) -> large ice caps", () => {
   assert.ok(p.iceCaps.south >= 0.7, `south ${p.iceCaps.south} >= 0.7`);
 });
 
-test("temperate planet (288K) -> small ice caps", () => {
+test("iceCaps → temperate 288 K → small caps", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ surfaceTempK: 288 }),
     makeInputs({ axialTiltDeg: 0 }),
@@ -177,13 +177,13 @@ test("temperate planet (288K) -> small ice caps", () => {
   assert.ok(p.iceCaps.north < 0.15, `north cap small: ${p.iceCaps.north}`);
 });
 
-test("hot planet (>350K) -> no ice caps", () => {
+test("iceCaps → hot planet > 350 K → no caps", () => {
   const p = computeRockyVisualProfile(makeDerived({ surfaceTempK: 400 }), makeInputs());
   assert.ok(p.iceCaps.north < 0.01, `north ${p.iceCaps.north}`);
   assert.ok(p.iceCaps.south < 0.01, `south ${p.iceCaps.south}`);
 });
 
-test("high axial tilt -> asymmetric ice caps", () => {
+test("iceCaps → high axial tilt → asymmetric", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ surfaceTempK: 260 }),
     makeInputs({ axialTiltDeg: 80 }),
@@ -194,7 +194,7 @@ test("high axial tilt -> asymmetric ice caps", () => {
   );
 });
 
-test("zero tilt -> symmetric ice caps", () => {
+test("iceCaps → zero tilt → symmetric", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ surfaceTempK: 260 }),
     makeInputs({ axialTiltDeg: 0 }),
@@ -207,18 +207,18 @@ test("zero tilt -> symmetric ice caps", () => {
 
 // ── Cloud coverage ───────────────────────────────────────────────
 
-test("no atmosphere -> no clouds", () => {
+test("clouds → no atmosphere → zero coverage", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ pressureAtm: 0, h2oPct: 1 }));
   assert.equal(p.clouds.coverage, 0);
 });
 
-test("Earth-like atmosphere -> moderate clouds", () => {
+test("clouds → Earth-like atmosphere → moderate coverage", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ pressureAtm: 1, h2oPct: 1 }));
   assert.ok(p.clouds.coverage > 0, `coverage > 0: ${p.clouds.coverage}`);
   assert.ok(p.clouds.coverage < 0.5, `coverage < 0.5: ${p.clouds.coverage}`);
 });
 
-test("Venus-like -> near-total cloud cover, yellowish", () => {
+test("clouds → Venus-like → near-total yellowish cover", () => {
   const p = computeRockyVisualProfile(
     makeDerived(),
     makeInputs({ pressureAtm: 90, co2Pct: 96, h2oPct: 0.005 }),
@@ -229,23 +229,23 @@ test("Venus-like -> near-total cloud cover, yellowish", () => {
 
 // ── Atmosphere thickness ─────────────────────────────────────────
 
-test("zero pressure -> no atmosphere rim", () => {
+test("atmosphere → zero pressure → no rim", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ pressureAtm: 0 }));
   assert.equal(p.atmosphere.thickness, 0);
 });
 
-test("Earth-like pressure -> moderate atmosphere rim", () => {
+test("atmosphere → Earth-like pressure → moderate rim", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ pressureAtm: 1 }));
   assert.ok(p.atmosphere.thickness > 0.02, `thickness ${p.atmosphere.thickness}`);
   assert.ok(p.atmosphere.thickness < 0.1, `thickness ${p.atmosphere.thickness}`);
 });
 
-test("high pressure (90 atm) -> thick atmosphere rim", () => {
+test("atmosphere → 90 atm → thick rim", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ pressureAtm: 90 }));
   assert.ok(p.atmosphere.thickness > 0.1, `thickness ${p.atmosphere.thickness}`);
 });
 
-test("atmosphere colour from sky colour", () => {
+test("atmosphere → sky colour provided → matches rim colour", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ skyColourDayHex: "#FF0000" }),
     makeInputs({ pressureAtm: 1 }),
@@ -255,7 +255,7 @@ test("atmosphere colour from sky colour", () => {
 
 // ── Terrain type from tectonic regime ────────────────────────────
 
-test("stagnant + no atmosphere -> cratered terrain", () => {
+test("terrain → stagnant + no atmosphere → cratered", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ tectonicRegime: "stagnant" }),
     makeInputs({ pressureAtm: 0 }),
@@ -264,7 +264,7 @@ test("stagnant + no atmosphere -> cratered terrain", () => {
   assert.ok(p.terrain.craterDensity > 0.5);
 });
 
-test("stagnant + atmosphere -> worn terrain", () => {
+test("terrain → stagnant + atmosphere → worn", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ tectonicRegime: "stagnant" }),
     makeInputs({ pressureAtm: 1 }),
@@ -272,18 +272,18 @@ test("stagnant + atmosphere -> worn terrain", () => {
   assert.equal(p.terrain.type, "worn");
 });
 
-test("mobile -> continental terrain", () => {
+test("terrain → mobile tectonics → continental", () => {
   const p = computeRockyVisualProfile(makeDerived({ tectonicRegime: "mobile" }), makeInputs());
   assert.equal(p.terrain.type, "continental");
   assert.ok(p.terrain.craterDensity < 0.1);
 });
 
-test("episodic -> volcanic terrain", () => {
+test("terrain → episodic tectonics → volcanic", () => {
   const p = computeRockyVisualProfile(makeDerived({ tectonicRegime: "episodic" }), makeInputs());
   assert.equal(p.terrain.type, "volcanic");
 });
 
-test("plutonic-squishy -> smooth terrain", () => {
+test("terrain → plutonic-squishy → smooth", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ tectonicRegime: "plutonic-squishy" }),
     makeInputs(),
@@ -294,12 +294,12 @@ test("plutonic-squishy -> smooth terrain", () => {
 
 // ── Special effects ──────────────────────────────────────────────
 
-test("very hot surface (>1200K) -> lava special", () => {
+test("special → surface > 1200 K → lava", () => {
   const p = computeRockyVisualProfile(makeDerived({ surfaceTempK: 1500 }), makeInputs());
   assert.equal(p.special, "lava");
 });
 
-test("very cold + airless -> frozen special", () => {
+test("special → very cold + airless → frozen", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ surfaceTempK: 80 }),
     makeInputs({ pressureAtm: 0 }),
@@ -307,20 +307,20 @@ test("very cold + airless -> frozen special", () => {
   assert.equal(p.special, "frozen");
 });
 
-test("temperate planet -> no special effect", () => {
+test("special → temperate planet → null", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs());
   assert.equal(p.special, null);
 });
 
 // ── Vegetation ───────────────────────────────────────────────────
 
-test("habitable world -> vegetation coverage > 0", () => {
+test("vegetation → habitable world → coverage > 0", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs());
   assert.ok(p.vegetation.coverage > 0, `coverage ${p.vegetation.coverage}`);
   assert.ok(p.vegetation.colour, "has colour");
 });
 
-test("no vegetation hex -> zero coverage", () => {
+test("vegetation → no hex colours → zero coverage", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ vegetationPaleHex: null, vegetationDeepHex: null }),
     makeInputs(),
@@ -329,14 +329,14 @@ test("no vegetation hex -> zero coverage", () => {
   assert.equal(p.vegetation.colour, null);
 });
 
-test("global ocean -> zero vegetation", () => {
+test("vegetation → global ocean → zero coverage", () => {
   const p = computeRockyVisualProfile(makeDerived({ waterRegime: "Global ocean" }), makeInputs());
   assert.equal(p.vegetation.coverage, 0);
 });
 
 // ── Determinism ──────────────────────────────────────────────────
 
-test("same inputs produce identical profiles", () => {
+test("determinism → same inputs → identical profiles", () => {
   const d = makeDerived();
   const inp = makeInputs();
   const p1 = computeRockyVisualProfile(d, inp);
@@ -346,7 +346,7 @@ test("same inputs produce identical profiles", () => {
 
 // ── Edge cases ───────────────────────────────────────────────────
 
-test("missing sky colour -> fallback atmosphere colour", () => {
+test("atmosphere → missing sky colour → fallback colour", () => {
   const p = computeRockyVisualProfile(
     makeDerived({ skyColourDayHex: null }),
     makeInputs({ pressureAtm: 1 }),
@@ -354,26 +354,26 @@ test("missing sky colour -> fallback atmosphere colour", () => {
   assert.equal(p.atmosphere.colour, "#6688bb");
 });
 
-test("missing derived -> safe defaults", () => {
+test("profile → missing derived → safe defaults", () => {
   const p = computeRockyVisualProfile({}, {});
   assert.ok(p.palette.c1, "has palette");
   assert.equal(p.ocean.coverage, 0);
   assert.ok(p.seed, "has seed");
 });
 
-test("tidally locked flag propagated", () => {
+test("profile → tidally locked → flag propagated", () => {
   const p = computeRockyVisualProfile(makeDerived({ tidallyLockedToStar: true }), makeInputs());
   assert.equal(p.tidallyLocked, true);
 });
 
-test("seed comes from planet name", () => {
+test("profile → planet name → used as seed", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ name: "Arrakis" }));
   assert.equal(p.seed, "Arrakis");
 });
 
 // ── Albedo-based palette tinting ────────────────────────────────
 
-test("low albedo darkens palette vs high albedo", () => {
+test("albedo tint → low albedo → darker palette than high", () => {
   const d = makeDerived({ compositionClass: "Earth-like" });
   const dark = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.1 }));
   const bright = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.7 }));
@@ -383,12 +383,12 @@ test("low albedo darkens palette vs high albedo", () => {
   assert.ok(darkR < brightR, `dark ${darkR} should be less than bright ${brightR}`);
 });
 
-test("no albedo -> untinted base palette", () => {
+test("albedo tint → no albedo → untinted base palette", () => {
   const p = computeRockyVisualProfile(makeDerived(), makeInputs({ albedoBond: undefined }));
   assert.equal(p.palette.c1, "#c4a882"); // exact Earth-like base
 });
 
-test("ocean world land palette is tinted by albedo", () => {
+test("albedo tint → ocean world → land palette tinted", () => {
   const d = makeDerived({ compositionClass: "Ocean world", waterRegime: "Global ocean" });
   const dark = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.1 }));
   const bright = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.7 }));
@@ -397,7 +397,7 @@ test("ocean world land palette is tinted by albedo", () => {
   assert.ok(darkR < brightR, `dark land ${darkR} < bright land ${brightR}`);
 });
 
-test("ice world + low albedo produces darker palette", () => {
+test("albedo tint → ice world + low albedo → darker palette", () => {
   const d = makeDerived({ compositionClass: "Ice world", waterRegime: "Ice world" });
   const p = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.1 }));
   // Base Ice world c1 is #d8e4f0 (216,228,240); at factor 0.76 → ~164
@@ -405,7 +405,7 @@ test("ice world + low albedo produces darker palette", () => {
   assert.ok(r < 200, `ice world c1 red ${r} should be darkened below 200`);
 });
 
-test("ice world + high albedo produces brighter palette", () => {
+test("albedo tint → ice world + high albedo → brighter palette", () => {
   const d = makeDerived({ compositionClass: "Ice world", waterRegime: "Ice world" });
   const p = computeRockyVisualProfile(d, makeInputs({ albedoBond: 0.7 }));
   // At factor 1.12 → ~242 (capped at 255)

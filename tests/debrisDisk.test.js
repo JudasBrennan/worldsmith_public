@@ -89,7 +89,7 @@ test("Inner disk resonances: Jupiter @ 5.2 → ~2.06–3.28 AU", () => {
   approxEqual(inner.outerAu, 3.28, 0.1);
 });
 
-test("count limits number of returned zones (includes all, not just recommended)", () => {
+test("suggestions → count param → limits returned zones", () => {
   const s = calcDebrisDiskSuggestions({
     gasGiants: [{ name: "Neptune", au: 30.05 }],
     count: 2,
@@ -99,7 +99,7 @@ test("count limits number of returned zones (includes all, not just recommended)
   assert.equal(s[1].label, "Inner disk");
 });
 
-test("suggestions include priority field sorted ascending", () => {
+test("suggestions → multi-giant → priority sorted ascending", () => {
   const s = calcDebrisDiskSuggestions({
     gasGiants: [
       { name: "Jupiter", au: 5.2 },
@@ -111,7 +111,7 @@ test("suggestions include priority field sorted ascending", () => {
   }
 });
 
-test("suggestions filter out invalid gas giants (NaN, 0, negative)", () => {
+test("suggestions → invalid gas giants NaN/0/negative → filtered out", () => {
   const s = calcDebrisDiskSuggestions({
     gasGiants: [
       { name: "Bad", au: NaN },
@@ -124,7 +124,7 @@ test("suggestions filter out invalid gas giants (NaN, 0, negative)", () => {
   assert.equal(s.filter((x) => x.recommended).length, 2);
 });
 
-test("no two recommended suggestions overlap (recommended zones disjoint)", () => {
+test("suggestions → recommended zones → disjoint (no overlap)", () => {
   // Single giant — recommended zones should tile without overlap
   const s1 = calcDebrisDiskSuggestions({
     gasGiants: [{ name: "Jupiter", au: 5.2 }],
@@ -163,7 +163,7 @@ test("no two recommended suggestions overlap (recommended zones disjoint)", () =
   }
 });
 
-test("frost-line scales with luminosity for 0-giant fallback", () => {
+test("suggestions → 0 giants + varying luminosity → frost-line scales", () => {
   const dim = calcDebrisDiskSuggestions({ gasGiants: [], starLuminosityLsol: 0.01 });
   const bright = calcDebrisDiskSuggestions({ gasGiants: [], starLuminosityLsol: 100 });
   assert.ok(
@@ -174,12 +174,12 @@ test("frost-line scales with luminosity for 0-giant fallback", () => {
 
 /* ── Dust temperature ──────────────────────────────────────────────── */
 
-test("Kuiper belt analog temp ~40–50 K at midpoint", () => {
+test("temperature → Kuiper belt analog → midpoint ~40-50 K", () => {
   const d = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
   assert.ok(d.temperature.midK >= 30 && d.temperature.midK <= 55, `midK = ${d.temperature.midK}`);
 });
 
-test("asteroid belt analog temp ~165–200 K at midpoint", () => {
+test("temperature → asteroid belt analog → midpoint ~165-200 K", () => {
   const d = calcDebrisDisk({ innerAu: 2.06, outerAu: 3.28, ...SOLAR });
   assert.ok(d.temperature.midK >= 140 && d.temperature.midK <= 220, `midK = ${d.temperature.midK}`);
 });
@@ -196,7 +196,7 @@ test("Kuiper belt → Ice-dominated", () => {
   assert.equal(d.composition.className, "Ice-dominated");
 });
 
-test("composition: metal-poor stars increase ice/rock, metal-rich decrease it", () => {
+test("composition → metal-poor vs metal-rich → ice/rock ratio scales", () => {
   const lowFeH = calcDebrisDisk({
     innerAu: 2.7,
     outerAu: 3.5,
@@ -225,7 +225,7 @@ test("composition: metal-poor stars increase ice/rock, metal-rich decrease it", 
   );
 });
 
-test("composition class stays temperature-driven across stellar metallicity", () => {
+test("composition → varying metallicity → class stays temperature-driven", () => {
   const lowFeH = calcDebrisDisk({
     innerAu: 2.06,
     outerAu: 3.28,
@@ -244,7 +244,7 @@ test("composition class stays temperature-driven across stellar metallicity", ()
 
 /* ── Fractional luminosity ─────────────────────────────────────────── */
 
-test("fractional luminosity decreases with age", () => {
+test("fractionalLuminosity → young vs old → young brighter", () => {
   const young = calcDebrisDisk({
     innerAu: 30,
     outerAu: 50,
@@ -309,7 +309,7 @@ test("classification: very close → Warm exozodiacal dust", () => {
 
 /* ── Mass estimate ────────────────────────────────────────────────── */
 
-test("Kuiper belt analog mass estimate is sub-Earth (not billions)", () => {
+test("mass → Kuiper belt analog → sub-Earth estimate", () => {
   const d = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
   // Wyatt steady-state max mass should be < ~5 M⊕, not 62 billion
   assert.ok(d.mass.estimatedMassEarth < 5, `mass = ${d.mass.estimatedMassEarth} M⊕, should be < 5`);
@@ -319,7 +319,7 @@ test("Kuiper belt analog mass estimate is sub-Earth (not billions)", () => {
   );
 });
 
-test("asteroid belt analog mass estimate is reasonable", () => {
+test("mass → asteroid belt analog → reasonable estimate", () => {
   const d = calcDebrisDisk({ innerAu: 2.06, outerAu: 3.28, ...SOLAR });
   // Asteroid belt real mass ~0.0005 M⊕; Wyatt max should be modest
   assert.ok(d.mass.estimatedMassEarth < 1, `mass = ${d.mass.estimatedMassEarth} M⊕, should be < 1`);
@@ -331,7 +331,7 @@ test("asteroid belt analog mass estimate is reasonable", () => {
 
 /* ── Frost line placement ──────────────────────────────────────────── */
 
-test("frost line placement: asteroid belt inside, Kuiper belt outside", () => {
+test("frostLine → asteroid belt inside, Kuiper belt → outside", () => {
   const ab = calcDebrisDisk({ innerAu: 2, outerAu: 3.5, ...SOLAR });
   const kb = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR });
   assert.equal(ab.placement.relativeToFrostLine, "Inside");
@@ -340,7 +340,7 @@ test("frost line placement: asteroid belt inside, Kuiper belt outside", () => {
 
 /* ── Backward compatibility ──────────────────────────────────────── */
 
-test("backward compat: default ecc/inc/mass when omitted", () => {
+test("defaults → ecc/inc/mass omitted → uses fallback values", () => {
   const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR });
   assert.equal(d.inputs.eccentricity, 0.05, "default ecc");
   assert.equal(d.inputs.inclination, 0, "default inc");
@@ -350,7 +350,7 @@ test("backward compat: default ecc/inc/mass when omitted", () => {
 
 /* ── Condensation sequence ───────────────────────────────────────── */
 
-test("condensation: asteroid belt has silicates, no water ice at inner edge", () => {
+test("condensation → asteroid belt → silicates yes, water ice no at inner", () => {
   const d = calcDebrisDisk({ innerAu: 2.06, outerAu: 3.28, ...SOLAR });
   const forsterite = d.composition.species.find((s) => s.name === "Forsterite");
   const waterIce = d.composition.species.find((s) => s.name === "Water ice");
@@ -358,7 +358,7 @@ test("condensation: asteroid belt has silicates, no water ice at inner edge", ()
   assert.ok(!waterIce.presentAtInner, "Water ice should NOT condense at inner edge (~165 K)");
 });
 
-test("condensation: Kuiper belt has water and CO₂ ice", () => {
+test("condensation → Kuiper belt → water and CO2 ice present", () => {
   const d = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
   const waterIce = d.composition.species.find((s) => s.name === "Water ice");
   const co2 = d.composition.species.find((s) => s.name === "CO\u2082 ice");
@@ -366,7 +366,7 @@ test("condensation: Kuiper belt has water and CO₂ ice", () => {
   assert.ok(co2.presentAtMid, "CO\u2082 ice should be present");
 });
 
-test("condensation: very cold disk has CO and N₂ ice", () => {
+test("condensation → very cold disk → CO and N2 ice present", () => {
   const d = calcDebrisDisk({ innerAu: 500, outerAu: 800, ...SOLAR });
   const coIce = d.composition.species.find((s) => s.name === "CO ice");
   const n2Ice = d.composition.species.find((s) => s.name === "N\u2082 ice");
@@ -374,7 +374,7 @@ test("condensation: very cold disk has CO and N₂ ice", () => {
   assert.ok(n2Ice.presentAtMid, "N\u2082 ice should be present at ~10 K");
 });
 
-test("condensation: ice-to-rock ratio > 0.5 beyond frost line, zero inside frost line", () => {
+test("condensation → beyond frost line → ice-to-rock >0.5; inside → zero", () => {
   const kb = calcDebrisDisk({ innerAu: 39.4, outerAu: 47.7, ...SOLAR });
   assert.ok(kb.composition.iceToRockRatio > 0.5, `ice/rock = ${kb.composition.iceToRockRatio}`);
   const hot = calcDebrisDisk({ innerAu: 0.5, outerAu: 1.0, ...SOLAR });
@@ -383,7 +383,7 @@ test("condensation: ice-to-rock ratio > 0.5 beyond frost line, zero inside frost
 
 /* ── Eccentricity ────────────────────────────────────────────────── */
 
-test("eccentricity: peri < mid < apo", () => {
+test("eccentricity → e=0.3 → peri < mid < apo", () => {
   const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, eccentricity: 0.3, ...SOLAR });
   assert.ok(d.orbital.periAu < d.orbital.midpointAu);
   assert.ok(d.orbital.apoAu > d.orbital.midpointAu);
@@ -406,7 +406,7 @@ test("eccentricity: e=0 → peri=apo=mid, circular label", () => {
 
 /* ── Mass override ───────────────────────────────────────────────── */
 
-test("mass override: user mass used exactly", () => {
+test("massOverride → user mass provided → used exactly", () => {
   const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, totalMassMearth: 0.1, ...SOLAR });
   assert.equal(d.mass.estimatedMassEarth, 0.1);
   assert.equal(d.mass.source, "User override");
@@ -432,7 +432,7 @@ test("collision velocity: very low e → gentle regime", () => {
 
 /* ── Surface density ─────────────────────────────────────────────── */
 
-test("surface density: asteroid belt in reasonable range", () => {
+test("surfaceDensity → asteroid belt → reasonable range below MMSN", () => {
   const d = calcDebrisDisk({ innerAu: 2.06, outerAu: 3.28, ...SOLAR });
   assert.ok(d.surfaceDensity.gcm2 > 0, "surface density should be positive");
   assert.ok(d.surfaceDensity.ratioMMSN < 1, "Wyatt steady-state should be well below MMSN");
@@ -440,7 +440,7 @@ test("surface density: asteroid belt in reasonable range", () => {
 
 /* ── IR excess ───────────────────────────────────────────────────── */
 
-test("IR excess: young disk brighter than old", () => {
+test("irExcess → young vs old disk → young brighter", () => {
   const young = calcDebrisDisk({
     innerAu: 30,
     outerAu: 50,
@@ -460,7 +460,7 @@ test("IR excess: young disk brighter than old", () => {
   assert.ok(young.irExcess.value > old.irExcess.value, "young disk brighter IR excess");
 });
 
-test("IR excess: label is valid detectability category", () => {
+test("irExcess → solar star → valid detectability label", () => {
   const d = calcDebrisDisk({ innerAu: 30, outerAu: 50, ...SOLAR, starTeffK: 5776 });
   const valid = ["Easily detected", "Marginal", "Below threshold"];
   assert.ok(valid.includes(d.irExcess.label), `label = ${d.irExcess.label}`);

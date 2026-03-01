@@ -17,7 +17,7 @@ import {
 } from "../engine/stellarActivity.js";
 import { approxEqual } from "./testHelpers.js";
 
-test("flare params follow teff/age bins", () => {
+test("computeFlareParams → Sun-like FGK old → correct N32 and alpha", () => {
   const sunLike = computeFlareParams({ teffK: 5770, ageGyr: 4.6, massMsol: 1, luminosityLsol: 1 });
   assert.equal(sunLike.teffBin, "FGK");
   assert.equal(sunLike.ageBand, "old");
@@ -31,7 +31,7 @@ test("flare params follow teff/age bins", () => {
   assert.equal(earlyM.N32, 8.0);
 });
 
-test("computeStellarActivityModel returns style-guide tiers and numeric activity values", () => {
+test("computeStellarActivityModel → Sun-like star → returns tiers and activity values", () => {
   const model = computeStellarActivityModel({
     teffK: 5770,
     ageGyr: 4.6,
@@ -52,7 +52,7 @@ test("computeStellarActivityModel returns style-guide tiers and numeric activity
   assert.equal(model.inputs.massMsun, 1);
 });
 
-test("flare scheduling is deterministic with seeded RNG", () => {
+test("scheduleNextFlare → same seed → deterministic result", () => {
   const params = computeFlareParams({ teffK: 5770, ageGyr: 4.6 });
   const rngA = createSeededRng("ws-seed");
   const rngB = createSeededRng("ws-seed");
@@ -66,7 +66,7 @@ test("flare scheduling is deterministic with seeded RNG", () => {
   assert.ok(nextA.energyErg <= params.EmaxErg);
 });
 
-test("CME spawn probability soft-suppresses as recent daily count rises", () => {
+test("maybeSpawnCME → high recent count → suppressed spawn rate", () => {
   const params = computeFlareParams({ teffK: 5770, ageGyr: 4.6 });
   let lowRecentHits = 0;
   let highRecentHits = 0;
@@ -80,7 +80,7 @@ test("CME spawn probability soft-suppresses as recent daily count rises", () => 
   assert.ok(highRecentHits < lowRecentHits, "high-recent CME spawn count should be lower");
 });
 
-test("flareClassFromEnergy returns correct class for each energy range and edge cases", () => {
+test("flareClassFromEnergy → energy thresholds → correct class labels", () => {
   assert.equal(flareClassFromEnergy(1e29), "micro");
   assert.equal(flareClassFromEnergy(1e30), "micro");
   assert.equal(flareClassFromEnergy(5e30), "micro");
@@ -98,7 +98,7 @@ test("flareClassFromEnergy returns correct class for each energy range and edge 
   assert.equal(flareClassFromEnergy(null), "micro");
 });
 
-test("sampleFlareEnergyErg returns energy within bounds (derived and custom)", () => {
+test("sampleFlareEnergyErg → derived and custom bounds → energy within range", () => {
   const params = computeFlareParams({ teffK: 5770, ageGyr: 4.6 });
   const rng = createSeededRng("energy-test");
   for (let i = 0; i < 20; i++) {
@@ -116,7 +116,7 @@ test("sampleFlareEnergyErg returns energy within bounds (derived and custom)", (
   }
 });
 
-test("expectedRateAboveEnergyPerDay returns correct power-law rate", () => {
+test("expectedRateAboveEnergyPerDay → various thresholds → correct power-law rate", () => {
   const params = computeFlareParams({ teffK: 5770, ageGyr: 4.6 });
   // At E0 (1e32), rate should equal N32
   const rateAtE0 = expectedRateAboveEnergyPerDay(params, 1e32);
@@ -132,7 +132,7 @@ test("expectedRateAboveEnergyPerDay returns correct power-law rate", () => {
   assert.ok(rateHigh > 0, "rate should be positive");
 });
 
-test("activity helpers accept nested activity params contract", () => {
+test("scheduleNextFlare/maybeSpawnCME → nested model object → accepted", () => {
   const model = computeStellarActivityModel({ teffK: 5770, ageGyr: 4.6 });
   const next = scheduleNextFlare(0, model, createSeededRng("nested"));
   assert.ok(next.timeSec > 0);
@@ -148,13 +148,13 @@ test("activity helpers accept nested activity params contract", () => {
   assert.equal(typeof cmeSpawn, "boolean");
 });
 
-test("flareCycleMultiplierFromCycle keeps midpoint at unity", () => {
+test("flareCycleMultiplierFromCycle → cycle=0.5 midpoint → returns 1", () => {
   approxEqual(flareCycleMultiplierFromCycle("FGK", 0.5), 1, 1e-12, "FGK midpoint");
   approxEqual(flareCycleMultiplierFromCycle("earlyM", 0.5), 1, 1e-12, "earlyM midpoint");
   approxEqual(flareCycleMultiplierFromCycle("lateM", 0.5), 1, 1e-12, "lateM midpoint");
 });
 
-test("computeCmeRateModel matches FGK target envelope by splitting associated/background channels", () => {
+test("computeCmeRateModel → FGK cycle=0.2 → total matches target envelope", () => {
   const model = computeStellarActivityModel({ teffK: 5770, ageGyr: 4.6 }, { activityCycle: 0.2 });
   const cme = computeCmeRateModel(model, { activityCycle: 0.2 });
   const target = cmeTargetPerDayFromCycle(0.2);
@@ -163,7 +163,7 @@ test("computeCmeRateModel matches FGK target envelope by splitting associated/ba
   assert.ok(cme.backgroundRatePerDay >= 0);
 });
 
-test("scheduleNextCme is deterministic with seeded RNG", () => {
+test("scheduleNextCme → same seed → deterministic result", () => {
   const rngA = createSeededRng("cme-seed");
   const rngB = createSeededRng("cme-seed");
   const tA = scheduleNextCme(123.4, 2.5, rngA);

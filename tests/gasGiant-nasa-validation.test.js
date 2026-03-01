@@ -148,7 +148,7 @@ function fmtNum(n) {
   return n.toFixed(4);
 }
 
-test("NASA gas giant validation \u2014 summary table", () => {
+test("NASA validation → all giants → summary table", () => {
   const W = 93;
   const sep = "\u2500".repeat(W);
   console.log("\n" + "\u2550".repeat(W));
@@ -199,12 +199,12 @@ for (const [name, cfg] of Object.entries(GIANTS)) {
   const m = models[name];
   const n = cfg.nasa;
 
-  test(`${name}: density within 1.5%`, () => {
+  test(`${name} → density → within 1.5%`, () => {
     const err = pctErr(m.physical.densityGcm3, n.densityGcm3);
     assert.ok(err <= 1.5, `${m.physical.densityGcm3} vs ${n.densityGcm3}: ${err.toFixed(1)}%`);
   });
 
-  test(`${name}: escape velocity within 1.5%`, () => {
+  test(`${name} → escape velocity → within 1.5%`, () => {
     const err = pctErr(m.physical.escapeVelocityKms, n.escapeVelocityKms);
     assert.ok(
       err <= 1.5,
@@ -212,7 +212,7 @@ for (const [name, cfg] of Object.entries(GIANTS)) {
     );
   });
 
-  test(`${name}: orbital period within 1.5%`, () => {
+  test(`${name} → orbital period → within 1.5%`, () => {
     const err = pctErr(m.orbital.orbitalPeriodYears, n.orbitalPeriodYr);
     assert.ok(
       err <= 1.5,
@@ -220,7 +220,7 @@ for (const [name, cfg] of Object.entries(GIANTS)) {
     );
   });
 
-  test(`${name}: orbital velocity within 1.5%`, () => {
+  test(`${name} → orbital velocity → within 1.5%`, () => {
     const err = pctErr(m.orbital.orbitalVelocityKms, n.orbitalVelocityKms);
     assert.ok(
       err <= 1.5,
@@ -228,7 +228,7 @@ for (const [name, cfg] of Object.entries(GIANTS)) {
     );
   });
 
-  test(`${name}: equatorial radius within 1.5%`, () => {
+  test(`${name} → equatorial radius → within 1.5%`, () => {
     const err = pctErr(m.oblateness.equatorialRadiusKm, n.eqRadiusKm);
     assert.ok(
       err <= 1.5,
@@ -236,17 +236,17 @@ for (const [name, cfg] of Object.entries(GIANTS)) {
     );
   });
 
-  test(`${name}: polar radius within 1.5%`, () => {
+  test(`${name} → polar radius → within 1.5%`, () => {
     const err = pctErr(m.oblateness.polarRadiusKm, n.polRadiusKm);
     assert.ok(err <= 1.5, `${m.oblateness.polarRadiusKm} vs ${n.polRadiusKm}: ${err.toFixed(1)}%`);
   });
 
-  test(`${name}: flattening within 1.5%`, () => {
+  test(`${name} → flattening → within 1.5%`, () => {
     const err = pctErr(m.oblateness.flattening, n.flattening);
     assert.ok(err <= 1.5, `${m.oblateness.flattening} vs ${n.flattening}: ${err.toFixed(1)}%`);
   });
 
-  test(`${name}: equatorial gravity within 1.5%`, () => {
+  test(`${name} → equatorial gravity → within 1.5%`, () => {
     const err = pctErr(m.physical.equatorialGravityMs2, n.gravityMs2);
     assert.ok(
       err <= 1.5,
@@ -267,26 +267,26 @@ const EXPECTED_VISUAL = {
 for (const [name, expected] of Object.entries(EXPECTED_VISUAL)) {
   const m = models[name];
 
-  test(`${name}: Sudarsky class = ${expected.sudarsky}`, () => {
+  test(`${name} → Sudarsky class → ${expected.sudarsky}`, () => {
     assert.equal(m.classification.sudarsky, expected.sudarsky);
   });
 
-  test(`${name}: visual style = "${expected.styleId}"`, () => {
+  test(`${name} → visual style → "${expected.styleId}"`, () => {
     const { primary } = suggestStyles(m);
     assert.equal(primary, expected.styleId, `suggestStyles primary for ${name}`);
   });
 
-  test(`${name}: computeGasGiantVisualProfile styleId = "${expected.styleId}"`, () => {
+  test(`${name} → computeGasGiantVisualProfile → styleId "${expected.styleId}"`, () => {
     const profile = computeGasGiantVisualProfile(m);
     assert.equal(profile.bodyType, "gasGiant");
     assert.equal(profile.styleId, expected.styleId);
   });
 
-  test(`${name}: ring optical depth = "${expected.ringDepth}"`, () => {
+  test(`${name} → ring optical depth → "${expected.ringDepth}"`, () => {
     assert.equal(m.ringProperties.opticalDepthClass, expected.ringDepth);
   });
 
-  test(`${name}: rings displayed = ${expected.rings}`, () => {
+  test(`${name} → rings displayed → ${expected.rings}`, () => {
     const depth = m.ringProperties.opticalDepthClass;
     const showRings = depth === "Dense" || depth === "Moderate";
     assert.equal(showRings, expected.rings);

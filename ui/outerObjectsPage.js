@@ -16,7 +16,7 @@ import {
 const TIP_LABEL = {
   // ── Debris disk inputs ──
   "Debris disks":
-    "Debris regions (asteroid/Kuiper-belt-like zones) of planetesimals, dust, and ice. In mature systems these are sculpted by gravitational resonances with gas giants, similar to our asteroid belt and Kuiper belt.",
+    "Debris regions (asteroid/Kuiper-belt-like zones) of planetesimals, dust, and ice. In mature systems these are sculpted by gravitational resonances with gas giants, similar to the asteroid belt and Kuiper belt.",
   "Disk name": "Name of this debris disk zone.",
   "Inner edge":
     "Inner boundary of the debris disk in AU. In resonance-sculpted disks, this is set by interior mean-motion resonances (e.g. 4:1, 2:1) with the nearest gas giant.",
@@ -61,11 +61,11 @@ const TIP_LABEL = {
   "IR Excess":
     "Ratio of disk thermal emission to stellar flux at 24 \u03BCm. >10% is easily detectable, 1\u201310% is marginal, <1% is below current instrument thresholds (Spitzer/JWST).",
   "Disk Stability":
-    "Checks whether any gas giant\u2019s chaotic zone (Wisdom 1980: \u0394a = 1.3 a (M_p/M\u2605)^{2/7}) overlaps the disk. Overlap means the disk would be cleared on ~Myr timescales.",
+    "Checks whether any gas giant\u2019s chaotic zone (Wisdom 1980: \u0394a = 1.3 a (M_p/M\u2605)^(2/7)) overlaps the disk. Overlap means the disk would be cleared on ~Myr timescales.",
   "Dust Production":
     "Rate at which collisional grinding converts planetesimal mass into small dust grains. Equal to M_disk / t_collisional.",
   "Zodiacal Delivery":
-    "Poynting\u2013Robertson drag slowly spirals small grains inward. This estimates the mass inflow rate toward the inner system, analogous to our zodiacal dust cloud.",
+    "Poynting\u2013Robertson drag slowly spirals small grains inward. This estimates the mass inflow rate toward the inner system, analogous to the zodiacal dust cloud.",
   "Ice-to-Rock Ratio":
     "Mass ratio of condensed ices to refractory minerals at the disk midpoint. Beyond the frost line this exceeds ~1; inside, the disk is rock-dominated.",
   "Condensation Species":
@@ -292,6 +292,7 @@ export function initOuterObjectsPage(mountEl) {
         </div>
       </div>
     `;
+    attachTooltips(debrisEditorEl);
 
     const ddRows = [...debrisEditorEl.querySelectorAll(".dd-row")];
     let hydrating = true;

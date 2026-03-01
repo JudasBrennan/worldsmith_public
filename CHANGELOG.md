@@ -2,6 +2,256 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.15.0 — 2026-03-02
+
+### Tectonics Phase 2 — Science Enhancements
+
+**New engine functions** (engine/tectonics.js)
+
+Added eight new exported functions with full scientific references:
+`spreadingRate`, `volcanicArcDistance`, `airyRootDepth`, `prattDensity`,
+`continentalMarginProfile`, `maxShieldHeight`, `shieldVolcanoProfile`,
+`riftProfile`. Extended `calcTectonics()` to compute all new features.
+
+New constants: crustal/mantle densities (Turcotte & Schubert 2014),
+slab depth 110 km (Syracuse & Abers 2006), shield volcano reference
+10 km (McGovern & Solomon 1993/1998), spreading rate ranges
+(Dalton et al. 2022).
+
+**New UI features** (ui/tectonicsPage.js)
+
+- Seafloor spreading rate slider with regime-dependent range and KPI
+- Slab angle slider per Andean/Laramide range with volcanic arc
+  distance marker on cross-section canvas
+- Isostasy toggle (Off / Airy / Pratt) with root polygon and
+  density-zone visualisations on the cross-section
+- Continental margin canvas with shelf/slope/rise/abyssal zones
+  and adjustable shelf width, depth, and slope angle
+- Shield volcano subsection with height/slope cards and profile
+  canvases; max shield height KPI scales with 1/g
+- Rift valley subsection with add/remove cards, graben
+  width/depth/fault angle inputs, and profile canvases
+
+**Store** (ui/store.js)
+
+Schema version bumped from 47 to 48. New fields: `spreadingRateFraction`,
+`isostasyMode`, `margin`, `shieldVolcanoes`, `riftValleys`, `plates`,
+`plateTimeMyr`. Migration adds `slabAngleDeg: 45` to existing mountain
+ranges.
+
+**Tests** (tests/tectonics.test.js)
+
+- ~35 new tests covering all Phase 2 functions (68 total, all passing)
+
+**References**
+
+- Turcotte, D. L. & Schubert, G. (2014), Geodynamics, Ch. 2
+- Syracuse, E. & Abers, G. (2006), G³, 7
+- McGovern, P. J. & Solomon, S. C. (1993, 1998), JGR
+- Dalton, C. A. et al. (2022), GRL
+
+### Tectonics Phase 3 — Interactive Plate Canvas
+
+**New engine** (engine/plates.js)
+
+Spherical Voronoi tessellation via 3D incremental convex hull (dual
+graph). Functions: `latLonToXYZ`, `xyzToLatLon`, `convexHull3D`,
+`sphericalVoronoi`, `rotateAroundPole`, `classifyBoundaryWithSeeds`,
+`calcPlates`. Rigid kinematic plates with Euler pole rotation and
+convergent/divergent/transform boundary classification.
+
+**New UI** (ui/tectonicsPage.js)
+
+Full-width plate canvas panel below the existing two-column grid:
+
+- Equirectangular projection (Plate Carrée) with lat/lon grid
+- Click to place plate seeds (up to 20), drag to reposition,
+  right-click to toggle continental/oceanic type
+- Colour-coded cells (warm tones = continental, blues = oceanic)
+- Boundary lines: red = convergent, blue = divergent,
+  green = transform
+- Timeline slider (0–500 Myr) with live redraw
+- Earth preset (8 major plates with approximate Euler poles)
+- Plate summary table with type toggle and remove buttons
+
+**Tests** (tests/plates.test.js)
+
+- 20 new tests: coordinate transforms, convex hull, Voronoi cells,
+  Euler rotation, boundary classification, calcPlates integration
+
+### Science & Maths Page — Tectonics Section
+
+**New section** (ui/sciencePage.js)
+
+Added "Tectonics & Geodynamics" section with 11 formulas:
+maximum mountain height (Weisskopf 1975), ocean subsidence (PSM 1977),
+Airy/Pratt isostasy (Turcotte & Schubert 2014), volcanic arc distance
+(Syracuse & Abers 2006), linear erosion, spreading rate categories
+(Dalton et al. 2022), shield volcano scaling (McGovern & Solomon),
+continental margin dimensions, and tectonic regime probabilities.
+
+Interactive calculator: gravity slider → max mountain height + max
+shield volcano height + Airy root depth.
+
+Moved tectonic regime probability formula from Interior & Composition
+into the new section. Added 3 new divergence entries (ocean subsidence
+intersection constant, shield volcano 1/g scaling, continental margin
+fixed dimensions).
+
+### Science & Maths Page — Complete Formula Audit
+
+Cross-referenced all 14 engine modules against the Science & Maths
+page and expanded coverage from 12 sections / ~108 equations to
+18 sections / ~160 equations.
+
+**6 new sections** (ui/sciencePage.js)
+
+- **Stellar Evolution** (7 formulas) — metallicity conversion,
+  ZAMS luminosity/radius (Tout et al. 1996), main-sequence lifetime
+  (Hurley 2000), terminal-age luminosity/radius, evolved L/R
+  parametric tracks.
+- **Gas Giant Physics** (12 formulas) — Chen & Kipping mass-radius,
+  Sudarsky classification, Lodders & Fegley cloud condensation
+  layers, Thorngren & Fortney atmospheric metallicity,
+  mass-dependent internal heat ratio, Christensen dipole scaling,
+  Rhines atmospheric dynamics, Darwin-Radau oblateness, Ribas XUV
+  mass loss, Thorngren core mass, Fortney radius inflation,
+  Gaussian ring model.
+- **Lagrange Points** (4 formulas) — Hill sphere, L1/L2, L3,
+  L4/L5 equilateral points.
+- **Climate Classification** (7 formulas) — temperature at
+  latitude with equator-pole gradient, seasonal amplitude,
+  three-zone moisture index, Köppen decision tree (E/B/A/D/C),
+  tidally locked substellar/terminator/antistellar zones,
+  environmental lapse rate.
+- **Population Dynamics** (5 formulas) — ocean fraction by water
+  regime, latitude-weighted habitability fraction, tech-era
+  carrying capacity with crop efficiency scaling, Verhulst
+  logistic growth, Zipf rank-size distribution.
+- **Debris Disks** (9 formulas) — mean-motion resonance positions,
+  Lodders condensation sequence, dust equilibrium temperature,
+  Wyatt fractional luminosity, blowout grain size, PR drag
+  timescale, collisional lifetime, Wisdom chaotic zone, Planck
+  IR excess at 24 μm.
+
+**4 sections expanded** (ui/sciencePage.js)
+
+- **Tectonics & Geodynamics** (+4 formulas, 14 total) — added
+  composition-dependent peak heights table, elastic lithosphere
+  thickness, volcanic activity index, climate-adjusted erosion
+  scaling.
+- **Stellar Activity** (+2 formulas, 7 total) — added N₃₂
+  reference table with age-band boundaries per spectral bin,
+  flare cycle multiplier ranges (FGK/early-M/late-M).
+- **Local Cluster** (+1 formula, 7 total) — added metallicity
+  gradient model (radial −0.06 dex/kpc, vertical −0.30 dex/kpc)
+  and per-class multiplicity fractions table (O through L/T/Y).
+- **Interior & Composition** (+2 formulas, 7 total) — added
+  composition classification thresholds (WMF/CMF → class label)
+  and mantle outgassing oxidation states (Ortenzi et al. 2020).
+
+**Fixes** (ui/sciencePage.js)
+
+- Replaced stale CME Association Probability table. Old values
+  (0.2/0.5/0.8/0.95) did not match engine truth; corrected to
+  0.005/0.12/0.4/0.75 at energy breaks 10³²/10³³/10³⁴ erg,
+  matching `stellarActivity.js`.
+- Corrected equation counts in SECTIONS array: Planetary Physics
+  11 (was 12), Orbital Mechanics 13 (was 11).
+
+**6 new divergence entries** (ui/sciencePage.js)
+
+- Gas giant internal heat ratio ramps (WS-derived)
+- Gas giant ring mass Gaussian model (WS-derived)
+- Gas giant oblateness MOI interpolation (WS-derived)
+- Population tech era density/growth tables (WS-derived)
+- Climate moisture index zone model (WS-derived)
+- Climate tidally-locked temperature model (WS-derived)
+
+**References**
+
+- Chen, J. & Kipping, D. (2017), ApJ 834
+- Christensen, U. R. (2009), Space Sci. Rev. 152
+- Fortney, J. J. et al. (2007), ApJ 659
+- Hurley, J. R. et al. (2000), MNRAS 315
+- Lodders, K. (2003), ApJ 591
+- Lodders, K. & Fegley, B. (2002), Icarus 155
+- Luck, R. E. & Lambert, D. L. (2011), AJ 142
+- Ortenzi, G. et al. (2020), Sci. Rep. 10
+- Ribas, I. et al. (2005), ApJ 622
+- Schlesinger, K. J. et al. (2014), ApJ 791
+- Thorngren, D. P. & Fortney, J. J. (2019), ApJL 874
+- Thorngren, D. P. et al. (2016), ApJ 831
+- Tout, C. A. et al. (1996), MNRAS 281
+- Wyatt, M. C. (2007), ApJ 663
+- Yashiro, S. et al. (2006), ApJL 650
+
+### Tooltip Audit & Style Guide Compliance
+
+**Full tooltip review** (ui/\*.js)
+
+Audited all page controllers for style guide compliance. Rewrote
+tooltips across moonPage, outerObjectsPage, and visualizerPage to
+use declarative tone, Unicode units (g/cm³, m/s²), and correct
+reference names ("Sun" not "Sol", "Moon" not "Our Moon"). Added
+missing tipIcon calls on visualiser download buttons. Removed all
+imperative verbs ("Choose", "Select", "Set") in favour of
+declarative phrasing.
+
+Added ~80 new tooltips across tectonicsPage, climatePage, and
+populationPage covering all previously undocumented inputs and
+outputs.
+
+### Preset Schema Compliance
+
+**Updated all presets to schema version 51** (ui/solPreset.js,
+ui/realmspacePreset.js, ui/arrakisPreset.js)
+
+All three presets (Sol, Realmspace, Arrakis) updated from version
+44 to 51 with the following additions:
+
+- Star: `evolutionMode`, `activityModelVersion`
+- Gas giants: explicit `style` and `rings` fields (Saturn gets
+  rings; Uranus/Neptune/Revona get "neptune" style)
+- Planets: `wmfPct`, `tectonicRegime`, `mantleOxidation`,
+  `greenhouseMode` where missing
+- Moons: `compositionOverride: null` on all moon inputs
+- Top-level: `clusterAdjustments` collection
+
+**Data corruption fix** — Venus (Sol) and Toril (Realmspace) had
+`cmfPct: 32.0`, which the v43 migration silently converts to −1
+(auto). Changed Venus to 31.17% and Toril to 33.0% to preserve
+intended values.
+
+**Tectonic regime fix** — The v42 migration unconditionally
+converts `"mobile"` to `"auto"`. Changed Earth and Toril presets
+to use `"auto"` directly to match post-migration state.
+
+### Import/Export Improvements
+
+**Extended import summary** (ui/importExportPage.js)
+
+The import preview now shows all nine world sections: Star,
+Planets, Moons, Gas Giants, Debris Disks, Tectonics (with range/
+volcano/rift/inactive counts), Population (tech era), Climate
+(altitude), and Calendar (present/absent).
+
+**Fixed default world** (ui/store.js)
+
+Added missing `climate: { altitudeM: 0 }` to `defaultWorld()`.
+Without this, a fresh install (no localStorage) returned a world
+object missing the climate section, causing the Climate page to
+fail on first load.
+
+### Build Fix
+
+**GIF encoder path resolution** (ui/canvasExport.js)
+
+Changed `new URL("../assets/vendor/gif.js", import.meta.url)` to
+page-relative string `"./assets/vendor/gif.js"`. The old pattern
+resolved correctly in development but escaped the `dist/` root
+after esbuild bundling, breaking GIF export in production builds.
+
 ## 1.14.0 — 2026-02-28
 
 ### Bug Fixes

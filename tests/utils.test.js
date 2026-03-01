@@ -5,91 +5,91 @@ import { clamp, toFinite, round, fmt } from "../engine/utils.js";
 
 // --- clamp ---
 
-test("clamp returns min for NaN input", () => {
+test("clamp → NaN input → returns min", () => {
   assert.equal(clamp(NaN, 0, 10), 0);
 });
 
-test("clamp returns min for -Infinity input", () => {
+test("clamp → -Infinity input → returns min", () => {
   assert.equal(clamp(-Infinity, 5, 10), 5);
 });
 
-test("clamp returns max when value exceeds max", () => {
+test("clamp → value exceeds max → returns max", () => {
   assert.equal(clamp(20, 0, 10), 10);
 });
 
-test("clamp returns value when within range", () => {
+test("clamp → value within range → returns value unchanged", () => {
   assert.equal(clamp(5, 0, 10), 5);
 });
 
-test("clamp works with identical min and max", () => {
+test("clamp → identical min and max → returns that value", () => {
   assert.equal(clamp(7, 3, 3), 3);
 });
 
 // --- toFinite ---
 
-test("toFinite returns numeric value unchanged", () => {
+test("toFinite → numeric value → returns unchanged", () => {
   assert.equal(toFinite(42, 0), 42);
   assert.equal(toFinite(-3.14, 0), -3.14);
 });
 
-test("toFinite converts numeric strings", () => {
+test("toFinite → numeric string → converts to number", () => {
   assert.equal(toFinite("7.5", 0), 7.5);
 });
 
-test("toFinite returns fallback for NaN", () => {
+test("toFinite → NaN → returns fallback", () => {
   assert.equal(toFinite(NaN, 99), 99);
 });
 
-test("toFinite returns fallback for Infinity", () => {
+test("toFinite → ±Infinity → returns fallback", () => {
   assert.equal(toFinite(Infinity, 99), 99);
   assert.equal(toFinite(-Infinity, 99), 99);
 });
 
-test("toFinite returns fallback for non-numeric strings", () => {
+test("toFinite → non-numeric string → returns fallback", () => {
   assert.equal(toFinite("hello", 5), 5);
 });
 
-test("toFinite returns 0 for null (Number(null) === 0, which is finite)", () => {
+test("toFinite → null → returns 0 (Number(null) is finite)", () => {
   assert.equal(toFinite(null, 99), 0);
 });
 
-test("toFinite returns fallback for undefined", () => {
+test("toFinite → undefined → returns fallback", () => {
   assert.equal(toFinite(undefined, 2), 2);
 });
 
 // --- round ---
 
-test("round rounds to specified decimal places", () => {
+test("round → specified decimal places → correct rounding", () => {
   assert.equal(round(3.14159, 2), 3.14);
   assert.equal(round(2.5, 0), 3);
 });
 
-test("round returns NaN for non-finite input", () => {
+test("round → non-finite input → returns NaN", () => {
   assert.ok(Number.isNaN(round(NaN, 2)));
   assert.ok(Number.isNaN(round(Infinity, 2)));
 });
 
-test("round defaults to 3 decimal places", () => {
+test("round → no dp argument → defaults to 3 decimals", () => {
   assert.equal(round(1.23456789), 1.235);
 });
 
 // --- fmt ---
 
-test("fmt returns NA for non-finite input", () => {
+test("fmt → non-finite input → returns 'NA'", () => {
   assert.equal(fmt(NaN), "NA");
   assert.equal(fmt(Infinity), "NA");
 });
 
-test("fmt formats with en-US locale (dot decimal separator)", () => {
+test("fmt → en-US locale → dot decimal separator", () => {
   const result = fmt(1.5, 1);
   assert.equal(result, "1.5");
 });
 
-test("fmt respects dp parameter", () => {
+test("fmt → explicit dp → respects decimal places", () => {
   assert.equal(fmt(1.23456, 2), "1.23");
   assert.equal(fmt(1000, 0), "1,000");
 });
 
-test("fmt uses three decimal places by default", () => {
+test("fmt → no dp argument → defaults to 3 decimals", () => {
   assert.equal(fmt(1.23456789), "1.235");
 });
