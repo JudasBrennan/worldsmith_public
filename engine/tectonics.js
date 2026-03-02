@@ -216,13 +216,20 @@ export function listMountainTypes() {
  * @param {number} ageGyr - System age in Gyr
  * @param {number} massEarth - Planet mass in Earth masses
  * @param {number} [tidalHeatingWm2=0] - Tidal heating flux in W/m²
+ * @param {number} [radioisotopeAbundance=1] - Radioisotope abundance relative to Earth
  * @returns {number} Elastic lithosphere thickness in km
  */
-export function elasticLithosphereThicknessKm(ageGyr, massEarth, tidalHeatingWm2 = 0) {
+export function elasticLithosphereThicknessKm(
+  ageGyr,
+  massEarth,
+  tidalHeatingWm2 = 0,
+  radioisotopeAbundance = 1,
+) {
   const age = Math.max(toFinite(ageGyr, 4.6), 0.01);
   const mass = Math.max(toFinite(massEarth, 1), 0.01);
   const tidal = Math.max(toFinite(tidalHeatingWm2, 0), 0);
-  let te = 20 * Math.sqrt(age) * Math.pow(mass, 0.3);
+  const abundance = Math.max(toFinite(radioisotopeAbundance, 1), 0.01);
+  let te = 20 * Math.sqrt(age / abundance) * Math.pow(mass, 0.3);
   if (tidal > 0.1) {
     te *= Math.max(0.2, 1 - 0.3 * Math.log10(tidal));
   }
@@ -323,12 +330,14 @@ export function convergenceFactor(convergenceMmYr) {
  *
  * @param {number} ageGyr - System age in Gyr
  * @param {number} [tidalHeatingWm2=0] - Tidal heating flux in W/m²
+ * @param {number} [radioisotopeAbundance=1] - Radioisotope abundance relative to Earth
  * @returns {number} Activity fraction (1.0 ≈ Earth-level)
  */
-export function volcanicActivity(ageGyr, tidalHeatingWm2 = 0) {
+export function volcanicActivity(ageGyr, tidalHeatingWm2 = 0, radioisotopeAbundance = 1) {
   const age = Math.max(toFinite(ageGyr, 4.6), 0);
   const tidal = Math.max(toFinite(tidalHeatingWm2, 0), 0);
-  let activity = Math.exp(-HEAT_DECAY_RATE * age);
+  const abundance = Math.max(toFinite(radioisotopeAbundance, 1), 0.01);
+  let activity = Math.exp((-HEAT_DECAY_RATE * age) / abundance);
   if (tidal > 0.1) {
     activity += 0.5 * Math.min(1, tidal / 2);
   }
@@ -700,7 +709,12 @@ export function maxShieldHeight(gravityG, stagnantLid = false, options = {}) {
   const age = toFinite(options.ageGyr, 4.6);
   const mass = toFinite(options.massEarth, 1);
   const tidal = toFinite(options.tidalHeatingWm2, 0);
-  const te = elasticLithosphereThicknessKm(age, mass, tidal);
+  const te = elasticLithosphereThicknessKm(
+    age,
+    mass,
+    tidal,
+    toFinite(options.radioisotopeAbundance, 1),
+  );
   const flexLimit = flexuralShieldLimit(te, gravityG);
 
   // Limit 3: basal spreading
@@ -831,6 +845,7 @@ export function riftProfile({
  * @param {number} [params.h2oPct=0] - Atmospheric H₂O fraction (%)
  * @param {string} [params.compositionClass="Earth-like"] - Planet composition class
  * @param {number} [params.tidalHeatingWm2=0] - Tidal heating flux in W/m²
+ * @param {number} [params.radioisotopeAbundance=1] - Radioisotope abundance relative to Earth
  * @returns {{ inputs: Object, tectonics: Object, display: Object }}
  */
 export function calcTectonics({
@@ -849,14 +864,20 @@ export function calcTectonics({
   h2oPct = 0,
   compositionClass = "Earth-like",
   tidalHeatingWm2 = 0,
+  radioisotopeAbundance = 1,
 } = {}) {
   const g = toFinite(gravityG, 1);
   const ridge = toFinite(ridgeHeightM, DEFAULT_RIDGE_HEIGHT_M);
   const maxPeak = maxPeakHeight(g, compositionClass);
 
   // Planet-aware derived quantities
-  const te = elasticLithosphereThicknessKm(ageGyr, massEarth, tidalHeatingWm2);
-  const activity = volcanicActivity(ageGyr, tidalHeatingWm2);
+  const te = elasticLithosphereThicknessKm(
+    ageGyr,
+    massEarth,
+    tidalHeatingWm2,
+    radioisotopeAbundance,
+  );
+  const activity = volcanicActivity(ageGyr, tidalHeatingWm2, radioisotopeAbundance);
   const erosionRate = climateErosionRate(surfaceTempK, h2oPct);
 
   // Spreading rate
@@ -900,7 +921,13 @@ export function calcTectonics({
 
   // Shield volcanism (planet-aware)
   const isStagnant = tectonicRegime === "stagnant";
-  const shieldOpts = { ageGyr, massEarth, tidalHeatingWm2, compositionClass };
+  const shieldOpts = {
+    ageGyr,
+    massEarth,
+    tidalHeatingWm2,
+    compositionClass,
+    radioisotopeAbundance,
+  };
   const maxShield = maxShieldHeight(g, isStagnant, shieldOpts);
   const shieldProfiles = shieldVolcanoes.map((sv) => {
     const h = clamp(toFinite(sv.heightM, maxShield * 0.5), 0, maxShield);
@@ -924,6 +951,7 @@ export function calcTectonics({
       inactiveRanges,
       shieldVolcanoes,
       riftValleys,
+      radioisotopeAbundance,
     },
     tectonics: {
       maxPeakHeightM: maxPeak,

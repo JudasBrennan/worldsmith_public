@@ -25,9 +25,14 @@ import {
   toggleMoonLock,
   listSystemGasGiants,
   listSystemDebrisDisks,
+  setOrbitMode,
 } from "./store.js";
 
 const TIP_LABEL = {
+  "Orbit Placement Mode":
+    "Guided mode generates logarithmically-spaced orbit slots from Spacing Factor and Orbit 1; planets are assigned to slots via drag-and-drop.\n\n" +
+    "Manual mode disables the slot system\u2014each planet\u2019s semi-major axis is set directly on the Planets page.\n\n" +
+    "Switching from Guided to Manual copies each planet\u2019s slot distance into its semi-major axis input.",
   "Star Mass": "Star mass in solar masses (read-only; set on the Star page).\n\nSun = 1 Msol.",
   "Habitable Zone":
     "A planet orbiting within this region receives Earth-like stellar heating.\n\nUses a temperature-dependent model where the inner/outer flux thresholds (S_in/S_out) vary with stellar effective temperature, based on Chromant\u2019s Desmos correction.",
@@ -159,26 +164,42 @@ export function initSystemPage(mountEl) {
         <div class="panel__header"><h2>Inputs</h2></div>
         <div class="panel__body">
 
+          <div class="label">Orbit Placement ${tipIcon(TIP_LABEL["Orbit Placement Mode"] || "")}</div>
+          <div class="hint">Guided uses generated orbit slots. Manual sets orbit per-planet.</div>
+          <div class="pill-toggle-wrap" style="min-width:260px">
+            <div class="physics-duo-toggle" data-toggle="orbitMode">
+              <input type="radio" name="orbitMode" id="omode-guided" value="guided" checked />
+              <label for="omode-guided">Guided</label>
+              <input type="radio" name="orbitMode" id="omode-manual" value="manual" />
+              <label for="omode-manual">Manual</label>
+              <span></span>
+            </div>
+          </div>
+
+          <div style="height:10px"></div>
+
           <div class="label">Derived Data ${tipIcon(TIP_LABEL["Star Mass"] || "")}</div>
           <div class="hint">Read-only. Change it on the Star tab.</div>
           <div class="derived-readout" id="massDisplay"></div>
 
-          <div style="height:8px"></div>
+          <div id="guidedInputs">
+            <div style="height:8px"></div>
 
-          ${numWithSlider("spacing", "Spacing Factor", "", "Controls orbit slot spacing.", 0, 10, 0.01)}
-          ${numWithSlider("orbit1", "Orbit 1", "AU", "First orbit slot.", 0.0001, 1000000, 0.01)}
+            ${numWithSlider("spacing", "Spacing Factor", "", "Controls orbit slot spacing.", 0, 10, 0.01)}
+            ${numWithSlider("orbit1", "Orbit 1", "AU", "First orbit slot.", 0.0001, 1000000, 0.01)}
 
-          <div style="height:10px"></div>
-          <div class="hint">Gas giants are managed on the <a href="#/planet">Planets</a> tab. Debris disks are managed on the <a href="#/outer">Other Objects</a> tab.</div>
+            <div style="height:10px"></div>
+            <div class="hint">Gas giants are managed on the <a href="#/planet">Planets</a> tab. Debris disks are managed on the <a href="#/outer">Other Objects</a> tab.</div>
 
-          <div class="button-row">
-            <button class="primary" id="btn-apply">Apply</button>
-            <button id="btn-sol">Sol-ish Preset</button>
-            <button id="btn-reset">Reset to Defaults</button>
-          </div>
+            <div class="button-row">
+              <button class="primary" id="btn-apply">Apply</button>
+              <button id="btn-sol">Sol-ish Preset</button>
+              <button id="btn-reset">Reset to Defaults</button>
+            </div>
 
-          <div class="hint" style="margin-top:10px">
-            Tip: adjust Orbit 1 and Spacing to get a nice distribution of orbit slots around the habitable zone.
+            <div class="hint" style="margin-top:10px">
+              Tip: adjust Orbit 1 and Spacing to get a nice distribution of orbit slots around the habitable zone.
+            </div>
           </div>
         </div>
       </div>
@@ -189,28 +210,36 @@ export function initSystemPage(mountEl) {
           <div class="kpi-grid" id="kpis"></div>
 
           <div style="margin-top:14px">
-            <div class="label">Planets in system ${tipIcon(TIP_LABEL["Planets in system"] || "")}</div>
-            <div class="hint">Drag planets into orbit slots. One planet per slot.</div>
-            <div class="dropzone" id="unassignedZone">
-              <div class="dropzone-title">Unassigned planets</div>
-              <div id="unassignedPlanets"></div>
+            <div id="guidedOutputs">
+              <div class="label">Planets in system ${tipIcon(TIP_LABEL["Planets in system"] || "")}</div>
+              <div class="hint">Drag planets into orbit slots. One planet per slot.</div>
+              <div class="dropzone" id="unassignedZone">
+                <div class="dropzone-title">Unassigned planets</div>
+                <div id="unassignedPlanets"></div>
+              </div>
+
+              <div style="height:10px"></div>
+              <div class="dropzone" id="unassignedMoonsZone">
+                <div class="dropzone-title">Unassigned moons</div>
+                <div id="unassignedMoons"></div>
+              </div>
+
+              <div style="height:14px"></div>
+              <div class="label">Orbit slots ${tipIcon(TIP_LABEL["Orbit slots"] || "")}</div>
+              <div class="hint">One planet per slot. Manage planets on the Planets tab.</div>
+              <div id="slotsUi" style="margin-top:10px"></div>
+
+              <div style="height:10px"></div>
+              <div class="label">Derived orbit slots (AU) ${tipIcon(TIP_LABEL["Orbit Slots (AU)"] || "")}</div>
+              <div class="hint">Generated orbit positions (1-20).</div>
+              <div class="derived-readout" id="orbits"></div>
             </div>
 
-            <div style="height:10px"></div>
-            <div class="dropzone" id="unassignedMoonsZone">
-              <div class="dropzone-title">Unassigned moons</div>
-              <div id="unassignedMoons"></div>
+            <div id="manualOutputs" style="display:none">
+              <div class="label">Bodies by orbit</div>
+              <div class="hint">Sorted by semi-major axis. Edit orbits on the Planets tab.</div>
+              <div id="manualBodyList" style="margin-top:10px"></div>
             </div>
-
-            <div style="height:14px"></div>
-<div class="label">Orbit slots ${tipIcon(TIP_LABEL["Orbit slots"] || "")}</div>
-            <div class="hint">One planet per slot. Manage planets on the Planets tab.</div>
-            <div id="slotsUi" style="margin-top:10px"></div>
-
-            <div style="height:10px"></div>
-            <div class="label">Derived orbit slots (AU) ${tipIcon(TIP_LABEL["Orbit Slots (AU)"] || "")}</div>
-            <div class="hint">Generated orbit positions (1-20).</div>
-            <div class="derived-readout" id="orbits"></div>
           </div>
         </div>
       </div>
@@ -230,6 +259,10 @@ export function initSystemPage(mountEl) {
   const unassignedMoonsEl = wrap.querySelector("#unassignedMoons");
   const slotsUiEl = wrap.querySelector("#slotsUi");
   const orbitsEl = wrap.querySelector("#orbits");
+  const guidedInputsEl = wrap.querySelector("#guidedInputs");
+  const guidedOutputsEl = wrap.querySelector("#guidedOutputs");
+  const manualOutputsEl = wrap.querySelector("#manualOutputs");
+  const manualBodyListEl = wrap.querySelector("#manualBodyList");
   const posterCanvas = wrap.querySelector("#systemPoster");
   const posterWrap = wrap.querySelector("#posterWrap");
   const posterBody = wrap.querySelector("#posterBody");
@@ -451,6 +484,18 @@ export function initSystemPage(mountEl) {
     `,
         )
         .join("");
+
+      // ── Orbit mode UI toggle ──
+      const orbitMode = w0.system.orbitMode || "guided";
+      const isManual = orbitMode === "manual";
+      const guidedRadio = wrap.querySelector("#omode-guided");
+      const manualRadio = wrap.querySelector("#omode-manual");
+      if (guidedRadio) guidedRadio.checked = !isManual;
+      if (manualRadio) manualRadio.checked = isManual;
+      guidedInputsEl.style.display = isManual ? "none" : "";
+      guidedOutputsEl.style.display = isManual ? "none" : "";
+      manualOutputsEl.style.display = isManual ? "" : "none";
+
       // Planet assignment UI
       const w = w0;
       const planets = listPlanets(w);
@@ -599,17 +644,65 @@ export function initSystemPage(mountEl) {
         .map((v, i) => `Orbit ${String(i + 1).padStart(2, "0")}: ${fmt(v, 3)} AU`)
         .join("\n");
 
+      // ── Manual mode: sorted body list ──
+      if (isManual) {
+        const allBodies = [];
+        for (const p of planetsForUi) {
+          const au = Number(p.inputs?.semiMajorAxisAu) || 0;
+          allBodies.push({
+            kind: "Rocky planet",
+            name: p.name || p.id,
+            au,
+            auLabel: `${fmt(au, 3)} AU`,
+          });
+        }
+        for (const g of gasGiants) {
+          const au = Number(g.au) || 0;
+          allBodies.push({
+            kind: "Gas giant",
+            name: g.name || g.id,
+            au,
+            auLabel: `${fmt(au, 3)} AU`,
+          });
+        }
+        for (const d of debrisRows) {
+          const mid = (d.inner + d.outer) / 2;
+          allBodies.push({
+            kind: "Debris disk",
+            name: d.name || "Debris disk",
+            au: mid,
+            auLabel: `${fmt(d.inner, 2)}\u2013${fmt(d.outer, 2)} AU`,
+          });
+        }
+        allBodies.sort((a, b) => a.au - b.au);
+        manualBodyListEl.innerHTML = allBodies.length
+          ? allBodies
+              .map(
+                (b) => `
+            <div class="slot-row">
+              <div class="slot-title">${escapeHtml(b.name)} (${escapeHtml(b.auLabel)})</div>
+              <div class="dropzone" style="cursor:default">
+                <div class="hint">${escapeHtml(b.kind)}</div>
+              </div>
+            </div>`,
+              )
+              .join("")
+          : `<div class="hint">No bodies created yet.</div>`;
+      }
+
       // ── System Poster ──────────────────────────────
       const posterPlanets = planetsForUi
-        .filter((p) => p.slotIndex != null)
+        .filter((p) => (isManual ? true : p.slotIndex != null))
         .map((p) => {
-          const slotAu = model.orbitsAu[p.slotIndex - 1];
+          const au = isManual
+            ? Number(p.inputs?.semiMajorAxisAu) || 0
+            : model.orbitsAu[p.slotIndex - 1];
           let dayHex = "#9bbbe0";
           let horizonHex = "#6a6a6a";
           let radiusKm = EARTH_R_KM;
           let visualProfile = null;
           try {
-            const planetInputs = { ...p.inputs, semiMajorAxisAu: slotAu };
+            const planetInputs = isManual ? p.inputs : { ...p.inputs, semiMajorAxisAu: au };
             const pm = calcPlanetExact({
               starMassMsol: state.starMassMsol,
               starAgeGyr: Number(w.star.ageGyr) || 4.6,
@@ -629,7 +722,7 @@ export function initSystemPage(mountEl) {
           return {
             id: p.id,
             name: p.name,
-            au: slotAu,
+            au,
             radiusKm,
             dayHex,
             horizonHex,
@@ -671,10 +764,12 @@ export function initSystemPage(mountEl) {
       const posterStarAge = Number(w.star.ageGyr) || 4.6;
       const gasGiantsById = new Map(gasGiants.map((g) => [g.id, g]));
       const correctedInputsByPlanetId = new Map();
-      for (const p of planetsForUi) {
-        if (p.slotIndex != null) {
-          const slotAu = model.orbitsAu[p.slotIndex - 1];
-          correctedInputsByPlanetId.set(p.id, { ...p.inputs, semiMajorAxisAu: slotAu });
+      if (!isManual) {
+        for (const p of planetsForUi) {
+          if (p.slotIndex != null) {
+            const slotAu = model.orbitsAu[p.slotIndex - 1];
+            correctedInputsByPlanetId.set(p.id, { ...p.inputs, semiMajorAxisAu: slotAu });
+          }
         }
       }
       const posterMoons = moonsForUi
@@ -828,6 +923,31 @@ export function initSystemPage(mountEl) {
     render();
   });
 
+  // ── Orbit placement mode toggle ──
+  wrap.querySelector('[data-toggle="orbitMode"]').addEventListener("change", (e) => {
+    const mode = e.target.value;
+    const w = loadWorld();
+    const sov = getStarOverrides(w.star);
+    const starModel = calcStar({
+      massMsol: Number(w.star.massMsol),
+      ageGyr: Number(w.star.ageGyr) || 4.6,
+      metallicityFeH: Number(w.star.metallicityFeH) || 0,
+      radiusRsolOverride: sov.r,
+      luminosityLsolOverride: sov.l,
+      tempKOverride: sov.t,
+      evolutionMode: sov.ev,
+    });
+    const sysModel = calcSystem({
+      starMassMsol: state.starMassMsol,
+      spacingFactor: state.spacingFactor,
+      orbit1Au: state.orbit1Au,
+      luminosityLsolOverride: starModel.luminosityLsol,
+      radiusRsolOverride: starModel.radiusRsol,
+    });
+    setOrbitMode(mode, sysModel.orbitsAu);
+    render();
+  });
+
   function sortMoonsByOrbitKm(a, b) {
     const aa = Number(a?.inputs?.semiMajorAxisKm);
     const bb = Number(b?.inputs?.semiMajorAxisKm);
@@ -941,6 +1061,11 @@ export function initSystemPage(mountEl) {
     }
 
     wrap.addEventListener("dragstart", (e) => {
+      const curWorld = loadWorld();
+      if ((curWorld.system.orbitMode || "guided") === "manual") {
+        e.preventDefault();
+        return;
+      }
       const moonCard = e.target.closest?.(".moon-card");
       if (moonCard) {
         if (moonCard.classList.contains("is-locked")) {

@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.15.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.16.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -40,7 +40,7 @@ export function initAboutPage(mountEl) {
         <ol>
           <li><b>Star</b>: choose a star mass (and any other inputs) to generate star properties. An animated preview shows real-time flare and CME events.</li>
           <li><b>Planetary System</b>: set spacing and orbit framework for the system. The System Poster renders a 3D lineup of all bodies.</li>
-          <li><b>Planets</b>: create and edit rocky planets and gas giants, then assign them to system slots. Each body shows a live 3D preview driven by its physics.</li>
+          <li><b>Planets</b>: create and edit rocky planets (including dwarf planets), and gas giants, then assign them to system slots. Each body shows a live 3D preview driven by its physics. Enable the atmospheric escape filter to auto-strip gases the body cannot retain.</li>
           <li><b>Other Objects</b>: configure debris disks and other non-planetary components.</li>
           <li><b>Moons</b>: create moons and assign them to parent planets.</li>
           <li><b>Tectonics</b>: model mountain ranges, shield volcanoes, rift valleys, ocean spreading, and continental margins. Add a plate canvas with Voronoi tessellation and boundary classification.</li>
@@ -59,14 +59,27 @@ export function initAboutPage(mountEl) {
           <li>If something looks wrong, use <b>Refresh</b> on the visualiser to redraw from latest data.</li>
           <li>Most inputs support both a <b>slider</b> and a <b>text box</b> for precision.</li>
           <li>Use <b>Import/Export</b> to save your world as JSON and reload it later, or import a WorldSmith 8.x spreadsheet directly.</li>
-          <li>Try the <b>Sol</b>, <b>Arrakis</b>, or <b>Realmspace</b> presets on the Import/Export page to explore a fully configured system.</li>
+          <li>Try the <b>Sol</b>, <b>Arrakis</b>, or <b>Realmspace</b> presets on the Import/Export page to explore a fully configured system. Sol includes dwarf planets (Ceres, Pluto) and Charon.</li>
           <li>Use the <b>Splash</b> toggle in the header to skip the loading screen on startup.</li>
           <li>Switch between <b>light</b> and <b>dark</b> themes with the toggle in the header.</li>
+          <li>Turn on <b>Atmospheric escape filter</b> on the Planet page to automatically remove gases the body is too small or warm to retain. The model includes non-thermal losses for H&#x2082; and He.</li>
+          <li>Use the <b>Radioisotope Abundance</b> slider (or Per-Isotope mode) to model worlds with more or less internal heat than Earth, affecting volcanism, lithosphere thickness, and dynamo lifetime.</li>
           <li>Your work is stored locally in your browser (localStorage). Use <b>Export</b> regularly to back up your world. Clearing site data will reset the tool.</li>
         </ul>
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
         <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+
+        <p><b>Version 1.16.0</b> (from 1.15.0)</p>
+        <ul>
+          <li><b>Atmospheric Escape</b> &mdash; Per-species Jeans escape analysis with exobase temperature model, pressure-dependent XUV absorption, and non-thermal escape enhancement for H&#x2082; and He. Optional auto-strip toggle removes gases the body cannot retain. Calibrated against NASA Planetary Fact Sheet data.</li>
+          <li><b>Dwarf Planets</b> &mdash; Mass-based body classification (Dwarf planet below 0.01 M&#x2295;). Mass floor lowered to 0.0001 M&#x2295;. Sol preset adds Ceres, Pluto, and Charon.</li>
+          <li><b>Radioisotope Abundance</b> &mdash; Configurable radioisotope abundance for rocky planets with Simple (single slider) and Per-Isotope (U-238, U-235, Th-232, K-40) modes. Scales volcanic activity, lithosphere thickness, internal heat budget, and magnetic dynamo lifetime.</li>
+          <li><b>Moon Physics</b> &mdash; Surface temperature calculation, magnetospheric radiation dose from host planet, tidal-thermal feedback for rocky moons (Io-calibrated), and configurable initial rotation period with estimated current spin.</li>
+          <li><b>Orbit Placement Mode</b> &mdash; Guided / Manual orbit toggle on the System tab lets you place planets at arbitrary semi-major axes.</li>
+          <li><b>Local Cluster Limits</b> &mdash; Tightened input ranges (25 ly max radius, 0.1 /ly&sup3; max density) and raised system render cap from 99 to 750.</li>
+          <li><b>UI Polish</b> &mdash; Unified pill-toggle style across planet and star pages, section headings in Derived Details, and canvas loading performance optimisations (IndexedDB texture caching, worker pre-warming, progressive LOD).</li>
+        </ul>
 
         <p><b>Version 1.15.0</b> (from 1.14.0)</p>
         <ul>

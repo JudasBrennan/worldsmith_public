@@ -58,9 +58,12 @@ const {
   listMoons,
   createMoonFromInputs,
   saveWorld,
+  setOrbitMode,
+  assignPlanetToSlot,
 } = await import("../ui/store.js");
 const { createSolPresetEnvelope } = await import("../ui/solPreset.js");
 const { createRealmspacePresetEnvelope } = await import("../ui/realmspacePreset.js");
+const { calcSystem } = await import("../engine/system.js");
 
 beforeEach(() => {
   globalThis.localStorage.clear();
@@ -171,7 +174,7 @@ test("coexistence → Sol preset → planets and gas giants independent", () => 
 
   const planets = listPlanets(world);
   const giants = listSystemGasGiants(world);
-  assert.equal(planets.length, 4);
+  assert.equal(planets.length, 6);
   assert.equal(giants.length, 4);
 
   // Planet selection
@@ -423,4 +426,92 @@ test("createMoonFromInputs → gas giant target → moon assigned", () => {
   const after = listMoons(loadWorld()).filter((m) => m.planetId === "gg_neptune");
   assert.equal(after.length, before + 1);
   assert.ok(after.some((m) => m.name === "Test Moon"));
+});
+
+/* ── Orbit placement mode (v52) ───────────────────────────────── */
+
+test("migration v52 → adds orbitMode = guided", () => {
+  const legacy = {
+    version: 51,
+    star: { name: "Test", massMsol: 1, ageGyr: 4.6 },
+    system: { spacingFactor: 0.3, orbit1Au: 0.39 },
+  };
+  const world = importWorld(legacy);
+  assert.equal(world.system.orbitMode, "guided");
+  assert.equal(world.version, getSchemaVersion());
+});
+
+test("setOrbitMode('manual') → syncs planet AU from slot, preserves slotIndex", () => {
+  importWorld(createSolPresetEnvelope().world);
+
+  // Sol preset uses manual mode; switch to guided and assign slots for this test
+  const w0 = loadWorld();
+  w0.system.orbitMode = "guided";
+  saveWorld(w0);
+  assignPlanetToSlot("p_earth", 3);
+
+  const before = loadWorld();
+  const earth = Object.values(before.planets.byId).find((p) => p.name === "Earth");
+  assert.ok(earth, "Earth should exist");
+  assert.ok(earth.slotIndex != null, "Earth should have a slot");
+  const earthSlot = earth.slotIndex;
+
+  // Build orbitsAu array matching the sol preset
+  const model = calcSystem({
+    starMassMsol: Number(before.star.massMsol) || 1,
+    spacingFactor: Number(before.system.spacingFactor) || 0.3,
+    orbit1Au: Number(before.system.orbit1Au) || 0.39,
+  });
+
+  const earthSlotAu = model.orbitsAu[earth.slotIndex - 1];
+  setOrbitMode("manual", model.orbitsAu);
+  const after = loadWorld();
+  assert.equal(after.system.orbitMode, "manual");
+
+  // Earth's semiMajorAxisAu should match the slot AU
+  const earthAfter = Object.values(after.planets.byId).find((p) => p.name === "Earth");
+  assert.equal(earthAfter.inputs.semiMajorAxisAu, earthSlotAu);
+
+  // Slot assignments should be preserved
+  assert.equal(earthAfter.slotIndex, earthSlot, "Earth slotIndex preserved");
+});
+
+test("setOrbitMode → guided→manual→guided round-trip preserves slot assignments", () => {
+  importWorld(createSolPresetEnvelope().world);
+
+  // Sol preset uses manual mode; switch to guided and assign slots for this test
+  const w0 = loadWorld();
+  w0.system.orbitMode = "guided";
+  saveWorld(w0);
+  assignPlanetToSlot("p_mercury", 1);
+  assignPlanetToSlot("p_venus", 2);
+  assignPlanetToSlot("p_earth", 3);
+  assignPlanetToSlot("p_mars", 4);
+
+  const before = loadWorld();
+  const model = calcSystem({
+    starMassMsol: Number(before.star.massMsol) || 1,
+    spacingFactor: Number(before.system.spacingFactor) || 0.3,
+    orbit1Au: Number(before.system.orbit1Au) || 0.39,
+  });
+
+  // Record original slot assignments
+  const originalSlots = {};
+  for (const pid of before.planets.order) {
+    originalSlots[pid] = before.planets.byId[pid].slotIndex;
+  }
+
+  setOrbitMode("manual", model.orbitsAu);
+  setOrbitMode("guided", []);
+  const after = loadWorld();
+  assert.equal(after.system.orbitMode, "guided");
+
+  // Planets should still have their original slot assignments
+  for (const pid of after.planets.order) {
+    assert.equal(
+      after.planets.byId[pid].slotIndex,
+      originalSlots[pid],
+      `planet ${pid} slot restored after round-trip`,
+    );
+  }
 });

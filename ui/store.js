@@ -16,7 +16,7 @@ const LEGACY_KEY = "worldsmith.world";
 let volatileWorldRaw = null;
 
 // Schema version for migrations
-const SCHEMA_VERSION = 51;
+const SCHEMA_VERSION = 55;
 // Practical giant-planet radius bounds in Jupiter radii (Rj):
 // lower bound ~= Neptune-size (~0.35 Rj), upper bound ~= inflated HAT-P-67 b (2.14 Rj).
 export const GAS_GIANT_RADIUS_MIN_RJ = 0.35;
@@ -288,6 +288,7 @@ function defaultWorld() {
     },
     selectedBodyType: "planet",
     system: {
+      orbitMode: "guided",
       spacingFactor: 0.33,
       orbit1Au: 0.62,
       gasGiants: { selectedId: null, order: [], byId: {} },
@@ -653,6 +654,53 @@ function migrateWorld(world) {
     world.climate = { altitudeM: 0 };
   }
 
+  // v52: orbit placement mode
+  if (!world.system.orbitMode) world.system.orbitMode = "guided";
+
+  // v53: add initialRotationPeriodHours to moon inputs
+  if (world.moons && world.moons.byId) {
+    for (const mid of Object.keys(world.moons.byId)) {
+      const inp = world.moons.byId[mid]?.inputs;
+      if (inp && inp.initialRotationPeriodHours === undefined)
+        inp.initialRotationPeriodHours = null;
+    }
+  }
+  if (world.moon && world.moon.initialRotationPeriodHours === undefined) {
+    world.moon.initialRotationPeriodHours = null;
+  }
+
+  // v54: add radioisotopeAbundance to planet inputs
+  if (world.planets && world.planets.byId) {
+    for (const pid of Object.keys(world.planets.byId)) {
+      const inp = world.planets.byId[pid]?.inputs;
+      if (inp && inp.radioisotopeAbundance === undefined) inp.radioisotopeAbundance = null;
+    }
+  }
+  if (world.planet && world.planet.radioisotopeAbundance === undefined) {
+    world.planet.radioisotopeAbundance = null;
+  }
+
+  // v55: add per-isotope abundance fields to planet inputs
+  if (world.planets && world.planets.byId) {
+    for (const pid of Object.keys(world.planets.byId)) {
+      const inp = world.planets.byId[pid]?.inputs;
+      if (inp) {
+        if (inp.radioisotopeMode === undefined) inp.radioisotopeMode = "simple";
+        if (inp.u238Abundance === undefined) inp.u238Abundance = null;
+        if (inp.u235Abundance === undefined) inp.u235Abundance = null;
+        if (inp.th232Abundance === undefined) inp.th232Abundance = null;
+        if (inp.k40Abundance === undefined) inp.k40Abundance = null;
+      }
+    }
+  }
+  if (world.planet) {
+    if (world.planet.radioisotopeMode === undefined) world.planet.radioisotopeMode = "simple";
+    if (world.planet.u238Abundance === undefined) world.planet.u238Abundance = null;
+    if (world.planet.u235Abundance === undefined) world.planet.u235Abundance = null;
+    if (world.planet.th232Abundance === undefined) world.planet.th232Abundance = null;
+    if (world.planet.k40Abundance === undefined) world.planet.k40Abundance = null;
+  }
+
   canonicalizeSystemFeatures(world);
 
   // Ensure version updated
@@ -919,6 +967,55 @@ export function assignPlanetToSlot(planetId, slotIndexOrNull) {
 
   p.slotIndex = slotIndexOrNull;
   if (world.planets.selectedId === planetId) world.planet = { ...p.inputs, name: p.name };
+  saveWorld(world);
+  return world;
+}
+
+/**
+ * Switch between "guided" (slot-based) and "manual" (free semi-major axis)
+ * orbit placement modes.
+ *
+ * When switching to "manual", each planet/gas-giant that sits in a slot has
+ * its semi-major axis synced to the slot's AU value.  Slot assignments are
+ * preserved so they can be restored when switching back to guided.
+ *
+ * @param {"guided"|"manual"} mode
+ * @param {number[]} orbitsAu  Current system orbit distances (needed for sync)
+ */
+export function setOrbitMode(mode, orbitsAu) {
+  const world = loadWorld();
+  const prev = world.system.orbitMode || "guided";
+  const next = mode === "manual" ? "manual" : "guided";
+  if (prev === next) return world;
+
+  if (next === "manual" && orbitsAu) {
+    // Sync each planet's semiMajorAxisAu to its slot AU (keep slotIndex)
+    for (const pid of world.planets.order) {
+      const p = world.planets.byId[pid];
+      if (!p || p.slotIndex == null) continue;
+      const slotAu = orbitsAu[p.slotIndex - 1];
+      if (Number.isFinite(slotAu) && slotAu > 0) {
+        p.inputs.semiMajorAxisAu = slotAu;
+      }
+    }
+    // Sync gas giants: copy slot AU (keep slotIndex)
+    const gg = world.system.gasGiants;
+    if (gg?.byId) {
+      for (const gid of gg.order || []) {
+        const g = gg.byId[gid];
+        if (!g || g.slotIndex == null) continue;
+        const slotAu = orbitsAu[g.slotIndex - 1];
+        if (Number.isFinite(slotAu) && slotAu > 0) {
+          g.au = slotAu;
+        }
+      }
+    }
+  }
+
+  world.system.orbitMode = next;
+  // Keep back-compat planet shortcut in sync
+  const sel = world.planets.byId[world.planets.selectedId];
+  if (sel) world.planet = { ...sel.inputs, name: sel.name };
   saveWorld(world);
   return world;
 }

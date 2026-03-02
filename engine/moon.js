@@ -25,7 +25,7 @@
 //          object, and moon parameters (mass, density, albedo, orbit).
 // Outputs: structured object with inputs, physical, orbit, tides, and
 //          display tiers (see STYLE_GUIDE.md § Return shape).
-import { clamp, eccentricityFactor, fmt, k2LoveNumber } from "./utils.js";
+import { clamp, eccentricityFactor, fmt, k2LoveNumber, toFinite } from "./utils.js";
 import { calcPlanetExact } from "./planet.js";
 import { massToLuminosity, massToRadius } from "./star.js";
 
@@ -54,6 +54,16 @@ const RIGIDITY = 30000000000.0; // C248 — used for planet k₂ (unchanged)
 const Q_PLANET = 13.0; // D245
 const EARTH_TIDES_REF = 1501373691439.2996; // C273
 const EARTH_GEOTHERMAL_WM2 = 0.09; // Earth mean geothermal heat flux (W/m²)
+
+// Surface temperature constants (SI units).
+const STEFAN_BOLTZ = 5.6704e-8; // W m⁻² K⁻⁴
+const L_SOL_W = 3.828e26; // Solar luminosity (W)
+
+// Radiogenic heating — same value used in planet.js.
+const EARTH_INTERNAL_HEAT_W = 44e12; // 44 TW
+
+// Magnetospheric radiation constants.
+const EARTH_SURFACE_FIELD_GAUSS = 0.31; // Earth equatorial dipole (Gauss)
 
 // Recession corrections.  The homogeneous-body Love number formula
 // overestimates k₂ for differentiated planets (~0.82 vs 0.30 for Earth).
@@ -176,6 +186,15 @@ function formatOrbitalFate(dadt, toRocheGyr, toEscapeGyr) {
   return "Stable";
 }
 
+function radiationLabel(remDay) {
+  if (remDay < 0.001) return "Negligible";
+  if (remDay < 0.01) return "Low";
+  if (remDay < 0.1) return "Moderate";
+  if (remDay < 1) return "High";
+  if (remDay < 100) return "Very High";
+  return "Extreme";
+}
+
 /**
  * Computes full moon properties from host-star, planet, and moon inputs.
  *
@@ -228,6 +247,10 @@ export function calcMoonExact({
   const ePlanet = clamp(p.inputs.eccentricity, 0, 0.99);
 
   const rotPlanetHours = clamp(p.inputs.rotationPeriodHours, 0.1, 1e6);
+
+  // Magnetic field and radioisotope abundance from parent (rocky planet or gas giant)
+  const surfaceFieldEarths = clamp(p.derived?.surfaceFieldEarths ?? 0, 0, 1000);
+  const radioisotopeAbundance = clamp(p.derived?.radioisotopeAbundance ?? 1, 0.01, 5);
 
   const mMoonMM = clamp(moon.massMoon ?? 1.0, 0.001, 10000);
   const rhoMoonGcm3 = clamp(moon.densityGcm3 ?? 3.34, 0.1, 100);
@@ -317,12 +340,13 @@ export function calcMoonExact({
   const mStarKg = mStarMsol * KG_PER_MSOL; // MOON!F3
 
   // Angular speeds (C238/D238)
-  // omegaMoon uses the spreadsheet's hardcoded 12-hour initial rotation period
-  // (C238 literal).  This is a model assumption: the moon is assumed to have
-  // started spinning once every 12 hours before tidal forces slowed it down.
-  // The output (tMoonLockGyr) tells you how long it takes to reach tidal lock
-  // from that initial state, matching the WorldSmith 8 spreadsheet exactly.
-  const omegaMoon = (2 * PI) / (12 * 3600); // C238 — fixed 12 h initial rotation
+  // Initial rotation period defaults to the spreadsheet's 12-hour assumption
+  // (C238 literal) but can be overridden via moon.initialRotationPeriodHours.
+  // Faster initial spin → more angular momentum to dissipate → longer lock time.
+  const initialRotHours = moon.initialRotationPeriodHours
+    ? toFinite(moon.initialRotationPeriodHours, 12)
+    : 12;
+  const omegaMoon = (2 * PI) / (initialRotHours * 3600); // C238
   const omegaPlanet = (2 * PI) / (rotPlanetHours * 3600); // D238
 
   // Distances (C239/D239/E239)
@@ -369,14 +393,106 @@ export function calcMoonExact({
   // is NOT the same as spin-axis obliquity, and the forced obliquity of
   // tidally locked moons requires Cassini-state theory to compute.
   const nMeanMotion = (2 * PI) / (periodSiderealDays * SEC_PER_DAY);
-  const tidalHeatingW =
+  const surfaceAreaM2 = 4 * PI * rMoonM ** 2;
+  const tidalGeomFactor =
     (21 / 2) *
-    (k2_moon / moonComp.Q) *
     ((G * mPlanetKg ** 2 * rMoonM ** 5 * nMeanMotion) / aMoonM ** 6) *
     eccentricityFactor(eMoon);
-  const surfaceAreaM2 = 4 * PI * rMoonM ** 2;
+
+  // Initial tidal heating with cold (density-derived) material properties.
+  const tidalHeatingW0 = tidalGeomFactor * (k2_moon / moonComp.Q);
+  const tidalFlux0 = surfaceAreaM2 > 0 ? tidalHeatingW0 / surfaceAreaM2 : 0;
+
+  // ── Tidal-thermal feedback (Moore 2003; Segatz et al. 1988) ───────
+  // Intense tidal heating partially melts a rocky interior, lowering
+  // rigidity μ and quality factor Q, which further amplifies dissipation.
+  // This positive feedback is the key mechanism behind Io's extreme
+  // volcanism in the Laplace resonance (Io-Europa-Ganymede 1:2:4).
+  //
+  // We apply the feedback when: (a) no manual composition override,
+  // (b) density indicates silicate mantle (ρ ≥ 3.2), and (c) the cold-
+  // state tidal flux exceeds a critical threshold for partial melting.
+  // The threshold (0.02 W/m²) corresponds to the convective cooling
+  // capacity of a silicate mantle (Fischer & Spohn 1999).
+  const MELT_FLUX_CRIT = 0.02; // W/m² — onset of significant partial melting
+  const MELT_MU = 10e9; // Pa — partially molten rigidity
+  const MELT_Q = 10; // — partially molten quality factor
+
+  let tidalFeedbackActive = false;
+  let meltFraction = 0;
+  let effMu = moonComp.mu;
+  let effQ = moonComp.Q;
+  let tidalHeatingW = tidalHeatingW0;
+
+  if (!moon.compositionOverride && rhoMoonGcm3 >= 3.2 && tidalFlux0 > 0) {
+    // Melt fraction: smooth logistic based on ratio of flux to critical flux.
+    // f → 0 when flux << flux_crit; f → 1 when flux >> flux_crit.
+    const ratio = tidalFlux0 / MELT_FLUX_CRIT;
+    meltFraction = ratio > 0 ? 1 / (1 + ratio ** -3) : 0;
+
+    if (meltFraction > 0.01) {
+      tidalFeedbackActive = true;
+      // Blend rigidity (log-space) and Q (linear) toward molten values.
+      effMu = Math.exp(
+        Math.log(moonComp.mu) * (1 - meltFraction) + Math.log(MELT_MU) * meltFraction,
+      );
+      effQ = moonComp.Q * (1 - meltFraction) + MELT_Q * meltFraction;
+      const k2Eff = k2LoveNumber(rhoMoonKgM3, gMoonMs2, rMoonM, effMu);
+      tidalHeatingW = tidalGeomFactor * (k2Eff / effQ);
+    }
+  }
+
   const tidalHeatingWm2 = surfaceAreaM2 > 0 ? tidalHeatingW / surfaceAreaM2 : 0;
   const tidalHeatingEarth = tidalHeatingWm2 / EARTH_GEOTHERMAL_WM2;
+
+  // ── Surface temperature ─────────────────────────────────────────────
+  // Equilibrium temperature for an airless body (no greenhouse):
+  //   T_eq⁴ = L★(1 − a) / (16πσd²)
+  const starDistanceM = aPlanetAU * M_PER_AU;
+  const tEq4 =
+    starDistanceM > 0
+      ? (lStarLsol * L_SOL_W * (1 - albedo)) / (16 * PI * STEFAN_BOLTZ * starDistanceM ** 2)
+      : 0;
+  const tEqK = tEq4 > 0 ? Math.sqrt(Math.sqrt(tEq4)) : 0;
+
+  // Radiogenic heat flux on moon surface (scales from Earth's 44 TW by mass × A)
+  const radiogenicWm2 =
+    surfaceAreaM2 > 0
+      ? (EARTH_INTERNAL_HEAT_W * (mMoonKg / KG_PER_MEARTH) * radioisotopeAbundance) / surfaceAreaM2
+      : 0;
+
+  // Total surface temperature (stellar + tidal + radiogenic)
+  const tSurf4 = tEq4 + tidalHeatingWm2 / STEFAN_BOLTZ + radiogenicWm2 / STEFAN_BOLTZ;
+  const tSurfK = tSurf4 > 0 ? Math.round(Math.sqrt(Math.sqrt(tSurf4))) : 0;
+  const tSurfC = tSurfK - 273;
+
+  // ── Magnetospheric radiation ────────────────────────────────────────
+  // Dipole field at moon orbit: B(r) = B_surface × (R_planet / r)³
+  const rPlanetKm = rPlanetRE * KM_PER_REARTH;
+  const lShell = rPlanetKm > 0 ? aMoonKm / rPlanetKm : Infinity;
+  const bSurfGauss = surfaceFieldEarths * EARTH_SURFACE_FIELD_GAUSS;
+  const bAtMoonGauss = lShell > 0 ? bSurfGauss / lShell ** 3 : 0;
+
+  // Magnetopause standoff distance in planet radii.
+  // For gas giants: use pre-computed magnetopauseRp from gasGiant.js.
+  // For rocky planets: Chapman-Ferraro scaling from Earth (10 R_E at 1 AU).
+  const magnetopauseLShell =
+    p.derived?.magnetopauseRp ??
+    (surfaceFieldEarths > 0 ? 10 * Math.cbrt(surfaceFieldEarths) * Math.cbrt(aPlanetAU) : 0);
+
+  // Radiation dose (B³ scaling, calibrated to Jupiter-Europa: 540 rem/day).
+  // Jupiter B at Europa orbit ≈ 5.14×10⁻³ G → K = 540 / (5.14e-3)³ ≈ 3.97×10⁹.
+  const EUROPA_K = 3.97e9; // rem day⁻¹ G⁻³
+  let magnetosphericRadRemDay = 0;
+  if (surfaceFieldEarths > 0 && lShell < magnetopauseLShell && bAtMoonGauss > 0) {
+    magnetosphericRadRemDay = EUROPA_K * bAtMoonGauss ** 3;
+    // Magnetopause shadowing: energetic particle drift orbits intersect
+    // the magnetopause on the dayside, depleting the outer radiation belts.
+    // Logistic rolloff onset ≈ 30% of magnetopause distance, steepness
+    // calibrated to Callisto (L/L_mp ≈ 0.35 → observed ~5× below pure B³).
+    const lFrac = lShell / magnetopauseLShell;
+    magnetosphericRadRemDay /= 1 + Math.exp(25 * (lFrac - 0.3));
+  }
 
   // ── Tidal recession (Leconte et al. 2010) ─────────────────────────
   // Corrected k₂ for differentiation, and Q scaled for parent type.
@@ -418,7 +534,17 @@ export function calcMoonExact({
   // User-friendly guardrail: compare lock time against current system age.
   const planetLockedToStar = tPlanetLockToStarGyr <= ageGyr ? "Yes" : "No";
 
-  const rotationPeriodDays = moonLockedToPlanet === "Yes" ? periodSynodicDays : null; // MOON!C40
+  // Rotation period: synchronous if locked, otherwise exponential despinning estimate.
+  // ω(t) = n + (ω₀ − n)·exp(−t/τ)  where τ = tLock/5 so exp(−5) ≈ 0.7% residual.
+  let rotationPeriodDays;
+  if (moonLockedToPlanet === "Yes") {
+    rotationPeriodDays = periodSynodicDays; // MOON!C40
+  } else {
+    const tau = tMoonLockGyr / 5;
+    const nSync = (2 * PI) / (periodSynodicDays * 24 * 3600);
+    const omegaCurrent = nSync + (omegaMoon - nSync) * Math.exp(-ageGyr / tau);
+    rotationPeriodDays = omegaCurrent > 0 ? (2 * PI) / omegaCurrent / (24 * 3600) : null;
+  }
 
   return {
     // Context (mirrors top of sheet)
@@ -444,6 +570,7 @@ export function calcMoonExact({
       semiMajorAxisKm: aMoonKm,
       eccentricity: eMoon,
       inclinationDeg: inc,
+      initialRotationPeriodHours: initialRotHours,
     },
 
     physical: {
@@ -466,6 +593,22 @@ export function calcMoonExact({
       rotationPeriodDays,
     },
 
+    temperature: {
+      equilibriumK: Math.round(tEqK),
+      surfaceK: tSurfK,
+      surfaceC: tSurfC,
+      radiogenicWm2,
+    },
+
+    radiation: {
+      magnetosphericRadRemDay,
+      magnetosphericLabel: radiationLabel(magnetosphericRadRemDay),
+      magnetopauseLShell,
+      bAtMoonGauss,
+      lShell,
+      insideMagnetosphere: lShell < magnetopauseLShell && surfaceFieldEarths > 0,
+    },
+
     tides: {
       totalEarthTides,
       moonContributionPct,
@@ -478,6 +621,10 @@ export function calcMoonExact({
       qMoon: moonComp.Q,
       rigidityMoonGPa: moonComp.mu / 1e9,
       compositionOverride: moon.compositionOverride || null,
+      tidalFeedbackActive,
+      meltFraction,
+      qEffective: effQ,
+      rigidityEffectiveGPa: effMu / 1e9,
       recessionCmYr,
       timeToRocheGyr,
       timeToEscapeGyr,
@@ -496,6 +643,8 @@ export function calcMoonExact({
       radius: fmt(rMoonRM, 3) + " R☾",
       gravity: fmt(gMoon_g, 3) + " g",
       esc: fmt(vEscKmS, 2) + " km/s",
+      equilibriumTemp: Math.round(tEqK) + " K",
+      surfaceTemp: tSurfK + " K (" + tSurfC + " \u00B0C)",
       // Orbit
       zoneInner: fmt(zoneInnerKm, 0) + " km",
       zoneOuter: fmt(zoneOuterKm, 0) + " km",
@@ -504,12 +653,19 @@ export function calcMoonExact({
       sidereal: fmt(periodSiderealDays, 3) + " days",
       synodic: fmt(periodSynodicDays, 3) + " days",
       rot:
-        rotationPeriodDays === null ? "Not tidally locked" : fmt(rotationPeriodDays, 3) + " days",
+        rotationPeriodDays === null
+          ? "Not tidally locked"
+          : moonLockedToPlanet === "Yes"
+            ? fmt(rotationPeriodDays, 3) + " days (locked)"
+            : fmt(rotationPeriodDays, 3) + " days (est.)",
+      initialRot: fmt(initialRotHours, 2) + " hours",
       // Tides
       tides: fmt(totalEarthTides, 3) + " Earth tides",
       moonPct: fmt(moonContributionPct, 1) + " %",
       starPct: fmt(starContributionPct, 1) + " %",
-      compositionClass: moonComp.compositionClass,
+      compositionClass: tidalFeedbackActive
+        ? moonComp.compositionClass + " (partially molten)"
+        : moonComp.compositionClass,
       tidalHeating:
         tidalHeatingWm2 < 1e-6
           ? "Negligible"
@@ -524,6 +680,21 @@ export function calcMoonExact({
             : tidalHeatingW.toExponential(2) + " W",
       tidalHeatingXEarth:
         tidalHeatingEarth < 1e-4 ? "Negligible" : fmt(tidalHeatingEarth, 2) + "\u00D7 Earth",
+      radiogenicHeating:
+        radiogenicWm2 < 1e-6
+          ? "Negligible"
+          : radiogenicWm2 < 0.001
+            ? radiogenicWm2.toExponential(2) + " W/m\u00B2"
+            : fmt(radiogenicWm2, 4) + " W/m\u00B2",
+      magnetosphericRad:
+        magnetosphericRadRemDay < 0.001
+          ? "Negligible"
+          : magnetosphericRadRemDay < 1
+            ? fmt(magnetosphericRadRemDay, 3) + " rem/day"
+            : magnetosphericRadRemDay < 1000
+              ? fmt(magnetosphericRadRemDay, 1) + " rem/day"
+              : magnetosphericRadRemDay.toExponential(2) + " rem/day",
+      magnetosphericLabel: radiationLabel(magnetosphericRadRemDay),
       recession: formatRecession(recessionCmYr),
       orbitalFate: formatOrbitalFate(dadt_total, timeToRocheGyr, timeToEscapeGyr),
       moonLocked: moonLockedToPlanet,

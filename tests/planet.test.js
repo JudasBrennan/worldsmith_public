@@ -938,3 +938,346 @@ test("calcPlanetExact → luminosity override 4× → HZ shifts outward", () => 
     "HZ outer edge moves outward with higher luminosity",
   );
 });
+
+// ── Radioisotope Abundance ────────────────────────────────
+
+test("radioisotopeAbundance → null uses Earth default (1.0)", () => {
+  const base = calcPlanetExact(EARTH_LIKE);
+  const explicit = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, radioisotopeAbundance: null },
+  });
+  assert.equal(base.inputs.radioisotopeAbundance, 1);
+  assert.equal(explicit.inputs.radioisotopeAbundance, 1);
+});
+
+test("radioisotopeAbundance → scales internal heat budget", () => {
+  const base = calcPlanetExact(EARTH_LIKE);
+  const high = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, radioisotopeAbundance: 2 },
+  });
+  // Higher abundance → bigger internal heat denominator → lower tidal fraction
+  assert.ok(
+    high.derived.planetTidalFraction <= base.derived.planetTidalFraction,
+    "2× abundance → lower or equal tidal fraction",
+  );
+});
+
+test("radioisotopeAbundance → 2.0 extends dynamo lifetime", () => {
+  const base = calcPlanetExact({
+    ...EARTH_LIKE,
+    starAgeGyr: 10,
+    planet: { ...EARTH_LIKE.planet, radioisotopeAbundance: 1 },
+  });
+  const high = calcPlanetExact({
+    ...EARTH_LIKE,
+    starAgeGyr: 10,
+    planet: { ...EARTH_LIKE.planet, radioisotopeAbundance: 2 },
+  });
+  assert.ok(
+    high.derived.surfaceFieldEarths >= base.derived.surfaceFieldEarths,
+    "2× abundance → stronger or equal magnetic field at 10 Gyr",
+  );
+});
+
+test("radioisotopeAbundance → display format", () => {
+  const earth = calcPlanetExact(EARTH_LIKE);
+  assert.equal(earth.display.radioisotopeAbundance, "Earth (1.0\u00d7)");
+  const custom = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, radioisotopeAbundance: 1.5 },
+  });
+  assert.equal(custom.display.radioisotopeAbundance, "1.5\u00d7 Earth");
+});
+
+// ── Per-isotope (advanced) mode ──────────────────────────
+
+test("radioisotopeAbundance → advanced mode all-1x gives effective 1.0", () => {
+  const m = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 1,
+      u235Abundance: 1,
+      th232Abundance: 1,
+      k40Abundance: 1,
+    },
+  });
+  assert.strictEqual(m.inputs.radioisotopeAbundance, 1);
+});
+
+test("radioisotopeAbundance → advanced mode all-2x equals simple 2x", () => {
+  const adv = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 2,
+      u235Abundance: 2,
+      th232Abundance: 2,
+      k40Abundance: 2,
+    },
+  });
+  const sim = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, radioisotopeAbundance: 2 },
+  });
+  assert.strictEqual(adv.inputs.radioisotopeAbundance, sim.inputs.radioisotopeAbundance);
+});
+
+test("radioisotopeAbundance → boosting only Th-232 raises effective proportionally", () => {
+  const m = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 1,
+      u235Abundance: 1,
+      th232Abundance: 3,
+      k40Abundance: 1,
+    },
+  });
+  // Expected: 0.39*1 + 0.04*1 + 0.40*3 + 0.17*1 = 1.80
+  assert.ok(Math.abs(m.inputs.radioisotopeAbundance - 1.8) < 0.01);
+});
+
+test("radioisotopeAbundance → zeroing all isotopes floors at 0.01", () => {
+  const m = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 0,
+      u235Abundance: 0,
+      th232Abundance: 0,
+      k40Abundance: 0,
+    },
+  });
+  assert.strictEqual(m.inputs.radioisotopeAbundance, 0.01);
+});
+
+test("radioisotopeAbundance → simple mode ignores per-isotope fields", () => {
+  const m = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      radioisotopeMode: "simple",
+      radioisotopeAbundance: 1.5,
+      u238Abundance: 5,
+      u235Abundance: 5,
+      th232Abundance: 5,
+      k40Abundance: 5,
+    },
+  });
+  assert.strictEqual(m.inputs.radioisotopeAbundance, 1.5);
+});
+
+// --- Body classification (dwarf planets) ---
+
+test("bodyClass → Earth-like → Planet", () => {
+  const p = calcPlanetExact(EARTH_LIKE);
+  assert.equal(p.derived.bodyClass, "Planet");
+});
+
+test("bodyClass → Pluto mass → Dwarf planet", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.0022 },
+  });
+  assert.equal(p.derived.bodyClass, "Dwarf planet");
+});
+
+test("bodyClass → Mercury mass (0.055) → Planet", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.055 },
+  });
+  assert.equal(p.derived.bodyClass, "Planet");
+});
+
+test("bodyClass → Mars mass (0.107) → Planet", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.107 },
+  });
+  assert.equal(p.derived.bodyClass, "Planet");
+});
+
+test("radiusEarth → Pluto mass → ~0.19 R⊕", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.0022, cmfPct: 32, wmfPct: 30 },
+  });
+  assert.ok(
+    p.derived.radiusEarth > 0.15 && p.derived.radiusEarth < 0.25,
+    `Expected ~0.19 R⊕, got ${p.derived.radiusEarth}`,
+  );
+});
+
+test("radiusEarth → Ceres mass → ~0.074 R⊕", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.00016, cmfPct: 25 },
+  });
+  assert.ok(
+    p.derived.radiusEarth > 0.05 && p.derived.radiusEarth < 0.1,
+    `Expected ~0.074 R⊕, got ${p.derived.radiusEarth}`,
+  );
+});
+
+test("no NaN at minimum mass (0.0001 M⊕)", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.0001 },
+  });
+  assert.ok(Number.isFinite(p.derived.radiusEarth));
+  assert.ok(Number.isFinite(p.derived.gravityG));
+  assert.ok(Number.isFinite(p.derived.escapeVelocityKms));
+  assert.ok(Number.isFinite(p.derived.surfaceTempK));
+});
+
+// ── Jeans escape ──────────────────────────────────────────────────
+
+test("jeansEscape \u2192 Earth-like \u2192 heavy gases retained, H\u2082 marginal (non-thermal)", () => {
+  const p = calcPlanetExact(EARTH_LIKE);
+  const je = p.derived.jeansEscape;
+  assert.ok(je, "jeansEscape should be defined");
+  assert.equal(je.species.n2.status, "Retained");
+  assert.equal(je.species.o2.status, "Retained");
+  assert.equal(je.species.co2.status, "Retained");
+  assert.equal(je.species.he.status, "Retained");
+  // H₂ is thermally retained (λ ≈ 16) but non-thermal processes downgrade it
+  assert.equal(je.species.h2.status, "Marginal");
+  assert.equal(je.species.h2.nonThermal, true);
+  assert.equal(je.species.h2.thermalStatus, "Retained");
+});
+
+test("jeansEscape \u2192 Ceres mass \u2192 H2 and He lost", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.00016, h2Pct: 5, hePct: 5 },
+  });
+  const je = p.derived.jeansEscape;
+  assert.equal(je.species.h2.status, "Lost");
+  assert.equal(je.species.he.status, "Lost");
+});
+
+test("jeansEscape \u2192 atmosphericEscape on \u2192 strips lost gases", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      massEarth: 0.00016,
+      h2Pct: 10,
+      hePct: 10,
+      atmosphericEscape: true,
+      greenhouseMode: "core",
+    },
+  });
+  assert.ok(p.derived.jeansEscape.stripped.includes("h2"));
+  assert.ok(p.derived.jeansEscape.stripped.includes("he"));
+  assert.equal(p.derived.ppH2Atm, 0);
+  assert.equal(p.derived.ppHeAtm, 0);
+});
+
+test("jeansEscape \u2192 atmosphericEscape off \u2192 preserves all gases", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      massEarth: 0.00016,
+      h2Pct: 10,
+      hePct: 10,
+      atmosphericEscape: false,
+      greenhouseMode: "core",
+    },
+  });
+  assert.equal(p.derived.jeansEscape.stripped.length, 0);
+  assert.ok(p.derived.ppH2Atm > 0);
+  assert.ok(p.derived.ppHeAtm > 0);
+});
+
+test("jeansEscape \u2192 exobaseTempK \u2192 Earth-like ~1000 K", () => {
+  const p = calcPlanetExact(EARTH_LIKE);
+  const tExo = p.derived.jeansEscape.exobaseTempK;
+  assert.ok(
+    tExo > 800 && tExo < 1200,
+    `Expected ~1000 K, got ${tExo}`,
+  );
+});
+
+test("jeansEscape \u2192 exobaseTempK \u2192 Venus-like CO2 suppresses boost", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      semiMajorAxisAu: 0.72,
+      pressureAtm: 92,
+      co2Pct: 96.5,
+      o2Pct: 0,
+      arPct: 0,
+      albedoBond: 0.77,
+      greenhouseMode: "core",
+    },
+  });
+  const tExo = p.derived.jeansEscape.exobaseTempK;
+  assert.ok(tExo < 400, `Expected < 400 K (CO2 cooling), got ${tExo}`);
+});
+
+test("jeansEscape \u2192 Mars-like \u2192 CO2 and N2 retained", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      massEarth: 0.107,
+      semiMajorAxisAu: 1.52,
+      pressureAtm: 0.006,
+      co2Pct: 95.3,
+      o2Pct: 0.13,
+      arPct: 1.6,
+      albedoBond: 0.25,
+      greenhouseMode: "core",
+    },
+  });
+  assert.equal(p.derived.jeansEscape.species.co2.status, "Retained");
+  assert.equal(p.derived.jeansEscape.species.n2.status, "Retained");
+});
+
+test("jeansEscape \u2192 cold body \u2192 non-thermal inactive (T_exo < 100 K)", () => {
+  // Pluto-like: very cold, very far from star → non-thermal processes negligible
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: {
+      ...EARTH_LIKE.planet,
+      massEarth: 0.0022,
+      semiMajorAxisAu: 39.5,
+      albedoBond: 0.72,
+      pressureAtm: 0.00001,
+      co2Pct: 0,
+      o2Pct: 0,
+      arPct: 0,
+      greenhouseMode: "core",
+    },
+  });
+  const je = p.derived.jeansEscape;
+  assert.ok(je.exobaseTempK < 100, `T_exo ${je.exobaseTempK} should be < 100 K`);
+  // Non-thermal should NOT be active for any species
+  for (const sp of Object.values(je.species)) {
+    assert.equal(sp.nonThermal, false, `${sp.label} nonThermal should be false`);
+  }
+});
+
+test("jeansEscape \u2192 no NaN at minimum mass", () => {
+  const p = calcPlanetExact({
+    ...EARTH_LIKE,
+    planet: { ...EARTH_LIKE.planet, massEarth: 0.0001 },
+  });
+  const je = p.derived.jeansEscape;
+  assert.ok(Number.isFinite(je.exobaseTempK));
+  assert.ok(Number.isFinite(je.xuvFluxRatio));
+  for (const sp of Object.values(je.species)) {
+    assert.ok(Number.isFinite(sp.lambda), `lambda for ${sp.label} should be finite`);
+  }
+});

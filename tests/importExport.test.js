@@ -214,10 +214,10 @@ test("Sol preset → validate + import → expected major bodies", () => {
   assert.equal(imported.star.massMsol, 1);
 
   const planets = listPlanets(imported);
-  assert.equal(planets.length, 4);
+  assert.equal(planets.length, 6);
   assert.deepEqual(
     planets.map((p) => p.name),
-    ["Mercury", "Venus", "Earth", "Mars"],
+    ["Mercury", "Venus", "Earth", "Ceres", "Mars", "Pluto"],
   );
 
   const gas = listSystemGasGiants(imported);

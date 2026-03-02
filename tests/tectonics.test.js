@@ -600,6 +600,61 @@ test("volcanicActivity → Io-like (heavy tidal) exceeds 1.0", () => {
   assert.ok(a > 1.0, `Io-like activity = ${a}`);
 });
 
+// ── volcanicActivity with radioisotopeAbundance ──────────
+
+test("volcanicActivity → abundance > 1 increases activity", () => {
+  const base = volcanicActivity(4.6, 0, 1);
+  const high = volcanicActivity(4.6, 0, 2);
+  assert.ok(high > base, `2× isotopes: ${high} > ${base}`);
+});
+
+test("volcanicActivity → abundance < 1 decreases activity", () => {
+  const base = volcanicActivity(4.6, 0, 1);
+  const low = volcanicActivity(4.6, 0, 0.5);
+  assert.ok(low < base, `0.5× isotopes: ${low} < ${base}`);
+});
+
+test("volcanicActivity → abundance = 1 matches default", () => {
+  const a = volcanicActivity(4.6, 0, 1);
+  const b = volcanicActivity(4.6, 0);
+  assert.equal(a, b);
+});
+
+// ── elasticLithosphereThicknessKm with radioisotopeAbundance ──
+
+test("elasticLithosphereThicknessKm → abundance > 1 thins lithosphere", () => {
+  const base = elasticLithosphereThicknessKm(4.6, 1, 0, 1);
+  const high = elasticLithosphereThicknessKm(4.6, 1, 0, 2);
+  assert.ok(high < base, `2× isotopes: ${high} < ${base}`);
+});
+
+test("elasticLithosphereThicknessKm → abundance < 1 thickens lithosphere", () => {
+  const base = elasticLithosphereThicknessKm(4.6, 1, 0, 1);
+  const low = elasticLithosphereThicknessKm(4.6, 1, 0, 0.5);
+  assert.ok(low > base, `0.5× isotopes: ${low} > ${base}`);
+});
+
+test("elasticLithosphereThicknessKm → abundance = 1 matches default", () => {
+  const a = elasticLithosphereThicknessKm(4.6, 1, 0, 1);
+  const b = elasticLithosphereThicknessKm(4.6, 1, 0);
+  assert.equal(a, b);
+});
+
+// ── calcTectonics with radioisotopeAbundance ─────────────
+
+test("calcTectonics → radioisotopeAbundance propagates to activity and lithosphere", () => {
+  const base = calcTectonics({ ageGyr: 4.6, radioisotopeAbundance: 1 });
+  const high = calcTectonics({ ageGyr: 4.6, radioisotopeAbundance: 2 });
+  assert.ok(
+    high.tectonics.volcanicActivityFraction > base.tectonics.volcanicActivityFraction,
+    "higher abundance → more activity",
+  );
+  assert.ok(
+    high.tectonics.elasticLithosphereKm < base.tectonics.elasticLithosphereKm,
+    "higher abundance → thinner lithosphere",
+  );
+});
+
 // ── maxPeakHeight with composition ───────────────────────
 
 test("maxPeakHeight → ice world gives lower peak", () => {

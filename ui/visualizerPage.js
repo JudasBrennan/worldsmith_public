@@ -40,7 +40,13 @@ import {
   makeFlatMapCanvas,
   hasLayer,
   shouldFlattenStyleMaps,
+  loadFromIDBToCache,
 } from "./celestialVisualPreview.js";
+import {
+  requestCelestialTextureBundle,
+  canvasFromMapPayload,
+  supportsCelestialTextureWorker,
+} from "./celestialTextureWorkerClient.js";
 import { composeCelestialDescriptor } from "./celestialComposer.js";
 import { clamp } from "../engine/utils.js";
 
@@ -861,20 +867,10 @@ export function initVisualiserPage(root, options = {}) {
     entry.haze.geometry = lod === "high" ? sharedGeo.hazeHigh : sharedGeo.hazeLow;
   }
 
-  /** Apply PBR texture maps to a mesh entry (runs once per body). */
-  async function generateBodyTextures(entry) {
+  /** Apply a set of texture maps to a mesh entry's materials. */
+  function applyMapsToEntry(THREE, entry, maps, descriptor) {
     if (!nativeThree || disposed) return;
-    const THREE = nativeThree.THREE;
-    const descriptor = entry.descriptor;
-    const textureSize = descriptor.textureSize || 128;
-    const signature = buildDescriptorSignature(descriptor, textureSize);
-    let maps = getCachedTextures(signature);
-    if (!maps) {
-      maps = generateCelestialTextureCanvasesLocal(descriptor, textureSize);
-      cacheTextures(signature, maps);
-    }
-    if (!nativeThree || disposed) return;
-
+    const textureSize = maps.surface?.width || descriptor.textureSize || 128;
     const normalCanvas =
       maps.normal || makeFlatMapCanvas(textureSize, textureSize, [128, 128, 255, 255]);
     const roughnessCanvas =
@@ -883,6 +879,15 @@ export function initVisualiserPage(root, options = {}) {
       maps.emissive || makeFlatMapCanvas(textureSize, textureSize, [0, 0, 0, 255]);
     const maxAniso = nativeThree.renderer?.capabilities?.getMaxAnisotropy?.() || 1;
     const aniso = clamp(Math.round(maxAniso), 1, 8);
+
+    /* Dispose previous textures before creating new ones */
+    if (entry._textures) {
+      for (const t of entry._textures) {
+        try {
+          t?.dispose?.();
+        } catch {}
+      }
+    }
 
     const surfTex = createCanvasTexture(THREE, maps.surface, { srgb: true });
     const cloudTex = createCanvasTexture(THREE, maps.cloud, { srgb: true });
@@ -894,11 +899,8 @@ export function initVisualiserPage(root, options = {}) {
       t.premultiplyAlpha = false;
     }
 
-    /* Store texture refs for disposal */
     entry._textures = [surfTex, cloudTex, normTex, roughTex, emisTex];
 
-    /* Body material — reset color to white so the texture isn't tinted
-       (createBodyMeshEntry sets a fallback color before textures load) */
     const mat = entry.bodyMat;
     mat.color.set(0xffffff);
     mat.map = surfTex;
@@ -950,12 +952,80 @@ export function initVisualiserPage(root, options = {}) {
     }
     mat.emissiveIntensity = warmEmissive ? 0.72 : coolEmissive ? 0.48 : 0.08;
 
-    /* Cloud shell textures */
     entry.cloudMat.map = cloudTex;
     entry.cloudMat.alphaMap = cloudTex;
     entry.cloudMat.needsUpdate = true;
 
     entry.texturesReady = true;
+  }
+
+  /** Generate textures for a body with progressive LOD and worker offloading. */
+  async function generateBodyTextures(entry) {
+    if (!nativeThree || disposed) return;
+    const THREE = nativeThree.THREE;
+    const descriptor = entry.descriptor;
+    const textureSize = descriptor.textureSize || 128;
+    const signature = buildDescriptorSignature(descriptor, textureSize);
+
+    /* 1. Memory cache hit — apply immediately */
+    let maps = getCachedTextures(signature);
+    if (maps) {
+      applyMapsToEntry(THREE, entry, maps, descriptor);
+      return;
+    }
+
+    /* 2. IDB cache — restore to memory and apply */
+    if (await loadFromIDBToCache(signature)) {
+      if (!nativeThree || disposed) return;
+      maps = getCachedTextures(signature);
+      if (maps) {
+        applyMapsToEntry(THREE, entry, maps, descriptor);
+        return;
+      }
+    }
+
+    /* 3. Progressive: tiny placeholder (64px, ~10ms) */
+    const tinyDesc = composeCelestialDescriptor(entry.model, { lod: "tiny" });
+    const tinySig = buildDescriptorSignature(tinyDesc, tinyDesc.textureSize || 64);
+    let tinyMaps = getCachedTextures(tinySig);
+    if (!tinyMaps) {
+      tinyMaps = generateCelestialTextureCanvasesLocal(tinyDesc, tinyDesc.textureSize || 64);
+      cacheTextures(tinySig, tinyMaps);
+    }
+    if (!nativeThree || disposed) return;
+    applyMapsToEntry(THREE, entry, tinyMaps, descriptor);
+
+    /* 4. Full quality via worker — upgrade when ready */
+    if (supportsCelestialTextureWorker()) {
+      try {
+        const result = await requestCelestialTextureBundle({
+          signature,
+          descriptor,
+          textureSize,
+        });
+        if (!nativeThree || disposed) return;
+        const wm = {
+          surface: canvasFromMapPayload(result?.maps?.surface),
+          cloud: canvasFromMapPayload(result?.maps?.cloud),
+          normal: canvasFromMapPayload(result?.maps?.normal),
+          roughness: canvasFromMapPayload(result?.maps?.roughness),
+          emissive: canvasFromMapPayload(result?.maps?.emissive),
+        };
+        if (wm.surface && wm.cloud && wm.normal) {
+          cacheTextures(signature, wm);
+          applyMapsToEntry(THREE, entry, wm, descriptor);
+          return;
+        }
+      } catch {
+        /* fall through to local */
+      }
+    }
+
+    /* 5. Local fallback */
+    if (!nativeThree || disposed) return;
+    maps = generateCelestialTextureCanvasesLocal(descriptor, textureSize);
+    cacheTextures(signature, maps);
+    applyMapsToEntry(THREE, entry, maps, descriptor);
   }
 
   /** Warm-up: ensure mesh entries exist for all bodies in the snapshot. */
@@ -4625,7 +4695,7 @@ export function initVisualiserPage(root, options = {}) {
     // Use slot AU when available
     const orbitAuBySlot = sys.orbitsAu || [];
     const planetNodes = planets
-      .filter((p) => p.slotIndex != null)
+      .filter((p) => p.slotIndex != null || Number(p.inputs?.semiMajorAxisAu) > 0)
       .map((p) => {
         const slot = Number(p.slotIndex);
         const slotAuRaw = orbitAuBySlot[slot - 1];

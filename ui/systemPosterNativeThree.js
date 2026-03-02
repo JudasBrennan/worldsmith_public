@@ -1,5 +1,9 @@
 import { loadThreeCore } from "./threeBridge2d.js";
-import { renderCelestialRecipeSnapshot, renderStarSnapshot } from "./celestialVisualPreview.js";
+import {
+  renderCelestialRecipeSnapshot,
+  renderStarSnapshot,
+  preWarmTextures,
+} from "./celestialVisualPreview.js";
 
 /* Pre-warm Three.js CDN import so it's ready before the first draw call */
 loadThreeCore().catch(() => {});
@@ -517,6 +521,27 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
     ...gasGiants.filter((g) => g.au > 0).map((g) => ({ ...g, type: "gas" })),
   ].sort((a, b) => a.au - b.au);
 
+  /* Pre-warm body + moon textures via worker (runs parallel with layout) */
+  const warmModels = [];
+  for (const body of allBodies) {
+    if (POSTER_CACHE.has(bodyKey(body))) continue;
+    warmModels.push(
+      body.type === "gas"
+        ? {
+            bodyType: "gasGiant",
+            styleId: body.style || "jupiter",
+            showRings: !!body.rings,
+            gasCalc: body.gasCalc,
+          }
+        : { bodyType: "rocky", visualProfile: body.visualProfile },
+    );
+  }
+  for (const m of moons || []) {
+    if (!m.parentId || !m.moonCalc || POSTER_CACHE.has(moonKey(m))) continue;
+    warmModels.push({ bodyType: "moon", name: m.name || "", moonCalc: m.moonCalc });
+  }
+  const warmPromise = preWarmTextures(warmModels, { lod: "low" });
+
   const allAu = [];
   for (const b of allBodies) allAu.push(b.au);
   if (system?.habitableZoneAu)
@@ -923,6 +948,9 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
   }
 
   runtime.renderer.render(runtime.scene, runtime.camera);
+
+  /* Ensure pre-warmed textures are cached before the sequential loop */
+  await warmPromise;
 
   /* Progressive body + moon rendering */
   const moonsByParent = new Map();

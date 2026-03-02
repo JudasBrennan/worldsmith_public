@@ -290,9 +290,9 @@ export function initLocalClusterPage(mountEl) {
               <div class="hint">Local sphere radius used for counts and coordinates.</div>
             </div>
             <div class="input-pair">
-              <input id="clusterRadius" type="number" min="0.1" max="500" step="0.1" aria-label="Neighbourhood Radius" />
+              <input id="clusterRadius" type="number" min="0.1" max="25" step="0.1" aria-label="Neighbourhood Radius" />
               <input id="clusterRadiusSlider" type="range" aria-label="Neighbourhood Radius slider" />
-              <div class="range-meta"><span>0.1</span><span>500</span></div>
+              <div class="range-meta"><span>0.1</span><span>25</span></div>
             </div>
           </div>
 
@@ -302,9 +302,9 @@ export function initLocalClusterPage(mountEl) {
               <div class="hint">Density of stellar objects in the local neighbourhood.</div>
             </div>
             <div class="input-pair">
-              <input id="clusterDensity" type="number" min="0.000001" max="1" step="0.000001" aria-label="Stellar Density" />
+              <input id="clusterDensity" type="number" min="0.000001" max="0.1" step="0.000001" aria-label="Stellar Density" />
               <input id="clusterDensitySlider" type="range" aria-label="Stellar Density slider" />
-              <div class="range-meta"><span>0.000001</span><span>1.0</span></div>
+              <div class="range-meta"><span>0.000001</span><span>0.1</span></div>
             </div>
           </div>
 
@@ -440,7 +440,7 @@ export function initLocalClusterPage(mountEl) {
     numberEl: radiusEl,
     sliderEl: radiusSlider,
     min: 0.1,
-    max: 500,
+    max: 25,
     step: 0.1,
     mode: "auto",
   });
@@ -448,7 +448,7 @@ export function initLocalClusterPage(mountEl) {
     numberEl: densityEl,
     sliderEl: densitySlider,
     min: 0.000001,
-    max: 1,
+    max: 0.1,
     step: 0.000001,
     mode: "auto",
   });
@@ -468,8 +468,8 @@ export function initLocalClusterPage(mountEl) {
   function readStateFromInputs() {
     const galacticRadiusLy = clamp(Number(galacticRadiusEl.value), 1000, 1000000);
     const locationLy = clamp(Number(locationEl.value), 0, galacticRadiusLy);
-    const neighbourhoodRadiusLy = clamp(Number(radiusEl.value), 0.1, 500);
-    const stellarDensityPerLy3 = clamp(Number(densityEl.value), 0.000001, 1);
+    const neighbourhoodRadiusLy = clamp(Number(radiusEl.value), 0.1, 25);
+    const stellarDensityPerLy3 = clamp(Number(densityEl.value), 0.000001, 0.1);
     const randomSeed = clamp(
       toInteger(seedEl.value, LOCAL_CLUSTER_DEFAULTS.randomSeed),
       1,
@@ -562,7 +562,7 @@ export function initLocalClusterPage(mountEl) {
         value: fmt(model.systems.length - 1, 0),
         meta:
           model.systemsOmitted > 0
-            ? `plus 1 home — ${fmt(model.systemsOmitted, 0)} systems omitted (visualiser cap: 99)`
+            ? `plus 1 home — ${fmt(model.systemsOmitted, 0)} systems omitted (visualiser cap: 750)`
             : "plus 1 home system",
       },
     ];

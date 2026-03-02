@@ -186,7 +186,7 @@ test("ghzProbability → near 53% of galactic radius → peaks at 1.0", () => {
 });
 
 test("systemsOmitted → small neighbourhood → zero", () => {
-  // With default inputs and small density the total is well under the 100 cap
+  // With default inputs and small density the total is well under the 751 cap
   const model = calcLocalCluster({
     ...INPUTS,
     stellarDensityPerLy3: 0.003,
@@ -195,18 +195,18 @@ test("systemsOmitted → small neighbourhood → zero", () => {
   assert.equal(model.systemsOmitted, 0);
 });
 
-test("systemsOmitted → total exceeds 100 → positive", () => {
-  // High density / large radius should exceed the 99-neighbour cap
+test("systemsOmitted → total exceeds 751 → positive", () => {
+  // High density / large radius should exceed the 750-neighbour cap
   const model = calcLocalCluster({
     ...INPUTS,
-    stellarDensityPerLy3: 0.08,
-    neighbourhoodRadiusLy: 12,
+    stellarDensityPerLy3: 0.1,
+    neighbourhoodRadiusLy: 25,
   });
   assert.ok(
     model.systemsOmitted > 0,
     `expected some omitted systems, got systemsOmitted=${model.systemsOmitted}`,
   );
-  assert.equal(model.systemsOmitted, Math.max(0, model.systemCounts.total - 100));
+  assert.equal(model.systemsOmitted, Math.max(0, model.systemCounts.total - 751));
 });
 
 test("classFractions → sum of counts → ~100% of rawStellarMassObjects", () => {

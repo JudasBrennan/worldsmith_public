@@ -454,6 +454,294 @@ test("NASA → all four planets → valid display strings", () => {
    REGRESSION: WMF=0 produces identical outputs to pre-overhaul
    ══════════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════
+   JEANS ESCAPE — EQUILIBRIUM TEMPERATURE & ATMOSPHERIC RETENTION
+   NASA reference: Planetary Fact Sheet (Williams, NSSDCA/GSFC)
+   T_eq  = blackbody equilibrium temperature (no greenhouse)
+   T_exo = exobase temperature (XUV-heated thermosphere)
+   Retention compared against observed atmospheric composition.
+   ══════════════════════════════════════════════════════════════════ */
+
+// ── Dwarf planet fixtures (not used in earlier bulk tests) ──
+
+const PLUTO = {
+  ...SUN,
+  planet: {
+    massEarth: 0.0022,
+    cmfPct: 32,
+    wmfPct: 30,
+    axialTiltDeg: 122.53,
+    albedoBond: 0.72,
+    greenhouseEffect: 0,
+    greenhouseMode: "manual",
+    observerHeightM: 2,
+    rotationPeriodHours: 153.29,
+    semiMajorAxisAu: 39.482,
+    eccentricity: 0.2488,
+    inclinationDeg: 17.16,
+    longitudeOfPeriapsisDeg: 0,
+    subsolarLongitudeDeg: 0,
+    pressureAtm: 0.00001,
+    o2Pct: 0,
+    co2Pct: 0,
+    arPct: 0,
+    ch4Pct: 5,
+  },
+};
+
+const CERES = {
+  ...SUN,
+  planet: {
+    massEarth: 0.00016,
+    cmfPct: 25,
+    wmfPct: 25,
+    axialTiltDeg: 4.0,
+    albedoBond: 0.034,
+    greenhouseEffect: 0,
+    greenhouseMode: "manual",
+    observerHeightM: 2,
+    rotationPeriodHours: 9.074,
+    semiMajorAxisAu: 2.7675,
+    eccentricity: 0.0758,
+    inclinationDeg: 10.59,
+    longitudeOfPeriapsisDeg: 0,
+    subsolarLongitudeDeg: 0,
+    pressureAtm: 0,
+    o2Pct: 0,
+    co2Pct: 0,
+    arPct: 0,
+  },
+};
+
+// ── T_eq (blackbody equilibrium temperature, no greenhouse) ──
+// NASA Fact Sheet "Black-body temperature" column.
+// Formula: 278 * L^0.25 * (1-A)^0.25 / sqrt(a)
+
+test("NASA → Jeans T_eq → Earth ~254 K (within 1%)", () => {
+  const p = calcPlanetExact(EARTH);
+  assertPctWithin(p.derived.jeansEscape.tEqNoGhK, 254.3, 1, "Earth T_eq");
+});
+
+test("NASA → Jeans T_eq → Venus ~229 K (within 2%)", () => {
+  // Using Bond albedo 0.76 (traditional). NASA updated to 0.90 → 184 K,
+  // but 0.76 is still the widely-used textbook value.
+  const p = calcPlanetExact(VENUS);
+  assertPctWithin(p.derived.jeansEscape.tEqNoGhK, 227, 2, "Venus T_eq");
+});
+
+test("NASA → Jeans T_eq → Mars ~210 K (within 1%)", () => {
+  const p = calcPlanetExact(MARS);
+  assertPctWithin(p.derived.jeansEscape.tEqNoGhK, 210.1, 1, "Mars T_eq");
+});
+
+test("NASA → Jeans T_eq → Mercury ~440 K (within 1%)", () => {
+  const p = calcPlanetExact(MERCURY);
+  assertPctWithin(p.derived.jeansEscape.tEqNoGhK, 440.1, 1, "Mercury T_eq");
+});
+
+test("NASA → Jeans T_eq → Ceres ~167 K (within 3%)", () => {
+  // No official NASA fact sheet for Ceres; computed from Bond albedo 0.034
+  // at 2.77 AU. 3% tolerance for albedo uncertainty.
+  const p = calcPlanetExact(CERES);
+  assertPctWithin(p.derived.jeansEscape.tEqNoGhK, 167, 3, "Ceres T_eq");
+});
+
+test("NASA → Jeans T_eq → ordering Mercury > Earth > Venus > Mars > Pluto", () => {
+  const tMerc = calcPlanetExact(MERCURY).derived.jeansEscape.tEqNoGhK;
+  const tEarth = calcPlanetExact(EARTH).derived.jeansEscape.tEqNoGhK;
+  const tVenus = calcPlanetExact(VENUS).derived.jeansEscape.tEqNoGhK;
+  const tMars = calcPlanetExact(MARS).derived.jeansEscape.tEqNoGhK;
+  const tPluto = calcPlanetExact(PLUTO).derived.jeansEscape.tEqNoGhK;
+  assert.ok(tMerc > tEarth, "Mercury > Earth");
+  assert.ok(tEarth > tVenus, "Earth > Venus");
+  assert.ok(tVenus > tMars, "Venus > Mars");
+  assert.ok(tMars > tPluto, "Mars > Pluto");
+});
+
+// ── Exobase temperature ──
+// Earth: ~1000 K typical (700–1400 K solar-cycle range).
+// Venus: CO₂ 15-μm emission strongly suppresses T_exo to near T_eq (~250–300 K).
+// Mars: ~200–350 K observed. Pressure-dependent XUV absorption (η_abs ≈ 0.09
+//   at 0.006 atm) brings our model to ~233 K, well within the observed range.
+
+test("NASA → Jeans T_exo → Earth ~1000 K (within 20%)", () => {
+  // Solar-mean exobase: ~1000 K. Wide tolerance for solar-cycle variation.
+  const p = calcPlanetExact(EARTH);
+  const t = p.derived.jeansEscape.exobaseTempK;
+  assert.ok(t >= 700 && t <= 1400, `Earth T_exo: ${t} K (expected 700–1400)`);
+});
+
+test("NASA → Jeans T_exo → Venus CO₂ cooling suppresses boost", () => {
+  // Dense CO₂ atmosphere acts as a thermostat. T_exo should be near T_eq.
+  // Literature: ~250–300 K dayside. Our model: ~229 K (≈ T_eq).
+  const p = calcPlanetExact(VENUS);
+  const t = p.derived.jeansEscape.exobaseTempK;
+  assert.ok(t < 400, `Venus T_exo: ${t} K (expected < 400, CO₂ cooling)`);
+});
+
+test("NASA → Jeans T_exo → Mars > T_eq (XUV heating present)", () => {
+  const p = calcPlanetExact(MARS);
+  const je = p.derived.jeansEscape;
+  assert.ok(
+    je.exobaseTempK > je.tEqNoGhK,
+    `Mars T_exo ${je.exobaseTempK} should exceed T_eq ${je.tEqNoGhK}`,
+  );
+});
+
+test("NASA → Jeans T_exo → ordering: Earth > Mercury > Mars > Venus > Pluto", () => {
+  // Earth's thick atmosphere (η_abs ≈ 0.94) absorbs nearly all XUV → highest T_exo.
+  // Mercury has no atmosphere (η_abs = 0) → T_exo = T_eq ≈ 439 K.
+  // Venus < Mars because dense CO₂ suppresses the boost heavily.
+  const exo = (cfg) => calcPlanetExact(cfg).derived.jeansEscape.exobaseTempK;
+  assert.ok(exo(EARTH) > exo(MERCURY), "Earth > Mercury");
+  assert.ok(exo(MERCURY) > exo(MARS), "Mercury > Mars");
+  assert.ok(exo(MARS) > exo(VENUS), "Mars > Venus");
+  assert.ok(exo(VENUS) > exo(PLUTO), "Venus > Pluto");
+});
+
+// ── Escape velocity cross-check ──
+
+test("NASA → escape velocity → Earth ~11.19 km/s (within 3%)", () => {
+  const p = calcPlanetExact(EARTH);
+  assertPctWithin(p.derived.escapeVelocityKms, 11.186, 3, "Earth v_esc");
+});
+
+test("NASA → escape velocity → Mars ~5.03 km/s (within 3%)", () => {
+  const p = calcPlanetExact(MARS);
+  assertPctWithin(p.derived.escapeVelocityKms, 5.03, 3, "Mars v_esc");
+});
+
+test("NASA → escape velocity → Venus ~10.36 km/s (within 3%)", () => {
+  const p = calcPlanetExact(VENUS);
+  assertPctWithin(p.derived.escapeVelocityKms, 10.36, 3, "Venus v_esc");
+});
+
+test("NASA → escape velocity → Mercury ~4.3 km/s (within 3%)", () => {
+  const p = calcPlanetExact(MERCURY);
+  assertPctWithin(p.derived.escapeVelocityKms, 4.3, 3, "Mercury v_esc");
+});
+
+// ── Atmospheric retention (Jeans thermal + non-thermal enhancement) ──
+// Combines Jeans thermal escape with enhanced thresholds for H₂ and He
+// that account for non-thermal loss (charge exchange, polar wind, ion pickup).
+
+test("NASA → retention → Earth retains heavy gases, H₂ marginal (non-thermal)", () => {
+  // Earth's high escape velocity + moderate exobase → heavy gases retained.
+  // H₂ is thermally retained (λ ≈ 16, Jeans "Retained") but non-thermal
+  // processes (polar wind, charge exchange) downgrade it to Marginal — matching
+  // the observation that Earth H₂ is present in trace amounts but escaping.
+  const sp = calcPlanetExact(EARTH).derived.jeansEscape.species;
+  assert.equal(sp.n2.status, "Retained");
+  assert.equal(sp.o2.status, "Retained");
+  assert.equal(sp.co2.status, "Retained");
+  assert.equal(sp.ar.status, "Retained");
+  assert.equal(sp.h2o.status, "Retained");
+  assert.equal(sp.h2.status, "Marginal");
+  assert.equal(sp.h2.nonThermal, true);
+  assert.equal(sp.he.status, "Retained");
+});
+
+test("NASA → Jeans retention → Venus retains all species", () => {
+  // Dense CO₂ atmosphere keeps T_exo low → enormous λ for all species.
+  const sp = calcPlanetExact(VENUS).derived.jeansEscape.species;
+  assert.equal(sp.n2.status, "Retained");
+  assert.equal(sp.co2.status, "Retained");
+  assert.equal(sp.h2.status, "Retained");
+  assert.equal(sp.he.status, "Retained");
+});
+
+test("NASA → Jeans retention → Mars retains CO₂, N₂, Ar", () => {
+  // Mars atmosphere: 95.3% CO₂, 2.7% N₂, 1.6% Ar — all observed and stable.
+  const sp = calcPlanetExact(MARS).derived.jeansEscape.species;
+  assert.equal(sp.co2.status, "Retained");
+  assert.equal(sp.n2.status, "Retained");
+  assert.equal(sp.ar.status, "Retained");
+});
+
+test("NASA → retention → Mars H₂ and He marginal (non-thermal)", () => {
+  // Mars H₂ and He are thermally retained (Jeans λ > 6) but non-thermal
+  // processes (ion pickup, charge exchange — no magnetic field) downgrade them.
+  const sp = calcPlanetExact(MARS).derived.jeansEscape.species;
+  assert.equal(sp.h2.status, "Marginal");
+  assert.equal(sp.h2.nonThermal, true);
+  assert.equal(sp.he.status, "Marginal");
+  assert.equal(sp.he.nonThermal, true);
+});
+
+test("NASA → Jeans T_exo → Mars within observed 200–350 K", () => {
+  const t = calcPlanetExact(MARS).derived.jeansEscape.exobaseTempK;
+  assert.ok(
+    t >= 200 && t <= 350,
+    `Mars T_exo: ${t} K (expected 200–350)`,
+  );
+});
+
+test("NASA → Jeans retention → Mercury loses H₂ and He", () => {
+  // Mercury: surface-bounded exosphere only. High T_exo from proximity to Sun
+  // + low v_esc → light gases are lost.
+  const sp = calcPlanetExact(MERCURY).derived.jeansEscape.species;
+  assert.equal(sp.h2.status, "Lost");
+  assert.equal(sp.he.status, "Lost");
+  // Heavier gases are retained or marginal (academic — Mercury has no
+  // meaningful atmosphere to lose them from).
+});
+
+test("NASA → Jeans retention → Pluto retains N₂ and CH₄", () => {
+  // Pluto's atmosphere: ~99% N₂, ~0.25% CH₄. Despite low v_esc (1.2 km/s),
+  // very low T_exo (~32 K) keeps λ high for heavy molecules.
+  const sp = calcPlanetExact(PLUTO).derived.jeansEscape.species;
+  assert.equal(sp.n2.status, "Retained");
+  assert.equal(sp.ch4.status, "Retained");
+  // H₂ is barely retained thermally (λ ≈ 6, right at threshold). Non-thermal
+  // inactive at T_exo < 100 K. In reality Pluto has no measurable H₂.
+  assert.ok(sp.h2.lambda > 5 && sp.h2.lambda < 8, `Pluto H₂ λ=${sp.h2.lambda.toFixed(1)} (expected ~6, near threshold)`);
+  assert.equal(sp.h2.nonThermal, false, "non-thermal inactive at cold T_exo");
+});
+
+test("NASA → Jeans retention → Ceres loses all gases", () => {
+  // Ceres: v_esc = 0.51 km/s, no permanent atmosphere observed.
+  // Only transient water vapour detected (sublimation). All species should
+  // be Lost or Marginal.
+  const sp = calcPlanetExact(CERES).derived.jeansEscape.species;
+  for (const key of ["n2", "o2", "co2", "ar", "h2o", "ch4", "h2", "he", "nh3"]) {
+    assert.ok(
+      sp[key].status === "Lost" || sp[key].status === "Marginal",
+      `Ceres ${sp[key].label}: ${sp[key].status} (expected Lost or Marginal)`,
+    );
+  }
+});
+
+// ── Lambda ordering sanity checks ──
+
+test("NASA → Jeans λ → heavier molecules have higher λ (Earth)", () => {
+  // λ ∝ molecular weight, so CO₂ > O₂ > N₂ > H₂O > CH₄ > He > H₂
+  const sp = calcPlanetExact(EARTH).derived.jeansEscape.species;
+  assert.ok(sp.co2.lambda > sp.o2.lambda, "CO₂ > O₂");
+  assert.ok(sp.o2.lambda > sp.n2.lambda, "O₂ > N₂");
+  assert.ok(sp.n2.lambda > sp.h2o.lambda, "N₂ > H₂O");
+  assert.ok(sp.he.lambda > sp.h2.lambda, "He > H₂");
+});
+
+test("NASA → Jeans λ → closer orbit increases XUV, lowers λ", () => {
+  // Same planet at different distances: closer → higher T_exo → lower λ.
+  const near = calcPlanetExact({
+    ...EARTH,
+    planet: { ...EARTH.planet, semiMajorAxisAu: 0.5 },
+  });
+  const far = calcPlanetExact({
+    ...EARTH,
+    planet: { ...EARTH.planet, semiMajorAxisAu: 2.0 },
+  });
+  assert.ok(
+    near.derived.jeansEscape.species.h2.lambda < far.derived.jeansEscape.species.h2.lambda,
+    "closer orbit → lower λ for H₂",
+  );
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   REGRESSION: WMF=0 produces identical outputs to pre-overhaul
+   ══════════════════════════════════════════════════════════════════ */
+
 test("regression → WMF=0 → density/radius match WMF-unaware path", () => {
   // With WMF=0, the water inflation factor is 1.0 and all dry-planet
   // outputs must be identical to the pre-overhaul formula.

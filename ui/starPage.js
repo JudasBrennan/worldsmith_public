@@ -36,6 +36,10 @@ const TIP_LABEL = {
     "Animated stellar preview using the current star colour and the active flare/CME rates.\n\nThe preview runs at 0.5 simulated days per second and renders textured photosphere detail plus flare/CME activity.",
   "Earth-like Life?":
     "Whether a planet comparable to modern-day Earth could orbit this star.\n\nYes: the star\u2019s mass and age permit an Earth-like biosphere.\nNo: conditions preclude an Earth-like biosphere.\nStar Too Young: a pre-Cambrian-level biosphere is possible, but complex life has not had time to develop.",
+  "Stellar Evolution":
+    "When enabled, luminosity and radius evolve with age and metallicity using analytical stellar evolution tracks (Hurley, Pols & Tout 2000).\n\nWhen off, properties are derived from mass only using static scaling laws (ZAMS).",
+  "Physics Mode":
+    "Simple: all physical properties (radius, luminosity, temperature) are derived from mass and age using stellar scaling laws.\n\nAdvanced: specify any two of radius, luminosity, and temperature; the third is computed via Stefan-Boltzmann (L = R\u00b2 \u00d7 (T/5776)\u2074).",
   "Metallicity [Fe/H]":
     "Stellar metallicity measures heavy-element abundance relative to the Sun.\n\n[Fe/H] = log\u2081\u2080(Fe/H)_star \u2212 log\u2081\u2080(Fe/H)_sun\n\nSun = 0.0 by definition. Positive = metal-rich, negative = metal-poor.\n\nTypical range:\n\u2022 Metal-rich inner disk: +0.1 to +0.5\n\u2022 Solar neighbourhood: \u22120.2 to +0.1\n\u2022 Old thin disk: \u22120.7 to \u22120.3\n\u2022 Halo / globular clusters: \u22122.5 to \u22121.0\n\nMetallicity does not modify the Eker mass\u2013luminosity or mass\u2013radius relations (their empirical scatter already includes metallicity variation). Instead it drives downstream effects like giant planet probability.",
   "Giant Planet Probability":
@@ -151,12 +155,14 @@ export function initStarPage(mountEl) {
           </div>
           </div>
 
-          <div class="viz-switch" style="margin:10px 0 6px">
-            <div class="viz-switch__text">Stellar Evolution: Off / On</div>
-            <label class="viz-switch__control" for="evolutionToggle">
-              <input type="checkbox" id="evolutionToggle" />
-              <span class="viz-switch__slider" aria-hidden="true"></span>
-            </label>
+          <div style="height:8px"></div>
+          <div class="label">Stellar Evolution ${tipIcon(TIP_LABEL["Stellar Evolution"] || "")}</div>
+          <div class="physics-duo-toggle" style="margin:4px 0 6px">
+            <input type="radio" name="evolutionMode" id="evolutionOff" value="zams" />
+            <label for="evolutionOff">Off</label>
+            <input type="radio" name="evolutionMode" id="evolutionOn" value="evolved" />
+            <label for="evolutionOn">On</label>
+            <span></span>
           </div>
           <div class="hint" id="evolutionHint" style="margin-bottom:8px"></div>
 
@@ -172,12 +178,14 @@ export function initStarPage(mountEl) {
           </div>
           </div>
 
-          <div class="viz-switch" style="margin:10px 0 6px">
-            <div class="viz-switch__text">Physics mode: Simple / Advanced</div>
-            <label class="viz-switch__control" for="physicsAdvancedToggle">
-              <input type="checkbox" id="physicsAdvancedToggle" />
-              <span class="viz-switch__slider" aria-hidden="true"></span>
-            </label>
+          <div style="height:8px"></div>
+          <div class="label">Physics Mode ${tipIcon(TIP_LABEL["Physics Mode"] || "")}</div>
+          <div class="physics-duo-toggle" style="margin:4px 0 6px">
+            <input type="radio" name="physicsMode" id="physicsSimple" value="simple" />
+            <label for="physicsSimple">Simple</label>
+            <input type="radio" name="physicsMode" id="physicsAdvanced" value="advanced" />
+            <label for="physicsAdvanced">Advanced</label>
+            <span></span>
           </div>
           <div class="hint" id="physicsModeHint" style="margin-bottom:8px"></div>
 
@@ -265,7 +273,7 @@ export function initStarPage(mountEl) {
   const kpisEl = wrap.querySelector("#kpis");
   const lifeBadge = wrap.querySelector("#lifeBadge");
   const classBadge = wrap.querySelector("#classBadge");
-  const physicsToggleEl = wrap.querySelector("#physicsAdvancedToggle");
+  const physicsModeRadios = wrap.querySelectorAll('[name="physicsMode"]');
   const advancedDerivRowEl = wrap.querySelector("#advancedDerivRow");
   const physicsDerivRadios = wrap.querySelectorAll('[name="physicsDerivMode"]');
   const radiusOverrideRowEl = wrap.querySelector("#radiusOverrideRow");
@@ -279,7 +287,7 @@ export function initStarPage(mountEl) {
   const tempHintEl = wrap.querySelector("#tempHint");
   const resolutionStatusEl = wrap.querySelector("#resolutionStatus");
   const physicsModeHintEl = wrap.querySelector("#physicsModeHint");
-  const evolutionToggleEl = wrap.querySelector("#evolutionToggle");
+  const evolutionModeRadios = wrap.querySelectorAll('[name="evolutionMode"]');
   const evolutionHintEl = wrap.querySelector("#evolutionHint");
   const sunPreviewController = createCelestialVisualPreviewController({ speedDaysPerSec: 0.5 });
 
@@ -623,9 +631,10 @@ export function initStarPage(mountEl) {
     ageEl.value = state.ageGyr;
     metallicityEl.value = state.metallicityFeH;
 
-    state.physicsMode = physicsToggleEl.checked ? "advanced" : "simple";
+    state.physicsMode = wrap.querySelector('input[name="physicsMode"]:checked')?.value || "simple";
     state.advancedDerivationMode = getDerivMode();
-    state.evolutionMode = evolutionToggleEl.checked ? "evolved" : "zams";
+    state.evolutionMode =
+      wrap.querySelector('input[name="evolutionMode"]:checked')?.value || "zams";
 
     // Read overrides only in Advanced mode; in Simple they stay dormant in state
     // so values are preserved if the user switches back to Advanced.
@@ -673,8 +682,14 @@ export function initStarPage(mountEl) {
   massEl.value = state.massMsol;
   ageEl.value = state.ageGyr;
   metallicityEl.value = state.metallicityFeH;
-  physicsToggleEl.checked = state.physicsMode === "advanced";
-  evolutionToggleEl.checked = state.evolutionMode === "evolved";
+  const physicsRadio = wrap.querySelector(
+    `#${state.physicsMode === "advanced" ? "physicsAdvanced" : "physicsSimple"}`,
+  );
+  if (physicsRadio) physicsRadio.checked = true;
+  const evolutionRadio = wrap.querySelector(
+    `#${state.evolutionMode === "evolved" ? "evolutionOn" : "evolutionOff"}`,
+  );
+  if (evolutionRadio) evolutionRadio.checked = true;
   setDerivMode(state.advancedDerivationMode);
   radiusOverrideEl.value = state.radiusRsolOverride != null ? state.radiusRsolOverride : "";
   luminosityOverrideEl.value =
@@ -698,14 +713,18 @@ export function initStarPage(mountEl) {
   });
 
   // Live-update the UI layout when the mode toggle or dropdown changes
-  physicsToggleEl.addEventListener("change", () => {
-    state.physicsMode = physicsToggleEl.checked ? "advanced" : "simple";
-    render();
+  physicsModeRadios.forEach((r) => {
+    r.addEventListener("change", () => {
+      state.physicsMode = r.value;
+      render();
+    });
   });
 
-  evolutionToggleEl.addEventListener("change", () => {
-    state.evolutionMode = evolutionToggleEl.checked ? "evolved" : "zams";
-    render();
+  evolutionModeRadios.forEach((r) => {
+    r.addEventListener("change", () => {
+      state.evolutionMode = r.value;
+      render();
+    });
   });
 
   physicsDerivRadios.forEach((r) => {
@@ -734,8 +753,10 @@ export function initStarPage(mountEl) {
     radiusOverrideEl.value = "";
     luminosityOverrideEl.value = "";
     tempOverrideEl.value = "";
-    physicsToggleEl.checked = false;
-    evolutionToggleEl.checked = false;
+    const physSimpleR = wrap.querySelector("#physicsSimple");
+    if (physSimpleR) physSimpleR.checked = true;
+    const evoOffR = wrap.querySelector("#evolutionOff");
+    if (evoOffR) evoOffR.checked = true;
     setDerivMode("rl");
     syncBoundInputs();
     updateWorld({
@@ -774,8 +795,10 @@ export function initStarPage(mountEl) {
     radiusOverrideEl.value = "";
     luminosityOverrideEl.value = "";
     tempOverrideEl.value = "";
-    physicsToggleEl.checked = false;
-    evolutionToggleEl.checked = false;
+    const physSimpleR = wrap.querySelector("#physicsSimple");
+    if (physSimpleR) physSimpleR.checked = true;
+    const evoOffR = wrap.querySelector("#evolutionOff");
+    if (evoOffR) evoOffR.checked = true;
     setDerivMode("rl");
     syncBoundInputs();
     updateWorld({

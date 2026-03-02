@@ -13,6 +13,7 @@ import {
   requestCelestialTextureBundle,
   supportsCelestialTextureWorker,
 } from "./celestialTextureWorkerClient.js";
+import { loadTexturesFromIDB, storeTexturesToIDB, clearStaleTextures } from "./textureCache.js";
 
 const DEFAULT_SPEED_DAYS_PER_SEC = 0.5;
 const STAR_BURST_SIZE_SCALE = 0.3;
@@ -30,8 +31,11 @@ const CELESTIAL_DEFAULT_LOD = "medium";
 const CELESTIAL_DPR_MIN = 1;
 const CELESTIAL_DPR_MAX = 2;
 const CELESTIAL_TEXTURE_CACHE = new Map();
-const CELESTIAL_TEXTURE_CACHE_MAX = 16;
+const CELESTIAL_TEXTURE_CACHE_MAX = 64;
 const CELESTIAL_TEXTURE_PIPELINE_VERSION = 9;
+
+/* Purge IDB entries from older pipeline versions (fire-and-forget) */
+clearStaleTextures(CELESTIAL_TEXTURE_PIPELINE_VERSION);
 
 function hashUnit(str) {
   let h = 2166136261;
@@ -2672,6 +2676,8 @@ function cacheTextures(signature, entry) {
     roughness: cloneCanvas(entry.roughness),
     emissive: cloneCanvas(entry.emissive),
   });
+  /* Persist to IndexedDB for cross-session cache (fire-and-forget) */
+  storeTexturesToIDB(signature, entry, CELESTIAL_TEXTURE_PIPELINE_VERSION);
   if (CELESTIAL_TEXTURE_CACHE.size <= CELESTIAL_TEXTURE_CACHE_MAX) return;
   const oldestKey = CELESTIAL_TEXTURE_CACHE.keys().next().value;
   if (oldestKey) CELESTIAL_TEXTURE_CACHE.delete(oldestKey);
@@ -3423,6 +3429,90 @@ export async function renderCelestialRecipeBatch(items, onProgress) {
   }
 }
 
+/* ── IndexedDB → in-memory cache bridge ────────────────────── */
+
+function canvasFromIDBPayload(buffer, width, height) {
+  if (!buffer || !(width > 0) || !(height > 0)) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer), width, height), 0, 0);
+  return canvas;
+}
+
+async function loadFromIDBToCache(signature) {
+  if (!signature) return false;
+  if (CELESTIAL_TEXTURE_CACHE.has(signature)) return true;
+  const rec = await loadTexturesFromIDB(signature);
+  if (!rec) return false;
+  const maps = {
+    surface: canvasFromIDBPayload(rec.surface, rec.width, rec.height),
+    cloud: canvasFromIDBPayload(rec.cloud, rec.width, rec.height),
+    normal: canvasFromIDBPayload(rec.normal, rec.width, rec.height),
+    roughness: canvasFromIDBPayload(rec.roughness, rec.width, rec.height),
+    emissive: canvasFromIDBPayload(rec.emissive, rec.width, rec.height),
+  };
+  if (!maps.surface || !maps.cloud || !maps.normal) return false;
+  cacheTextures(signature, maps);
+  return true;
+}
+
+/* ── Batch pre-warm (worker + IDB aware) ───────────────────── */
+
+async function warmSingle(descriptor, textureSize, signature) {
+  if (await loadFromIDBToCache(signature)) return;
+  if (supportsCelestialTextureWorker()) {
+    try {
+      const result = await requestCelestialTextureBundle({
+        signature,
+        descriptor,
+        textureSize,
+      });
+      const maps = result?.maps;
+      const wm = {
+        surface: canvasFromMapPayload(maps?.surface),
+        cloud: canvasFromMapPayload(maps?.cloud),
+        normal: canvasFromMapPayload(maps?.normal),
+        roughness: canvasFromMapPayload(maps?.roughness),
+        emissive: canvasFromMapPayload(maps?.emissive),
+      };
+      if (wm.surface && wm.cloud && wm.normal) {
+        cacheTextures(signature, wm);
+        return;
+      }
+    } catch {
+      /* fall through to local */
+    }
+  }
+  const localMaps = generateCelestialTextureCanvasesLocal(descriptor, textureSize);
+  cacheTextures(signature, localMaps);
+}
+
+/**
+ * Pre-generate textures for a batch of body models so they are cached
+ * (both in-memory and IDB) before the render loop needs them.
+ * Checks: in-memory → IDB → Web Worker → local fallback.
+ *
+ * @param {{ bodyType: string, [key: string]: any }[]} models
+ * @param {{ lod?: string }} [opts]
+ * @returns {Promise<void>}
+ */
+export async function preWarmTextures(models, opts = {}) {
+  if (!models?.length) return;
+  const lod = opts.lod || "low";
+  const tasks = [];
+  for (const model of models) {
+    const descriptor = composeCelestialDescriptor(model, { lod });
+    const textureSize = descriptor.textureSize || 128;
+    const signature = buildDescriptorSignature(descriptor, textureSize);
+    if (CELESTIAL_TEXTURE_CACHE.has(signature)) continue;
+    tasks.push(warmSingle(descriptor, textureSize, signature));
+  }
+  await Promise.all(tasks);
+}
+
 /* ── Exports for external 3D mesh creation ─────────────────── */
 export {
   previewPbrMaterial,
@@ -3435,4 +3525,5 @@ export {
   makeFlatMapCanvas,
   hasLayer,
   shouldFlattenStyleMaps,
+  loadFromIDBToCache,
 };

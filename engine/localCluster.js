@@ -126,8 +126,8 @@ function normalizeSeed(seed) {
  * @param {object} [raw={}] - Raw input object with optional overrides.
  * @param {number} [raw.galacticRadiusLy] - Galactic radius in light-years (1 000 – 1 000 000).
  * @param {number} [raw.locationLy] - Distance of the home system from galactic centre (0 – galacticRadiusLy).
- * @param {number} [raw.neighbourhoodRadiusLy] - Radius of the local neighbourhood sphere (0.1 – 500).
- * @param {number} [raw.stellarDensityPerLy3] - Stellar density in objects per cubic light-year (0.000001 – 1).
+ * @param {number} [raw.neighbourhoodRadiusLy] - Radius of the local neighbourhood sphere (0.1 – 25).
+ * @param {number} [raw.stellarDensityPerLy3] - Stellar density in objects per cubic light-year (0.000001 – 0.1).
  * @param {number} [raw.randomSeed] - PRNG seed (clamped to 1 – 2^31-2).
  * @returns {{ galacticRadiusLy: number, locationLy: number, neighbourhoodRadiusLy: number, stellarDensityPerLy3: number, randomSeed: number }}
  *   Validated and clamped inputs.
@@ -146,12 +146,12 @@ export function normalizeLocalClusterInputs(raw = {}) {
   const neighbourhoodRadiusLy = clamp(
     toFinite(raw.neighbourhoodRadiusLy, LOCAL_CLUSTER_DEFAULTS.neighbourhoodRadiusLy),
     0.1,
-    500,
+    25,
   );
   const stellarDensityPerLy3 = clamp(
     toFinite(raw.stellarDensityPerLy3, LOCAL_CLUSTER_DEFAULTS.stellarDensityPerLy3),
     0.000001,
-    1,
+    0.1,
   );
   const randomSeed = normalizeSeed(raw.randomSeed);
 
@@ -494,7 +494,7 @@ export function calcLocalCluster(rawInputs = {}) {
     total: totalStarSystems,
   };
 
-  const neighbourSystemCount = clamp(totalStarSystems - 1, 0, 99);
+  const neighbourSystemCount = clamp(totalStarSystems - 1, 0, 750);
   const systemsOmitted = Math.max(0, totalStarSystems - 1 - neighbourSystemCount);
 
   // Flatten the z-axis for large neighbourhood radii to approximate galactic disk geometry.

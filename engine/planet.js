@@ -53,6 +53,9 @@ const SECONDS_TO_GYR = 3.171e-17;
 // heating on the planet.  Scales linearly with mass for other bodies.
 const EARTH_INTERNAL_HEAT_W = 44e12;
 
+// Present-day fractional contribution of each isotope to Earth's radiogenic heat.
+const ISOTOPE_HEAT_FRACTIONS = { u238: 0.39, u235: 0.04, th232: 0.4, k40: 0.17 };
+
 // Atmospheric thermal-tide calibration constant.
 // Dimensionless ratio b_atm = C_ATM_TIDE × P_s × S / (g × T_eq),
 // calibrated so Venus (92 atm, S≈1.9, g≈8.8, T_eq≈229 K) gives b > 1.
@@ -173,6 +176,13 @@ function waterRegime(wmf) {
   return "Ice world";
 }
 
+// --- Body classification ---
+// Mass-based: bodies below 0.01 M⊕ are dwarf planets.
+// Mercury (0.055 M⊕) is a planet; Eris (0.0028 M⊕) is a dwarf planet.
+function bodyClass(massEarth) {
+  return massEarth < 0.01 ? "Dwarf planet" : "Planet";
+}
+
 // --- Zeng+Sasselov (2016) water-layer radius correction ---
 // For WMF=0, output is identical to the existing dry formula.
 // For WMF>0, the dry radius is inflated by interpolation between
@@ -260,6 +270,7 @@ function magneticFieldModel({
   rotationPeriodHours,
   ageGyr,
   tidalFraction = 0,
+  radioisotopeAbundance = 1,
 }) {
   const none = {
     dynamoActive: false,
@@ -278,7 +289,7 @@ function magneticFieldModel({
   // Core solidification timescale (Gyr) — empirical estimate.
   // Larger cores in larger planets retain heat longer.
   // Moon tidal heating extends core lifetime by offsetting radiative cooling.
-  const tauCoreBase = 2 + 12 * cmf * Math.sqrt(massEarth);
+  const tauCoreBase = (2 + 12 * cmf * Math.sqrt(massEarth)) * Math.max(radioisotopeAbundance, 0.01);
   const tauCore = tidalFraction >= 1 ? Infinity : tauCoreBase / Math.max(0.01, 1 - tidalFraction);
 
   // Core state
@@ -480,7 +491,7 @@ function gauss(x, mu, sigma) {
  * @returns {{ stagnant:number, mobile:number, episodic:number, plutonicSquishy:number, suggested:string }}
  */
 export function tectonicProbabilities(massEarth, ageGyr, wmf, cmf, tidalFraction) {
-  const lnM = Math.log(Math.max(massEarth, 0.01));
+  const lnM = Math.log(Math.max(massEarth, 0.0001));
 
   // Tectonic regime probability model — calibrated Gaussian mass/age/composition
   // preferences. Each regime has mass-factor (log-normal), age-factor, water-factor,
@@ -1217,6 +1228,85 @@ const MW_HE = 0.004;
 const MW_SO2 = 0.064;
 const MW_NH3 = 0.017;
 
+// Jeans escape constants (Ribas et al. 2005, Jeans 1925, Hunten 1973):
+const F_XUV_SUN_1AU = 4.64; // erg/cm²/s, present-day solar XUV at 1 AU
+const SUN_AGE_GYR = 4.6;
+const JEANS_RETAINED = 6; // λ ≥ 6: firmly retained over geological time
+const JEANS_MARGINAL = 3; // 3 ≤ λ < 6: marginal (slow escape)
+const EXOBASE_XUV_COEFF = 3.0; // calibrated to Earth T_exo ~ 1000 K
+const EXOBASE_CO2_COEFF = 100; // CO₂ radiative cooling suppression
+const EXOBASE_MAX_K = 5000; // cap at hydrodynamic blowoff regime
+const P_HALF_XUV = 0.06; // atm; half-absorption pressure for XUV (Beer-Lambert)
+// Non-thermal escape: charge exchange, polar wind, ion pickup (Gunell+ 2018)
+const NT_H2_FACTOR = 3.0; // threshold multiplier for H₂ (Lost < 9, Marginal 9–18)
+const NT_HE_FACTOR = 5.0; // threshold multiplier for He  (Lost < 15, Marginal 15–30)
+const NT_TEMP_FLOOR_K = 100; // non-thermal negligible below 100 K (outer system)
+
+// Gas species table for Jeans escape
+const GAS_SPECIES = [
+  { key: "n2", label: "N\u2082", mw: MW_N2 },
+  { key: "o2", label: "O\u2082", mw: MW_O2 },
+  { key: "co2", label: "CO\u2082", mw: MW_CO2 },
+  { key: "ar", label: "Ar", mw: MW_AR },
+  { key: "h2o", label: "H\u2082O", mw: MW_H2O },
+  { key: "ch4", label: "CH\u2084", mw: MW_CH4 },
+  { key: "h2", label: "H\u2082", mw: MW_H2 },
+  { key: "he", label: "He", mw: MW_HE },
+  { key: "so2", label: "SO\u2082", mw: MW_SO2 },
+  { key: "nh3", label: "NH\u2083", mw: MW_NH3 },
+];
+
+function jeansStatus(lambda) {
+  if (lambda >= JEANS_RETAINED) return "Retained";
+  if (lambda >= JEANS_MARGINAL) return "Marginal";
+  return "Lost";
+}
+
+function computeExobaseTemp(tEqK, fXuvRatio, pressureAtm, co2Fraction) {
+  if (tEqK <= 0) return 0;
+  // Thin-atmosphere correction: less column density absorbs less XUV.
+  const etaAbs = pressureAtm / (pressureAtm + P_HALF_XUV);
+  const boost =
+    (EXOBASE_XUV_COEFF * etaAbs * Math.sqrt(Math.max(0, fXuvRatio))) /
+    (1 + EXOBASE_CO2_COEFF * pressureAtm * co2Fraction);
+  return Math.min(tEqK * (1 + boost), EXOBASE_MAX_K);
+}
+
+function effectiveStatus(lambda, mw, exobaseTempK) {
+  const thermal = jeansStatus(lambda);
+  if (exobaseTempK > NT_TEMP_FLOOR_K) {
+    let factor = 1;
+    if (mw <= MW_H2) factor = NT_H2_FACTOR;
+    else if (mw <= MW_HE) factor = NT_HE_FACTOR;
+    if (factor > 1) {
+      if (lambda >= factor * JEANS_RETAINED) return "Retained";
+      if (lambda >= factor * JEANS_MARGINAL) return "Marginal";
+      return "Lost";
+    }
+  }
+  return thermal;
+}
+
+function computeJeansEscape(escapeVelocityKms, exobaseTempK) {
+  const vEsc = escapeVelocityKms * 1000;
+  const vEsc2 = vEsc * vEsc;
+  const denom = 2 * R_GAS * Math.max(exobaseTempK, 1);
+  const species = {};
+  for (const g of GAS_SPECIES) {
+    const lambda = (vEsc2 * g.mw) / denom;
+    const thermal = jeansStatus(lambda);
+    const status = effectiveStatus(lambda, g.mw, exobaseTempK);
+    species[g.key] = {
+      lambda,
+      thermalStatus: thermal,
+      status,
+      nonThermal: status !== thermal,
+      label: g.label,
+    };
+  }
+  return species;
+}
+
 // Greenhouse-from-gas coefficients:
 // Core gases — calibrated against NASA Planetary Fact Sheet (Earth, Venus, Mars).
 const GH_CO2_COEFF = 0.503; // logarithmic (band saturation, Myhre 1998)
@@ -1369,7 +1459,7 @@ export function calcPlanetExact({
   const suggestedCmfPct = suggestedCmf * 100;
 
   // Inputs (clamped to sensible bounds)
-  const massEarth = clamp(planet.massEarth, 0.01, 1000);
+  const massEarth = clamp(planet.massEarth, 0.0001, 1000);
   const cmfIsAuto = planet.cmfPct < 0 || planet.cmfPct == null;
   const cmfPct = cmfIsAuto ? suggestedCmfPct : clamp(planet.cmfPct, 0, 100); // percent
   const wmfPct = clamp(planet.wmfPct ?? 0, 0, 50); // water mass fraction %
@@ -1390,23 +1480,43 @@ export function calcPlanetExact({
 
   const pressureAtm = clamp(planet.pressureAtm, 0, 100);
 
-  const o2Pct = clamp(planet.o2Pct, 0, 100);
-  const co2Pct = clamp(planet.co2Pct, 0, 100);
-  const arPct = clamp(planet.arPct, 0, 100);
-  const h2oPct = clamp(planet.h2oPct ?? 0, 0, 100);
-  const ch4Pct = clamp(planet.ch4Pct ?? 0, 0, 100);
-  const h2Pct = clamp(planet.h2Pct ?? 0, 0, 100);
-  const hePct = clamp(planet.hePct ?? 0, 0, 100);
-  const so2Pct = clamp(planet.so2Pct ?? 0, 0, 100);
-  const nh3Pct = clamp(planet.nh3Pct ?? 0, 0, 100);
+  let o2Pct = clamp(planet.o2Pct, 0, 100);
+  let co2Pct = clamp(planet.co2Pct, 0, 100);
+  let arPct = clamp(planet.arPct, 0, 100);
+  let h2oPct = clamp(planet.h2oPct ?? 0, 0, 100);
+  let ch4Pct = clamp(planet.ch4Pct ?? 0, 0, 100);
+  let h2Pct = clamp(planet.h2Pct ?? 0, 0, 100);
+  let hePct = clamp(planet.hePct ?? 0, 0, 100);
+  let so2Pct = clamp(planet.so2Pct ?? 0, 0, 100);
+  let nh3Pct = clamp(planet.nh3Pct ?? 0, 0, 100);
+  const radioisotopeMode = planet.radioisotopeMode || "simple";
+  let radioisotopeAbundance;
+  if (radioisotopeMode === "advanced") {
+    const u238 = clamp(planet.u238Abundance ?? 1, 0, 5);
+    const u235 = clamp(planet.u235Abundance ?? 1, 0, 5);
+    const th232 = clamp(planet.th232Abundance ?? 1, 0, 5);
+    const k40 = clamp(planet.k40Abundance ?? 1, 0, 5);
+    radioisotopeAbundance = Math.max(
+      u238 * ISOTOPE_HEAT_FRACTIONS.u238 +
+        u235 * ISOTOPE_HEAT_FRACTIONS.u235 +
+        th232 * ISOTOPE_HEAT_FRACTIONS.th232 +
+        k40 * ISOTOPE_HEAT_FRACTIONS.k40,
+      0.01,
+    );
+  } else {
+    radioisotopeAbundance = clamp(planet.radioisotopeAbundance ?? 1, 0.1, 3.0);
+  }
   // User-friendly guardrail: do not allow derived N2 to go negative.
-  const gasInputTotalPct =
+  // These are from the raw user inputs; if Jeans escape auto-strip is active,
+  // they are recomputed below from the effective (post-strip) gas percentages.
+  const rawGasInputTotalPct =
     o2Pct + co2Pct + arPct + h2oPct + ch4Pct + h2Pct + hePct + so2Pct + nh3Pct;
-  const n2PctRaw = 100 - gasInputTotalPct;
-  const n2Pct = Math.max(0, n2PctRaw);
-  const gasMixOverflowPct = Math.max(0, gasInputTotalPct - 100);
-  const gasMixClamped = gasMixOverflowPct > 0;
-
+  const rawN2PctRaw = 100 - rawGasInputTotalPct;
+  const rawGasMixOverflowPct = Math.max(0, rawGasInputTotalPct - 100);
+  const rawGasMixClamped = rawGasMixOverflowPct > 0;
+  let gasInputTotalPct = rawGasInputTotalPct;
+  let n2PctRaw = rawN2PctRaw;
+  let n2Pct = Math.max(0, n2PctRaw);
   // Star derived (also present on PLANET sheet)
   const starMassKg = STAR_MASS_TO_KG * starMassMsol;
   const hzInnerAuRaw = Number(star.habitableZoneAu?.inner);
@@ -1446,8 +1556,101 @@ export function calcPlanetExact({
   const escapeVelocityVEarth = Math.sqrt(massEarth / radiusEarth);
   const escapeVelocityKms = escapeVelocityVEarth * VELOCITY_EARTH_KMS;
 
+  // ── Jeans escape ──────────────────────────────────────────────────
+  // Equilibrium temperature (no greenhouse) — same formula as tEqK below.
+  const tEqNoGh =
+    (278 * star.luminosityLsol ** 0.25 * (1 - albedoBond) ** 0.25) / Math.sqrt(semiMajorAxisAu);
+
+  // XUV flux ratio relative to present-day Earth at 1 AU (Ribas et al. 2005)
+  const starAge = Math.max(0.1, starAgeGyr);
+  const fXuv1Au = F_XUV_SUN_1AU * star.luminosityLsol * (starAge / SUN_AGE_GYR) ** -1.23;
+  const fXuvAtOrbit = fXuv1Au / (semiMajorAxisAu * semiMajorAxisAu);
+  const fXuvRatio = fXuvAtOrbit / F_XUV_SUN_1AU;
+
+  // Exobase temperature: XUV-heated thermosphere countered by CO₂ cooling.
+  const co2Frac = clamp(planet.co2Pct ?? 0, 0, 100) / 100;
+  const exobaseTempK = computeExobaseTemp(tEqNoGh, fXuvRatio, pressureAtm, co2Frac);
+
+  // Per-species Jeans escape analysis
+  const jeansSpecies = computeJeansEscape(escapeVelocityKms, exobaseTempK);
+
+  // Auto-strip: when enabled, zero out gases with "Lost" status and recompute
+  // N₂ and gas-mix totals.  The original user inputs are preserved in the
+  // `inputs` return object; only the physics uses the effective values.
+  const atmosphericEscape = !!planet.atmosphericEscape;
+  const stripped = [];
+  if (atmosphericEscape) {
+    const gasKeys = [
+      [
+        "o2",
+        () => {
+          o2Pct = 0;
+        },
+      ],
+      [
+        "co2",
+        () => {
+          co2Pct = 0;
+        },
+      ],
+      [
+        "ar",
+        () => {
+          arPct = 0;
+        },
+      ],
+      [
+        "h2o",
+        () => {
+          h2oPct = 0;
+        },
+      ],
+      [
+        "ch4",
+        () => {
+          ch4Pct = 0;
+        },
+      ],
+      [
+        "h2",
+        () => {
+          h2Pct = 0;
+        },
+      ],
+      [
+        "he",
+        () => {
+          hePct = 0;
+        },
+      ],
+      [
+        "so2",
+        () => {
+          so2Pct = 0;
+        },
+      ],
+      [
+        "nh3",
+        () => {
+          nh3Pct = 0;
+        },
+      ],
+    ];
+    for (const [key, zero] of gasKeys) {
+      if (jeansSpecies[key].status === "Lost") {
+        zero();
+        stripped.push(key);
+      }
+    }
+    // Recompute gas-mix totals from effective (post-strip) percentages
+    gasInputTotalPct = o2Pct + co2Pct + arPct + h2oPct + ch4Pct + h2Pct + hePct + so2Pct + nh3Pct;
+    n2PctRaw = 100 - gasInputTotalPct;
+    n2Pct = Math.max(0, n2PctRaw);
+  }
+
   // Composition labels
   const compClass = compositionClass(cmf, wmf);
+  const bClass = bodyClass(massEarth);
   const watRegime = waterRegime(wmf);
 
   // Core radius fraction (Zeng & Jacobsen 2017): CRF ≈ CMF^0.5
@@ -1526,7 +1729,7 @@ export function calcPlanetExact({
   );
   const surfaceAreaM2 = 4 * PI * radiusM ** 2;
   const planetTidalHeatingWm2 = surfaceAreaM2 > 0 ? planetTidalHeatingW / surfaceAreaM2 : 0;
-  const internalHeatW = EARTH_INTERNAL_HEAT_W * massEarth;
+  const internalHeatW = EARTH_INTERNAL_HEAT_W * massEarth * radioisotopeAbundance;
   const planetTidalFraction = internalHeatW > 0 ? planetTidalHeatingW / internalHeatW : 0;
 
   // Magnetic field model
@@ -1538,6 +1741,7 @@ export function calcPlanetExact({
     rotationPeriodHours,
     ageGyr: starAgeGyr,
     tidalFraction: planetTidalFraction,
+    radioisotopeAbundance,
   });
 
   // Mantle outgassing and tectonic advisory
@@ -1758,6 +1962,16 @@ export function calcPlanetExact({
       greenhouseMode,
       tectonicRegime: tecRegime,
       mantleOxidation: planet.mantleOxidation || "earth",
+      radioisotopeAbundance,
+      radioisotopeMode,
+      u238Abundance:
+        radioisotopeMode === "advanced" ? clamp(planet.u238Abundance ?? 1, 0, 5) : undefined,
+      u235Abundance:
+        radioisotopeMode === "advanced" ? clamp(planet.u235Abundance ?? 1, 0, 5) : undefined,
+      th232Abundance:
+        radioisotopeMode === "advanced" ? clamp(planet.th232Abundance ?? 1, 0, 5) : undefined,
+      k40Abundance:
+        radioisotopeMode === "advanced" ? clamp(planet.k40Abundance ?? 1, 0, 5) : undefined,
     },
     derived: {
       starMassKg,
@@ -1806,10 +2020,10 @@ export function calcPlanetExact({
 
       pressureKpa,
       n2Pct,
-      n2PctRaw,
-      gasInputTotalPct,
-      gasMixOverflowPct,
-      gasMixClamped,
+      n2PctRaw: rawN2PctRaw,
+      gasInputTotalPct: rawGasInputTotalPct,
+      gasMixOverflowPct: rawGasMixOverflowPct,
+      gasMixClamped: rawGasMixClamped,
       greenhouseMode,
       greenhouseEffect,
       computedGreenhouseEffect,
@@ -1838,12 +2052,23 @@ export function calcPlanetExact({
       atmWeightKgMol,
       atmDensityKgM3,
 
+      // Jeans escape
+      jeansEscape: {
+        exobaseTempK: Math.round(exobaseTempK),
+        xuvFluxRatio: fXuvRatio,
+        tEqNoGhK: Math.round(tEqNoGh),
+        species: jeansSpecies,
+        stripped,
+        atmosphericEscape,
+      },
+
       circulationCellCount: cellCount,
       circulationCellRanges: cellRanges,
 
       apparentStarDeg,
 
-      // Composition (Phase A)
+      // Classification & composition (Phase A)
+      bodyClass: bClass,
       compositionClass: compClass,
       waterRegime: watRegime,
       coreRadiusFraction,
@@ -1871,6 +2096,7 @@ export function calcPlanetExact({
       mantleOxidation: outgassing.oxidationLabel,
       primaryOutgassedSpecies: outgassing.primarySpecies,
       outgassingHint: outgassing.atmosphereHint,
+      radioisotopeAbundance,
 
       vegetationPaleHex: veg.paleHex,
       vegetationDeepHex: veg.deepHex,
@@ -1907,6 +2133,7 @@ export function calcPlanetExact({
           : tidallyEvolved
             ? `Spin-orbit resonance (${resonance.ratio})`
             : fmt(tidalLockStarGyr, 2) + " Gyr to despinning",
+      bodyClass: bClass,
       compositionClass: compClass,
       waterRegime: watRegime,
       coreRadius: `${fmt(coreRadiusFraction, 2)} R (${fmt(coreRadiusKm, 0)} km)`,
@@ -1933,6 +2160,10 @@ export function calcPlanetExact({
           ? "Plutonic-Squishy"
           : tecRegime.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       tectonicIsAuto: tecRegimeInput === "auto",
+      radioisotopeAbundance:
+        radioisotopeAbundance === 1
+          ? "Earth (1.0\u00d7)"
+          : fmt(radioisotopeAbundance, 2) + "\u00d7 Earth",
     },
   };
 }

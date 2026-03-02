@@ -53,7 +53,10 @@ const TIP_LABEL = {
 
   // â”€â”€ Body selector â”€â”€
   "Body selection":
-    "Choose which body you are editing. Bodies are sorted by orbital distance. [R] = rocky planet, [G] = gas giant.",
+    "Choose which body you are editing. Bodies are sorted by orbital distance. [R] = rocky planet, [D] = dwarf planet, [G] = gas giant.",
+
+  "Body Class":
+    "Classification based on mass. Bodies below 0.1 M\u2295 (~Mars mass) are labelled as dwarf planets. The physics model is identical \u2014 this is purely a label.\n\nReal examples: Ceres (0.00016 M\u2295), Pluto (0.0022 M\u2295), Eris (0.0028 M\u2295).",
 
   // â”€â”€ Rocky planet inputs â”€â”€
   "Orbital slot": "Assign this body to an available system slot. One body per slot.",
@@ -107,6 +110,8 @@ const TIP_LABEL = {
   "Carbon Dioxide (CO2)":
     "Carbon dioxide partial pressure. Habitable limit: < 0.02 atm (optimal < 0.005 atm).\n\nEarth \u2248 0.0004 atm (420 ppm).",
   "Argon (Ar)": "Argon partial pressure. Habitable limit: < 1.6 atm.\n\nEarth \u2248 0.0094 atm.",
+  "Atmospheric Escape":
+    "Atmospheric escape analysis combining Jeans thermal escape with non-thermal processes (charge exchange, polar wind, ion pickup).\n\nComputes the Jeans escape parameter \u03BB for each gas species based on escape velocity and exobase temperature. For H\u2082 and He, enhanced thresholds account for non-thermal loss channels that operate on all warm terrestrial planets (T_exo > 100 K).\n\nWhen enabled, gases classified as \u2018Lost\u2019 are automatically zeroed before computing greenhouse effect, partial pressures, and density. The original composition inputs are preserved.\n\nExobase temperature includes a pressure-dependent XUV absorption term \u2014 thin atmospheres absorb less XUV.\n\nH\u2082: Retained \u03BB \u2265 18 | Marginal 9\u201318 | Lost < 9\nHe: Retained \u03BB \u2265 30 | Marginal 15\u201330 | Lost < 15\nOthers: Retained \u03BB \u2265 6 | Marginal 3\u20136 | Lost < 3",
   "Vegetation override":
     "Override the auto-calculated vegetation colours with manually chosen pale and deep hex values. In Auto mode, colours are derived from the star's spectrum, atmospheric pressure, insolation, and tidal lock status.",
   Moons: "Major moons currently assigned to this body.",
@@ -378,11 +383,13 @@ export function initPlanetPage(mountEl) {
     const entries = [];
     for (const p of planets) {
       const au = Number(p.inputs?.semiMajorAxisAu) || 0;
+      const mass = Number(p.inputs?.massEarth) || 1;
       entries.push({
         type: "planet",
         id: p.id,
         name: p.name || p.inputs?.name || p.id,
         au,
+        isDwarf: mass < 0.01,
         value: `planet:${p.id}`,
       });
     }
@@ -405,7 +412,7 @@ export function initPlanetPage(mountEl) {
     bodySel.innerHTML = entries
       .map(
         (e) =>
-          `<option value="${escapeHtml(e.value)}"${e.value === selectedValue ? " selected" : ""}>[${e.type === "planet" ? "R" : "G"}] ${escapeHtml(e.name)} (${fmt(e.au, 3)} AU)</option>`,
+          `<option value="${escapeHtml(e.value)}"${e.value === selectedValue ? " selected" : ""}>[${e.type === "planet" ? (e.isDwarf ? "D" : "R") : "G"}] ${escapeHtml(e.name)} (${fmt(e.au, 3)} AU)</option>`,
       )
       .join("");
   }
@@ -440,7 +447,7 @@ export function initPlanetPage(mountEl) {
 
       <div style="height:8px"></div>
       <div class="label">Physical ${tipIcon(TIP_LABEL["Physical"])}</div>
-      ${numWithSlider("mass", "Mass", "MEarth", "", 0.01, 1000, 0.01, "Mass")}
+      ${numWithSlider("mass", "Mass", "MEarth", "", 0.0001, 1000, 0.0001, "Mass")}
       <div class="form-row">
         <div>
           <div class="label">CMF <span class="unit">%</span> ${tipIcon(TIP_LABEL["CMF"])}
@@ -501,6 +508,17 @@ export function initPlanetPage(mountEl) {
         ${numWithSlider("he", "Helium (He)", "%", "", 0, 50, 0.1, "Helium (He)")}
         ${numWithSlider("so2", "Sulfur Dioxide (SO\u2082)", "%", "", 0, 1, 0.001, "Sulfur Dioxide (SO\u2082)")}
         ${numWithSlider("nh3", "Ammonia (NH\u2083)", "%", "", 0, 1, 0.001, "Ammonia (NH\u2083)")}
+      </div>
+
+      <div style="height:8px"></div>
+      <div class="label">Atmospheric Escape ${tipIcon(TIP_LABEL["Atmospheric Escape"])}</div>
+      <div class="viz-switch" style="margin:4px 0 6px">
+        <div class="viz-switch__text">Atmospheric escape filter</div>
+        <label class="viz-switch__control" for="atmEscape">
+          <input type="checkbox" id="atmEscape" ${p.atmosphericEscape ? "checked" : ""} />
+          <span class="viz-switch__slider" aria-hidden="true"></span>
+        </label>
+        <span class="viz-switch__mode-label" id="atmEscapeLabel">${p.atmosphericEscape ? "On" : "Off"}</span>
       </div>
 
       <div style="height:8px"></div>
@@ -640,7 +658,7 @@ export function initPlanetPage(mountEl) {
       nh3: p.nh3Pct,
     };
     const sliderBindings = {
-      mass: [0.01, 1000, 0.01],
+      mass: [0.0001, 1000, 0.0001],
       wmf: [0, 50, 0.1],
       tilt: [0, 180, 0.1],
       albedo: [0, 0.95, 0.01],
@@ -773,6 +791,21 @@ export function initPlanetPage(mountEl) {
       );
       scheduleRender();
     });
+
+    // Atmospheric escape toggle
+    const atmEscapeToggle = bodyInputsEl.querySelector("#atmEscape");
+    const atmEscapeLabel = bodyInputsEl.querySelector("#atmEscapeLabel");
+    if (atmEscapeToggle) {
+      atmEscapeToggle.addEventListener("change", () => {
+        if (hydrating) return;
+        const on = atmEscapeToggle.checked;
+        if (atmEscapeLabel) atmEscapeLabel.textContent = on ? "On" : "Off";
+        const w = loadWorld();
+        updatePlanet(w.planets.selectedId, { inputs: { atmosphericEscape: on } });
+        updateWorld({ planet: { atmosphericEscape: on } });
+        scheduleRender();
+      });
+    }
 
     // Vegetation override toggle + colour pickers
     const vegToggle = bodyInputsEl.querySelector("#vegOverride");
@@ -947,6 +980,14 @@ export function initPlanetPage(mountEl) {
 
     const items = [
       {
+        label: "Body Class",
+        value: model.display.bodyClass,
+        meta:
+          model.display.bodyClass === "Dwarf planet"
+            ? `Mass below 0.1 M\u2295 (${fmt(model.inputs.massEarth, 4)} M\u2295)`
+            : "",
+      },
+      {
         label: "Appearance",
         value: d.compositionClass,
         meta: d.waterRegime,
@@ -1120,6 +1161,43 @@ export function initPlanetPage(mountEl) {
         ? `Greenhouse: manual (${fmt(d.greenhouseEffect, 3)})`
         : `Greenhouse: ${d.greenhouseMode} (computed ${fmt(d.computedGreenhouseEffect, 3)}, \u03C4 = ${fmt(d.computedGreenhouseTau, 3)})`;
 
+    // Jeans escape retention lines
+    const je = d.jeansEscape;
+    let jeansLines = "";
+    if (je) {
+      jeansLines = `\n\nAtmospheric escape (T_exo ${fmt(je.exobaseTempK, 0)} K, XUV ${fmt(je.xuvFluxRatio, 2)}\u00d7 Earth):`;
+      const gasKeys = ["n2", "o2", "co2", "ar", "h2o", "ch4", "h2", "he", "so2", "nh3"];
+      const gasLabels = {
+        n2: "N\u2082",
+        o2: "O\u2082",
+        co2: "CO\u2082",
+        ar: "Ar",
+        h2o: "H\u2082O",
+        ch4: "CH\u2084",
+        h2: "H\u2082",
+        he: "He",
+        so2: "SO\u2082",
+        nh3: "NH\u2083",
+      };
+      for (const key of gasKeys) {
+        const sp = je.species[key];
+        const pct = key === "n2" ? d.n2Pct : Number(p[key + "Pct"]) || 0;
+        if (pct > 0 || (je.atmosphericEscape && je.stripped.includes(key))) {
+          const ntTag = sp.nonThermal ? " (non-thermal)" : "";
+          const tag =
+            je.atmosphericEscape && sp.status === "Lost"
+              ? " [STRIPPED]"
+              : sp.status === "Marginal"
+                ? " [!]"
+                : "";
+          jeansLines += `\n  ${gasLabels[key]}: \u03BB=${fmt(sp.lambda, 1)} \u2014 ${sp.status}${ntTag}${tag}`;
+        }
+      }
+      if (je.stripped.length > 0) {
+        jeansLines += `\nStripped gases: ${je.stripped.map((k) => gasLabels[k] || k).join(", ")}`;
+      }
+    }
+
     // Capture existing canvas before innerHTML wipe to preserve WebGL context
     const prevRockyCanvas = bodyOutputsEl.querySelector(".rocky-preview-canvas");
 
@@ -1143,7 +1221,7 @@ Atmospheric pressure: ${model.display.pressureKpa}
 ${gasMixLine}
 ${ppLine}
 Atmospheric weight: ${model.display.atmWeight}
-Atmospheric density: ${model.display.atmDensity}${gasMixNote}</div>
+Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
       </div>
       <div style="margin-top:14px">
         <div class="label">Derived atmospheric circulation ${tipIcon(TIP_LABEL["Atmospheric circulation"])}</div>
@@ -2235,6 +2313,7 @@ Circularisation: ${m.display.circularisation}</div>
       bodyActionsEl.innerHTML = `
         <div class="button-row">
           <button id="btn-earth">Earth-ish Preset</button>
+          <button id="btn-pluto">Pluto-ish Preset</button>
           <button id="btn-reset">Reset to Defaults</button>
         </div>
       `;
@@ -2260,6 +2339,44 @@ Circularisation: ${m.display.circularisation}</div>
           arPct: 0.93,
         };
         updatePlanet(w.planets.selectedId, { name: "Earth", inputs });
+        updateWorld({ planet: inputs });
+        scheduleRender();
+      });
+      bodyActionsEl.querySelector("#btn-pluto").addEventListener("click", () => {
+        const w = loadWorld();
+        const inputs = {
+          name: "Pluto",
+          massEarth: 0.0022,
+          cmfPct: 32.0,
+          wmfPct: 30.0,
+          axialTiltDeg: 122.5,
+          albedoBond: 0.72,
+          greenhouseEffect: 0,
+          observerHeightM: 1.75,
+          rotationPeriodHours: 153.3,
+          semiMajorAxisAu: 39.48,
+          eccentricity: 0.2488,
+          inclinationDeg: 17.16,
+          longitudeOfPeriapsisDeg: 113.8,
+          subsolarLongitudeDeg: 0.0,
+          pressureAtm: 0.00001,
+          o2Pct: 0,
+          co2Pct: 0,
+          arPct: 0,
+          h2oPct: 0,
+          ch4Pct: 5,
+          h2Pct: 0,
+          hePct: 0,
+          so2Pct: 0,
+          nh3Pct: 0,
+          radioisotopeAbundance: null,
+          radioisotopeMode: "simple",
+          u238Abundance: null,
+          u235Abundance: null,
+          th232Abundance: null,
+          k40Abundance: null,
+        };
+        updatePlanet(w.planets.selectedId, { name: "Pluto", inputs });
         updateWorld({ planet: inputs });
         scheduleRender();
       });

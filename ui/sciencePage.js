@@ -708,9 +708,9 @@ function buildOrbitalMechanics() {
       <p>Reciprocal of the moon tidal heating formula: now the planet is the body being deformed.
       Uses the planet&rsquo;s composition-dependent ${iq("k_2")} and ${iq("Q")} (from CMF and WMF).</p>
       <p><b>Core lifetime extension:</b> comparing total moon tidal heating to the planet&rsquo;s
-      internal heat budget (${iq("\\sim 44")} TW &times; ${iq("M / M_\\oplus")}), tidal heating
+      internal heat budget (${iq("\\sim 44")} TW &times; ${iq("M / M_\\oplus")} &times; ${iq("A")}), tidal heating
       extends the core solidification timescale:</p>
-      <div class="sci-formula__eq">${eq("\\tau_{\\text{core}} = \\frac{\\tau_{\\text{base}}}{\\max(0.01,\\; 1 - f_{\\text{tidal}})}, \\quad f_{\\text{tidal}} = \\frac{\\dot{E}_{\\text{planet}}}{44 \\times 10^{12} \\cdot M/M_\\oplus}")}</div>
+      <div class="sci-formula__eq">${eq("\\tau_{\\text{core}} = \\frac{\\tau_{\\text{base}}}{\\max(0.01,\\; 1 - f_{\\text{tidal}})}, \\quad f_{\\text{tidal}} = \\frac{\\dot{E}_{\\text{planet}}}{44 \\times 10^{12} \\cdot (M/M_\\oplus) \\cdot A}")}</div>
       <p>When ${iq("f_{\\text{tidal}} \\ge 1")}, tidal heating dominates and the core stays liquid indefinitely.
       This can sustain a magnetic dynamo well past the planet&rsquo;s natural core solidification age.</p>
       ${cite("Peale, Cassen &amp; Reynolds (1979); Wisdom (2008)")}`,
@@ -729,6 +729,65 @@ function buildOrbitalMechanics() {
       ])}
       <p>When the planet spins faster than the moon orbits (${iq("\\Omega_p > n")}), the planet&rsquo;s tidal bulge leads the moon and transfers angular momentum outward &mdash; the orbit expands (Earth&ndash;Moon: +3.8 cm/yr). When ${iq("\\Omega_p < n")}, angular momentum is lost and the moon spirals inward (Phobos).</p>
       ${cite("Leconte et al. (2010); constant-time-lag tidal model")}`,
+    ),
+
+    formula(
+      "Tidal-Thermal Feedback",
+      `<p>Intense tidal heating partially melts a rocky interior, lowering rigidity ${iq("\\mu")} and quality factor ${iq("Q")}, which further amplifies dissipation &mdash; a positive feedback loop. This is the key mechanism behind Io&rsquo;s extreme volcanism in the Laplace resonance (Io&ndash;Europa&ndash;Ganymede 1:2:4).</p>
+      <p>For rocky moons (${iq("\\rho \\ge 3.2")} g/cm&sup3;) without a manual composition override, the model first computes tidal flux with cold (density-derived) material properties. A melt fraction ${iq("f")} is then derived from the ratio of flux to a critical threshold:</p>
+      <div class="sci-formula__eq">${eq("f = \\frac{1}{1 + (F_{\\text{crit}} / F_0)^3}, \\quad F_{\\text{crit}} = 0.02 \\;\\text{W/m}^2")}</div>
+      <p>Rigidity and Q are blended toward partially-molten values:</p>
+      <div class="sci-formula__eq">${eq("\\mu_{\\text{eff}} = \\exp\\!\\left[(1 - f)\\,\\ln\\mu_{\\text{cold}} + f\\,\\ln\\mu_{\\text{melt}}\\right], \\quad Q_{\\text{eff}} = (1 - f)\\,Q_{\\text{cold}} + f\\,Q_{\\text{melt}}")}</div>
+      ${vars([
+        ["F_0", "Initial tidal flux from cold material properties (W/m\u00B2)"],
+        ["F_{\\text{crit}}", "Critical flux for partial melting (0.02 W/m\u00B2)"],
+        ["\\mu_{\\text{melt}}", "10 GPa (partially molten rigidity)"],
+        ["Q_{\\text{melt}}", "10 (partially molten quality factor)"],
+      ])}
+      <p>Tidal heating is then recalculated with ${iq("\\mu_{\\text{eff}}")} and ${iq("Q_{\\text{eff}}")}. For Io: cold flux = 0.35 W/m&sup2; triggers full melting (${iq("f \\approx 1")}), giving ${iq("\\sim 10^{14}")} W &mdash; matching observed heating.</p>
+      ${cite("Moore (2003); Segatz et al. (1988) \u2014 tidal-convective equilibrium models")}`,
+    ),
+
+    formula(
+      "Moon Surface Temperature",
+      `<div class="sci-formula__eq">${eq("T_{\\text{eq}} = \\left(\\frac{L_\\star\\,(1 - a)}{16\\,\\pi\\,\\sigma\\,d^2}\\right)^{1/4}")}</div>
+      <p>Equilibrium temperature for an airless body (no greenhouse). The moon&rsquo;s distance from the star is approximated as the parent planet&rsquo;s semi-major axis.</p>
+      <div class="sci-formula__eq">${eq("T_{\\text{surf}} = \\left(T_{\\text{eq}}^4 + \\frac{F_{\\text{tidal}}}{\\sigma} + \\frac{F_{\\text{radio}}}{\\sigma}\\right)^{1/4}")}</div>
+      <p>Total surface temperature adds tidal heating flux and radiogenic heating flux as additional energy inputs. Radiogenic flux:</p>
+      <div class="sci-formula__eq">${eq("F_{\\text{radio}} = \\frac{44\\;\\text{TW} \\times (M_m / M_\\oplus) \\times A}{4\\,\\pi\\,R_m^2}")}</div>
+      ${vars([
+        ["L_\\star", "Star luminosity (W)"],
+        ["a", "Moon Bond albedo"],
+        ["d", "Star\u2013planet distance (metres)"],
+        [
+          "\\sigma",
+          "Stefan-Boltzmann constant (5.67\u00D710\u207B\u2078 W m\u207B\u00B2 K\u207B\u2074)",
+        ],
+        ["F_{\\text{tidal}}", "Tidal heating surface flux (W/m\u00B2)"],
+        ["A", "Radioisotope abundance (\u00D7 Earth)"],
+        ["M_m, R_m", "Moon mass (kg) and radius (metres)"],
+      ])}
+      <p>For Earth&rsquo;s Moon: ${iq("T_{\\text{eq}} \\approx 270")} K. Tidal and radiogenic contributions are negligible. For Io: tidal heating adds ~4 K to the mean surface temperature.</p>`,
+    ),
+
+    formula(
+      "Magnetospheric Radiation",
+      `<div class="sci-formula__eq">${eq("B(r) = B_{\\text{surf}} \\times \\left(\\frac{R_p}{r}\\right)^3")}</div>
+      <p>Dipole magnetic field at the moon&rsquo;s orbital distance. The radiation dose from trapped charged particles scales as ${iq("B^3")}:</p>
+      <div class="sci-formula__eq">${eq("D = 3.97 \\times 10^9 \\times B(r)^3 \\;\\text{rem/day}")}</div>
+      <p>where ${iq("B")} is in Gauss. Calibrated to Jupiter&ndash;Europa: ${iq("B \\approx 5.14 \\times 10^{-3}")} G &rarr; 540 rem/day.</p>
+      ${vars([
+        ["B_{\\text{surf}}", "Planet surface field (Gauss)"],
+        ["R_p", "Planet radius"],
+        ["r", "Moon semi-major axis"],
+      ])}
+      <p>Magnetopause standoff (Chapman&ndash;Ferraro scaling from Earth):</p>
+      <div class="sci-formula__eq">${eq("L_{\\text{mp}} = 10 \\times B_{\\oplus}^{1/3} \\times d_{\\text{AU}}^{1/3} \\;\\text{[planet radii]}")}</div>
+      <p>where ${iq("B_{\\oplus}")} is the planet&rsquo;s surface field in Earth units. Moons beyond the magnetopause receive zero trapped-particle radiation.</p>
+      <p>Magnetopause shadowing: energetic particle drift orbits that intersect the magnetopause are lost, depleting the outer radiation belts. Applied as a logistic attenuation factor:</p>
+      <div class="sci-formula__eq">${eq("D_{\\text{eff}} = \\frac{D}{1 + e^{25(L/L_{\\text{mp}} - 0.3)}} ")}</div>
+      <p>where ${iq("L/L_{\\text{mp}}")} is the moon&rsquo;s L-shell as a fraction of the magnetopause distance. The rolloff onset at 30% matches observed radiation depletion at Callisto (${iq("L/L_{\\text{mp}} \\approx 0.35")}).</p>
+      ${cite("Paranicas et al. (2009); Divine & Garrett (1983) — Jupiter radiation environment")}`,
     ),
   ].join("");
 }
@@ -963,6 +1022,95 @@ function buildAtmosphereColour() {
       <p><b>He</b> has no IR absorption and contributes ${iq("\\tau = 0")}. It only affects the mean molecular weight (0.004 kg/mol), atmospheric density, and scale height.</p>
       <p><b>Overlap constants are WorldSmith-derived.</b> The values ${iq("k_{\\text{SO}_2} = 8")} and ${iq("k_{\\text{NH}_3} = 20")} were calibrated so that Venus in Full mode (with NASA trace gases) matches the 737 K surface temperature. The physics basis is that pressure-broadened CO&#8322; wings extend beyond 15 &mu;m into the atmospheric window at high pressures, but the specific ${iq("k")} values are empirical fits.</p>
       ${cite("H&#8322;&ndash;N&#8322; CIA: Wordsworth &amp; Pierrehumbert (2013), Science 339. SO&#8322; and NH&#8323; coefficients and overlap constants: WorldSmith calibration.")}`,
+    ),
+
+    formula(
+      "Jeans Escape Parameter",
+      `<p>For each gas species with molar mass ${iq("M")} (kg/mol), the Jeans escape parameter ${iq("\\lambda")} determines whether the gas can be retained against thermal escape over geological time:</p>
+      <div class="sci-formula__eq">${eq("\\lambda = \\frac{v_{\\text{esc}}^2 \\cdot M}{2\\,R\\,T_{\\text{exo}}}")}</div>
+      ${vars([
+        ["v_{\\text{esc}}", "Surface escape velocity (m/s)"],
+        ["M", "Molar mass of gas species (kg/mol)"],
+        ["R", "Universal gas constant = 8.3145 J/(mol&middot;K)"],
+        ["T_{\\text{exo}}", "Exobase temperature (K)"],
+      ])}
+      ${dataTable(
+        ["\\u03BB range", "Status", "Meaning"],
+        [
+          ["\\u2265 6", "Retained", "Firmly held over geological time (> 4.5 Gyr)"],
+          ["3 &ndash; 6", "Marginal", "Slow escape; may be lost on Gyr timescales"],
+          ["< 3", "Lost", "Rapid thermal escape (lost within ~100 Myr)"],
+        ],
+      )}
+      <p>These are the base thresholds for standard Jeans thermal escape. H&#8322; and He use enhanced thresholds that account for non-thermal loss (see Non-Thermal Escape Enhancement below).</p>
+      <p>When the Atmospheric Escape toggle is enabled, gases classified as &ldquo;Lost&rdquo; are zeroed before computing greenhouse effect, partial pressures, and density.</p>
+      ${cite("Jeans (1925), The Dynamical Theory of Gases. Hunten (1973), J. Atmos. Sci. 30. Catling &amp; Zahnle (2009), Sci. Am. 300.")}`,
+    ),
+
+    formula(
+      "Exobase Temperature",
+      `<p>The exobase temperature is estimated from the equilibrium temperature (without greenhouse) plus XUV-driven thermospheric heating, countered by CO&#8322; radiative cooling and a pressure-dependent absorption term:</p>
+      <div class="sci-formula__eq">${eq("T_{\\text{exo}} = \\min\\!\\left(T_{\\text{eq}} \\cdot \\left(1 + \\frac{3.0\\;\\eta_{\\text{abs}}\\,\\sqrt{F_{\\text{XUV}} / F_0}}{1 + 100\\,P\\,f_{\\text{CO}_2}}\\right),\\; 5000\\right)")}</div>
+      <div class="sci-formula__eq">${eq("\\eta_{\\text{abs}} = \\frac{P}{P + P_{1/2}}")}</div>
+      ${vars([
+        ["T_{\\text{eq}}", "Equilibrium temperature without greenhouse (K)"],
+        ["\\eta_{\\text{abs}}", "XUV absorption efficiency (Beer-Lambert saturation)"],
+        ["P_{1/2}", "Half-absorption pressure = 0.06 atm"],
+        ["F_{\\text{XUV}}", "XUV flux at the planet's orbit (erg cm&#8315;&#178; s&#8315;&#185;)"],
+        ["F_0", "Present-day solar XUV at 1 AU = 4.64 erg cm&#8315;&#178; s&#8315;&#185;"],
+        ["P", "Surface pressure (atm)"],
+        ["f_{\\text{CO}_2}", "CO&#8322; volume fraction (0&ndash;1)"],
+      ])}
+      <p>Thin atmospheres (P &lt;&lt; 0.06 atm) lack sufficient column density to absorb the full XUV flux, so &eta;<sub>abs</sub> &rarr; 0 and the exobase stays near T<sub>eq</sub>. The 5000 K cap represents hydrodynamic blowoff.</p>
+      <p><b>Calibration:</b></p>
+      ${dataTable(
+        [
+          "Body",
+          "T<sub>eq</sub> (K)",
+          "F/F<sub>0</sub>",
+          "P (atm)",
+          "&eta;<sub>abs</sub>",
+          "T<sub>exo</sub> (K)",
+          "Observed",
+        ],
+        [
+          ["Earth", "254", "1.0", "1.0", "0.94", "~944", "700&ndash;1400"],
+          ["Venus", "229", "1.9", "92", "1.00", "~229", "250&ndash;300"],
+          ["Mars", "210", "0.43", "0.006", "0.09", "~233", "200&ndash;350"],
+          ["Pluto", "32", "0.0006", "10&#8315;&#8309;", "&lt;0.001", "~32", "~65&ndash;70"],
+        ],
+      )}
+      <p><b>WorldSmith-derived model.</b> The coefficient 3.0 is calibrated to reproduce Earth's ~1000 K exobase temperature. The CO&#8322; cooling term captures the efficient 15 &mu;m radiative cooling that suppresses thermospheric heating on Venus. The &eta;<sub>abs</sub> term corrects for thin atmospheres (Mars, Pluto) that let most XUV pass through unabsorbed.</p>`,
+    ),
+
+    formula(
+      "XUV Flux (Ribas et al. 2005)",
+      `<div class="sci-formula__eq">${eq("F_{\\text{XUV}} = F_0 \\cdot L_\\star \\cdot \\left(\\frac{t}{4.6\\,\\text{Gyr}}\\right)^{-1.23} \\cdot \\frac{1}{d^2}")}</div>
+      ${vars([
+        ["F_0", "Present-day solar XUV at 1 AU = 4.64 erg cm&#8315;&#178; s&#8315;&#185;"],
+        ["L_\\star", "Stellar luminosity (L&#9737;)"],
+        ["t", "Stellar age (Gyr)"],
+        ["d", "Orbital distance (AU)"],
+      ])}
+      <p>Young stars have stronger XUV emission, decaying as a power law with exponent &minus;1.23. This is the same formula used for gas giant atmospheric mass loss.</p>
+      ${cite("Ribas et al. (2005), ApJ 622, 680 &mdash; Evolution of the Solar Activity over Time.")}`,
+    ),
+
+    formula(
+      "Non-Thermal Escape Enhancement",
+      `<p>Pure Jeans (thermal) escape underestimates loss of light gases from warm terrestrial planets. Charge exchange with stellar-wind protons, polar wind escape through magnetic cusps, and ion pickup by the stellar wind all strip H&#8322; and He regardless of whether the body has a magnetic field.</p>
+      <p>Research shows magnetised and unmagnetised planets lose atmosphere at similar rates. These non-thermal channels effectively raise the retention threshold for the two lightest species:</p>
+      ${dataTable(
+        ["Gas", "Factor", "Lost", "Marginal", "Retained"],
+        [
+          ["H&#8322;", "&times;3.0", "&lambda; < 9", "9 &le; &lambda; < 18", "&lambda; &ge; 18"],
+          ["He", "&times;5.0", "&lambda; < 15", "15 &le; &lambda; < 30", "&lambda; &ge; 30"],
+          ["Others", "&times;1.0", "&lambda; < 3", "3 &le; &lambda; < 6", "&lambda; &ge; 6"],
+        ],
+      )}
+      <p>The enhancement only applies when T<sub>exo</sub> &gt; 100 K. Beyond ~10 AU, stellar wind flux is negligible and standard Jeans thermal escape dominates.</p>
+      <p><b>Calibration:</b> Earth H&#8322; (&lambda; &asymp; 16) is correctly classified as Marginal &mdash; present in trace amounts but slowly escaping via polar wind. Mars H&#8322; and He are Marginal. Mercury and Ceres lose all light gases.</p>
+      ${cite("Gunell et al. (2018), A&amp;A 614, L3 &mdash; Why an intrinsic magnetic field does not protect a planet against atmospheric escape. Gronoff et al. (2020), JGR Space Physics 125 &mdash; Atmospheric Escape Processes and Planetary Atmospheric Evolution.")}`,
     ),
   ].join("");
 }
@@ -1436,13 +1584,35 @@ function buildInteriorComposition() {
 
     formula(
       "Core Solidification Timescale",
-      `<div class="sci-formula__eq">${eq("\\tau = 2 + 12 \\cdot \\text{CMF} \\cdot \\sqrt{M_\\oplus} \\quad \\text{(Gyr)}")}</div>
+      `<div class="sci-formula__eq">${eq("\\tau = (2 + 12 \\cdot \\text{CMF} \\cdot \\sqrt{M_\\oplus}) \\;\\times\\; A \\quad \\text{(Gyr)}")}</div>
       <p>Empirical estimate of the time for a terrestrial core to fully solidify. A planet with age &gt; 1.5&tau; is assumed to have a solidified core and no active dynamo.</p>
+      <p>Higher radioisotope abundance keeps the core liquid longer by increasing internal heat production.</p>
       ${vars([
         ["\\tau", "Core solidification timescale (Gyr)"],
         ["\\text{CMF}", "Core mass fraction (0&ndash;1)"],
         ["M_\\oplus", "Planet mass (Earth masses)"],
+        ["A", "Radioisotope abundance (1.0 = Earth; see below)"],
       ])}`,
+    ),
+
+    formula(
+      "Radioisotope Abundance",
+      `<div class="sci-formula__eq">${eq("A = \\sum_i a_i \\cdot w_i")}</div>
+      <p>Effective radioisotope abundance relative to Earth. In <b>Simple</b> mode, ${iq("A")} is set directly by the slider.
+      In <b>Per-Isotope</b> mode, ${iq("A")} is the weighted sum of individual isotope abundances ${iq("a_i")} and their
+      present-day fractional contributions ${iq("w_i")} to Earth&rsquo;s radiogenic heat budget:</p>
+      ${dataTable(
+        ["Isotope", "Half-life (Gyr)", "Heat fraction <i>w<sub>i</sub></i>"],
+        [
+          ["U-238", "4.47", "0.39"],
+          ["U-235", "0.70", "0.04"],
+          ["Th-232", "14.05", "0.40"],
+          ["K-40", "1.25", "0.17"],
+        ],
+      )}
+      <p>When all four abundances equal 1.0, ${iq("A = 1.0")} (Earth).
+      ${iq("A")} scales the internal heat budget, volcanic decay rate, lithosphere cooling age, and core solidification timescale.</p>
+      <p>Range: 0.01&ndash;5.0 (per-isotope), 0.1&ndash;3.0 (simple slider).</p>`,
     ),
 
     formula(
@@ -1456,6 +1626,23 @@ function buildInteriorComposition() {
         ["172", "Effective molar mass of silicate mantle"],
       ])}
       ${cite("Schulze, J. et al. (2021), PSJ 2, 113")}`,
+    ),
+
+    formula(
+      "Body Classification",
+      `<p>Rocky bodies are classified by mass:</p>
+      ${dataTable(
+        ["Class", "Condition"],
+        [
+          ["Dwarf planet", "M &lt; 0.01 M&#8853;"],
+          ["Planet", "M &ge; 0.01 M&#8853;"],
+        ],
+      )}
+      <p>The threshold is 0.01 M&#8853;, between Mercury (0.055 M&#8853;) and
+      Eris (0.0028 M&#8853;). The physics model is identical for both classes
+      &mdash; mass&ndash;radius relation, composition, atmosphere, and tectonics
+      all apply unchanged. This is purely a labelling convention for worldbuilding.</p>
+      <p>Real examples: Ceres (0.00016 M&#8853;), Pluto (0.0022 M&#8853;), Eris (0.0028 M&#8853;).</p>`,
     ),
 
     formula(
@@ -1653,17 +1840,17 @@ function buildTectonicsScience() {
 
     formula(
       "Elastic Lithosphere Thickness",
-      `<div class="sci-formula__eq">${eq("T_e = 20\\,\\sqrt{t_{\\text{Gyr}}} \\cdot M_\\oplus^{0.3}\\;\\text{km}")}</div>
-      <p>Thickens with age (cooling) and mass (higher pressure). Tidal heating thins the lithosphere:
+      `<div class="sci-formula__eq">${eq("T_e = 20\\,\\sqrt{t_{\\text{Gyr}} / A} \\cdot M_\\oplus^{0.3}\\;\\text{km}")}</div>
+      <p>Thickens with age (cooling) and mass (higher pressure). Higher radioisotope abundance ${iq("A")} slows cooling, producing a thinner lithosphere at the same age. Tidal heating thins the lithosphere further:
       ${iq("T_e \\times \\max(0.2,\\; 1 - 0.3\\log_{10}(\\dot{E}_{\\text{tidal}}))")} when tidal heating &gt; 0.1&times; Earth.
       Clamped to [5, 300] km.</p>`,
     ),
 
     formula(
       "Volcanic Activity",
-      `<div class="sci-formula__eq">${eq("a = e^{-0.15\\,t} + 0.5\\,\\min(1,\\; \\dot{E}_{\\text{tidal}}/2)")}</div>
+      `<div class="sci-formula__eq">${eq("a = e^{-0.15\\,t\\,/\\,A} + 0.5\\,\\min(1,\\; \\dot{E}_{\\text{tidal}}/2)")}</div>
       <p>Activity relative to Earth (1.0). Decays exponentially with planetary age as internal heat
-      diminishes, but tidal heating can sustain volcanism indefinitely. Clamped to [0.01, 2.0].</p>`,
+      diminishes. Dividing by radioisotope abundance ${iq("A")} means a planet with 2&times; Earth&rsquo;s isotopes behaves as if it were half its actual thermal age. Tidal heating can sustain volcanism independently. Clamped to [0.01, 2.0].</p>`,
     ),
 
     formula(

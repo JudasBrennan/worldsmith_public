@@ -377,3 +377,200 @@ test("compositionOverride → Enceladus Subsurface ocean → matches ~1.6e10 W",
     `Enceladus heating ${m.tides.tidalHeatingW} should be <5e10`,
   );
 });
+
+// ── Initial rotation period ──────────────────────────────────────────
+
+test("default initial rotation → 12 hours (backwards-compat)", () => {
+  const m = calcMoonExact(BASE);
+  assert.equal(m.inputs.initialRotationPeriodHours, 12);
+});
+
+test("null initialRotationPeriodHours → uses 12h default", () => {
+  const explicit = calcMoonExact({
+    ...BASE,
+    moon: { ...EARTH_MOON, initialRotationPeriodHours: null },
+  });
+  const omitted = calcMoonExact(BASE);
+  assert.equal(explicit.inputs.initialRotationPeriodHours, omitted.inputs.initialRotationPeriodHours);
+  assert.equal(
+    explicit.tides.lockingTimesGyr.moonToPlanet,
+    omitted.tides.lockingTimesGyr.moonToPlanet,
+  );
+});
+
+test("slower initial rotation → shorter lock time", () => {
+  const base12h = calcMoonExact(BASE);
+  const slow100h = calcMoonExact({
+    ...BASE,
+    moon: { ...EARTH_MOON, initialRotationPeriodHours: 100 },
+  });
+  assert.ok(
+    slow100h.tides.lockingTimesGyr.moonToPlanet < base12h.tides.lockingTimesGyr.moonToPlanet,
+    "100h initial spin should lock faster than 12h",
+  );
+});
+
+test("faster initial rotation → longer lock time", () => {
+  const base12h = calcMoonExact(BASE);
+  const fast3h = calcMoonExact({
+    ...BASE,
+    moon: { ...EARTH_MOON, initialRotationPeriodHours: 3 },
+  });
+  assert.ok(
+    fast3h.tides.lockingTimesGyr.moonToPlanet > base12h.tides.lockingTimesGyr.moonToPlanet,
+    "3h initial spin should take longer to lock than 12h",
+  );
+});
+
+test("unlocked moon → estimated current rotation period", () => {
+  // Small icy moon far out in a young system → not yet locked
+  const m = calcMoonExact({
+    ...BASE,
+    starAgeGyr: 0.5,
+    moon: { ...EARTH_MOON, massMoon: 0.001, densityGcm3: 1.0, semiMajorAxisKm: 600000, initialRotationPeriodHours: 3 },
+  });
+  assert.equal(m.tides.moonLockedToPlanet, "No");
+  assert.ok(m.orbit.rotationPeriodDays !== null, "should have estimated rotation");
+  assert.ok(m.orbit.rotationPeriodDays > 0, "rotation should be positive");
+  // Estimated period should be longer than initial (3h = 0.125 days) due to despinning
+  assert.ok(
+    m.orbit.rotationPeriodDays >= 0.125,
+    `rotation ${m.orbit.rotationPeriodDays} should be >= initial 0.125 days`,
+  );
+});
+
+// ── Surface temperature ──
+
+test("temperature → Earth-Moon → equilibrium ~270 K", () => {
+  const m = calcMoonExact(BASE);
+  assert.ok(
+    m.temperature.equilibriumK > 250 && m.temperature.equilibriumK < 290,
+    `Expected ~270 K, got ${m.temperature.equilibriumK}`,
+  );
+});
+
+test("temperature → high eccentricity → surface temp >= equilibrium", () => {
+  const m = calcMoonExact({ ...BASE, moon: { ...EARTH_MOON, eccentricity: 0.3 } });
+  assert.ok(m.temperature.surfaceK >= m.temperature.equilibriumK);
+});
+
+test("temperature → radiogenic heating → positive for Earth-Moon", () => {
+  const m = calcMoonExact(BASE);
+  assert.ok(m.temperature.radiogenicWm2 > 0 && Number.isFinite(m.temperature.radiogenicWm2));
+});
+
+test("temperature → display strings → present and non-empty", () => {
+  const m = calcMoonExact(BASE);
+  assert.ok(m.display.equilibriumTemp.includes("K"));
+  assert.ok(m.display.surfaceTemp.includes("K"));
+  assert.ok(m.display.surfaceTemp.includes("\u00B0C"));
+});
+
+// ── Magnetospheric radiation ──
+
+test("radiation → Earth-Moon → outside magnetosphere → negligible", () => {
+  const m = calcMoonExact(BASE);
+  assert.ok(!m.radiation.insideMagnetosphere, "Moon should be outside Earth magnetosphere");
+  assert.strictEqual(m.radiation.magnetosphericRadRemDay, 0);
+  assert.strictEqual(m.radiation.magnetosphericLabel, "Negligible");
+});
+
+const JUPITER_OVERRIDE_MAG = {
+  inputs: {
+    massEarth: 317.83,
+    semiMajorAxisAu: 5.2,
+    eccentricity: 0,
+    rotationPeriodHours: 9.9,
+    cmfPct: 0,
+  },
+  derived: {
+    densityGcm3: 1.33,
+    radiusEarth: 11.21,
+    gravityG: 2.53,
+    surfaceFieldEarths: 4.28 / 0.31, // Jupiter ~13.8× Earth
+    magnetopauseRp: 75,
+    radioisotopeAbundance: 1,
+  },
+};
+
+test("radiation → Europa-like → ~540 rem/day (inside magnetosphere)", () => {
+  const m = calcMoonExact({
+    starMassMsol: 1,
+    starAgeGyr: 4.6,
+    moon: EUROPA_MOON,
+    parentOverride: JUPITER_OVERRIDE_MAG,
+  });
+  assert.ok(m.radiation.insideMagnetosphere, "Europa should be inside magnetosphere");
+  assert.ok(
+    m.radiation.magnetosphericRadRemDay > 100 && m.radiation.magnetosphericRadRemDay < 1000,
+    `Expected ~540, got ${m.radiation.magnetosphericRadRemDay}`,
+  );
+  assert.strictEqual(m.radiation.magnetosphericLabel, "Extreme");
+});
+
+test("radiation → moon beyond magnetopause → zero", () => {
+  const m = calcMoonExact({
+    ...BASE,
+    moon: { ...EARTH_MOON, semiMajorAxisKm: 5000000 },
+  });
+  assert.strictEqual(m.radiation.magnetosphericRadRemDay, 0);
+});
+
+test("radiation → no magnetic field → zero radiation", () => {
+  const m = calcMoonExact({
+    starMassMsol: 1,
+    starAgeGyr: 4.6,
+    moon: EUROPA_MOON,
+    parentOverride: {
+      ...JUPITER_OVERRIDE_MAG,
+      derived: { ...JUPITER_OVERRIDE_MAG.derived, surfaceFieldEarths: 0 },
+    },
+  });
+  assert.strictEqual(m.radiation.magnetosphericRadRemDay, 0);
+  assert.ok(!m.radiation.insideMagnetosphere);
+});
+
+// ── Tidal-thermal feedback ──
+
+test("tidalFeedback → Earth-Moon → no feedback (negligible heating)", () => {
+  const m = calcMoonExact(BASE);
+  assert.strictEqual(m.tides.tidalFeedbackActive, false);
+  assert.ok(m.tides.meltFraction < 0.001, `melt fraction ${m.tides.meltFraction} should be ~0`);
+});
+
+test("tidalFeedback → Io (no override) → feedback active → ~10^14 W", () => {
+  const m = calcMoonExact({
+    starMassMsol: 1,
+    starAgeGyr: 4.6,
+    moon: IO_MOON, // Rocky density, no override
+    parentOverride: JUPITER_OVERRIDE,
+  });
+  assert.ok(m.tides.tidalFeedbackActive, "Io should trigger tidal-thermal feedback");
+  assert.ok(m.tides.meltFraction > 0.95, `Io melt fraction ${m.tides.meltFraction} should be >95%`);
+  assert.ok(m.tides.qEffective < 12, `Effective Q ${m.tides.qEffective} should be near 10`);
+  // Heating should now match observed ~10^14 W
+  assert.ok(m.tides.tidalHeatingW > 5e13, `Io heating ${m.tides.tidalHeatingW} should be >5e13`);
+  assert.ok(m.tides.tidalHeatingW < 2e14, `Io heating ${m.tides.tidalHeatingW} should be <2e14`);
+  assert.ok(m.display.compositionClass.includes("partially molten"));
+});
+
+test("tidalFeedback → composition override → feedback skipped", () => {
+  const m = calcMoonExact({
+    starMassMsol: 1,
+    starAgeGyr: 4.6,
+    moon: { ...IO_MOON, compositionOverride: "Rocky" },
+    parentOverride: JUPITER_OVERRIDE,
+  });
+  assert.strictEqual(m.tides.tidalFeedbackActive, false);
+  assert.strictEqual(m.tides.compositionClass, "Rocky");
+});
+
+test("tidalFeedback → Europa (mixed rock/ice, ρ<3.2) → no feedback", () => {
+  const m = calcMoonExact({
+    starMassMsol: 1,
+    starAgeGyr: 4.6,
+    moon: EUROPA_MOON, // ρ = 3.013
+    parentOverride: JUPITER_OVERRIDE,
+  });
+  assert.strictEqual(m.tides.tidalFeedbackActive, false);
+});

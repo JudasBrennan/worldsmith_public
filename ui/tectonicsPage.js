@@ -235,6 +235,7 @@ function getPlanetTectonicContext(world) {
     h2oPct: 0,
     compositionClass: "Earth-like",
     tidalHeatingWm2: 0,
+    radioisotopeAbundance: 1,
   };
   const planet = getSelectedPlanet(world);
   if (!planet) return fallback;
@@ -258,6 +259,7 @@ function getPlanetTectonicContext(world) {
     h2oPct: model.inputs?.h2oPct || 0,
     compositionClass: model.derived.compositionClass || "Earth-like",
     tidalHeatingWm2: model.derived.planetTidalHeatingWm2 || 0,
+    radioisotopeAbundance: model.derived.radioisotopeAbundance ?? 1,
   };
 }
 
@@ -1131,6 +1133,7 @@ export function initTectonicsPage(containerEl) {
       h2oPct: pCtx.h2oPct,
       compositionClass: pCtx.compositionClass,
       tidalHeatingWm2: pCtx.tidalHeatingWm2,
+      radioisotopeAbundance: pCtx.radioisotopeAbundance,
     });
 
     const selIdx = Math.min(state.selectedRangeIdx, model.tectonics.mountainProfiles.length - 1);
@@ -1174,6 +1177,7 @@ export function initTectonicsPage(containerEl) {
       h2oPct: ctx.h2oPct,
       compositionClass: ctx.compositionClass,
       tidalHeatingWm2: ctx.tidalHeatingWm2,
+      radioisotopeAbundance: ctx.radioisotopeAbundance,
     });
 
     const selectedPlanet = getSelectedPlanet(w);

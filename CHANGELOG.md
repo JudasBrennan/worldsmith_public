@@ -2,6 +2,422 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.16.0 — 2026-03-02
+
+### Atmospheric Escape
+
+**New feature** (engine/planet.js)
+
+Added per-species atmospheric escape analysis for rocky planets and
+dwarf planets. For each of the 10 tracked gas species, the engine
+computes a Jeans escape parameter (λ) that determines whether the
+body can retain that gas against thermal escape over geological time.
+
+- Jeans escape parameter: λ = v_esc² · M / (2 R T_exo).
+- Exobase temperature model with XUV-driven thermospheric heating
+  (Ribas et al. 2005), CO₂ radiative cooling suppression, and
+  pressure-dependent XUV absorption efficiency (Beer-Lambert η_abs
+  term — thin atmospheres absorb less XUV).
+- Non-thermal escape enhancement for H₂ and He: charge exchange,
+  polar wind, and ion pickup raise the effective retention thresholds
+  (×3 for H₂, ×5 for He) on warm bodies (T_exo > 100 K), matching
+  observed loss from Earth, Mars, and Mercury.
+- Optional auto-strip toggle: when enabled, gases classified "Lost"
+  are zeroed before computing greenhouse, partial pressures, and
+  density. Original inputs are preserved.
+
+Each species returns `thermalStatus` (pure Jeans), `status`
+(effective, including non-thermal), `nonThermal` flag, and `lambda`.
+
+**Calibration against NASA Planetary Fact Sheet:**
+
+| Body    | T_eq  | T_exo | H₂ status           | He status           |
+| ------- | ----- | ----- | ------------------- | ------------------- |
+| Earth   | 254 K | 944 K | Marginal (non-thml) | Retained            |
+| Venus   | 229 K | 229 K | Retained            | Retained            |
+| Mars    | 210 K | 233 K | Marginal (non-thml) | Marginal (non-thml) |
+| Mercury | 439 K | 439 K | Lost                | Lost                |
+| Pluto   | 32 K  | 32 K  | Retained (barely)   | Retained            |
+| Ceres   | 166 K | 166 K | Lost                | Lost                |
+
+**UI** (ui/planetPage.js)
+
+- "Atmospheric Escape" toggle in the atmosphere input section
+  (viz-switch pattern, default off).
+- Per-species retention table in derived details output showing λ,
+  status, and "(non-thermal)" tag where applicable.
+- Tooltip documenting both thermal and non-thermal thresholds.
+
+**Science page** (ui/sciencePage.js)
+
+Four new formula sections: Jeans Escape Parameter, Exobase
+Temperature (with η_abs and calibration table), XUV Flux (Ribas
+et al. 2005), and Non-Thermal Escape Enhancement (Gunell et al.
+2018, Gronoff et al. 2020).
+
+**Tests** (tests/planet.test.js, tests/planet-nasa-validation.test.js)
+
+- 9 unit tests: Earth-like retention, Ceres mass loss, auto-strip
+  on/off, exobase Earth/Venus, Mars retention, cold-body non-thermal
+  inactive, no NaN at minimum mass.
+- 24 NASA validation tests: T_eq within 1–3% of NASA Fact Sheet for
+  Mercury/Venus/Earth/Mars/Ceres, T_exo range checks, escape velocity
+  cross-checks, per-species retention against observed atmospheres,
+  λ ordering sanity, orbital distance effects.
+
+### Dwarf Planets
+
+**New feature** (engine/planet.js, ui/planetPage.js)
+
+Added mass-based body classification for rocky planets. Bodies below
+0.01 M⊕ (~Mercury mass) are labelled "Dwarf planet"; at or above that
+threshold they remain "Planet". The physics model is identical for
+both classes — this is purely a labelling change.
+
+- Lowered the planet mass floor from 0.01 to 0.0001 M⊕, covering
+  Ceres (0.00016 M⊕) through sub-Mercury bodies.
+- New `bodyClass()` function classifies by mass threshold.
+- Body class appears as a KPI card in the planet output panel, with
+  a tooltip explaining the threshold.
+- Planet selector shows `[D]` prefix for dwarf planets (alongside
+  `[R]` for rocky and `[G]` for gas giants).
+- "Pluto-ish Preset" button pre-fills Pluto-like parameters
+  (0.0022 M⊕, 30% ice, 122.5° axial tilt, trace CH₄ atmosphere).
+
+**Science page** (ui/sciencePage.js)
+
+Added a "Body Classification" section documenting the mass threshold
+and listing real-world examples.
+
+**Sol preset** (ui/solPreset.js)
+
+Added Ceres, Pluto, and Charon (Pluto's moon) to the Solar System
+preset. The preset now uses Manual orbit placement mode so all
+bodies render at their real semi-major axis values.
+
+| Body   | Mass (M⊕) | Class        | Semi-major axis (AU) |
+| ------ | --------- | ------------ | -------------------- |
+| Ceres  | 0.00016   | Dwarf planet | 2.77                 |
+| Pluto  | 0.0022    | Dwarf planet | 39.48                |
+| Charon | —         | Moon (Pluto) | 19 591 km            |
+
+**Visualiser** (ui/visualizerPage.js)
+
+Fixed planet rendering filter to include unslotted planets. Previously
+only planets with an assigned orbital slot appeared in the system
+visualiser; planets without a slot now render at their
+`semiMajorAxisAu` position, matching how gas giants already worked.
+
+**Tests** (tests/planet.test.js)
+
+- `bodyClass → Earth-like → Planet`
+- `bodyClass → Pluto mass → Dwarf planet`
+- `bodyClass → Mercury mass (0.055) → Planet`
+- `bodyClass → Mars mass (0.107) → Planet`
+- `radiusEarth → Pluto mass → ~0.19 R⊕`
+- `radiusEarth → Ceres mass → ~0.074 R⊕`
+- `no NaN at minimum mass (0.0001 M⊕)`
+
+### Guided / Manual Orbit Placement Mode
+
+**New feature** (ui/store.js, ui/systemPage.js)
+
+Added an orbit placement mode toggle (Guided / Manual) to the System
+tab. Guided mode auto-assigns orbital slots using spacing heuristics;
+Manual mode lets users place planets at arbitrary semi-major axes
+without auto-spacing constraints.
+
+**Store** (ui/store.js)
+
+Schema version bumped from 51 to 52. New field:
+`world.system.orbitMode` (default `"guided"`).
+
+### Derived Details Section Headings
+
+**UI improvement** (ui/planetPage.js, ui/moonPage.js)
+
+Broke the monolithic Derived Details output block into labelled
+section headings (Physical, Orbital, Tides, etc.) for easier
+scanning.
+
+### Canvas Loading Performance Optimisations
+
+**Problem**: Pages with large celestial body canvases (system poster,
+visualiser, planet previews) took ~5 seconds to load due to
+synchronous procedural texture generation on the main thread.
+
+**Five optimisations implemented**:
+
+1. **Three.js modulepreload** (index.html) — `<link rel="modulepreload">`
+   starts downloading Three.js during HTML head parse instead of
+   waiting for the dynamic `import()`. Eliminates 1–2 s of CDN
+   latency.
+
+2. **Larger in-memory caches** (ui/celestialVisualPreview.js,
+   ui/celestialComposer.js) — `CELESTIAL_TEXTURE_CACHE_MAX` 16 → 64,
+   `LAYER_FIELD_CACHE_MAX` 14 → 32. Fits a full solar system without
+   evictions (~30 MB total).
+
+3. **IndexedDB texture persistence** (ui/textureCache.js) — New
+   standalone module stores RGBA texture buffers across browser
+   sessions. LRU eviction at 200 entries, automatic pipeline-version
+   invalidation, graceful degradation when IndexedDB is unavailable.
+
+4. **Batch pre-warming** (ui/celestialVisualPreview.js,
+   ui/systemPosterNativeThree.js) — `preWarmTextures()` generates all
+   body textures in parallel via Web Worker. System poster overlaps
+   texture generation with layout and zone rendering.
+
+5. **Progressive LOD** (ui/visualizerPage.js) — Shows a tiny 64 px
+   placeholder instantly (~10 ms) then upgrades to full quality
+   asynchronously via worker. Five-step fallback chain: memory cache
+   → IndexedDB → tiny placeholder → worker → local generation.
+
+Expected improvement: ~5 s → ~1.5 s (first visit), <1 s (subsequent
+visits with warm IndexedDB cache).
+
+### Moon Initial Rotation Period
+
+**New input** (engine/moon.js, ui/moonPage.js)
+
+Added configurable initial rotation period for moons. Previously
+hardcoded at 12 hours (WorldSmith 8 spreadsheet assumption), now
+exposed as an optional slider (2–1000 hours) under a new "Dynamics"
+section on the Moon page.
+
+The initial spin rate feeds directly into the tidal locking timescale:
+faster initial spin means more angular momentum to dissipate, resulting
+in a longer time to reach tidal lock. Default remains 12 hours for
+backwards compatibility — existing worlds are unaffected.
+
+**Unlocked moon rotation estimate** (engine/moon.js)
+
+Moons that are not yet tidally locked now show an estimated current
+rotation period instead of "Not tidally locked". Uses an exponential
+despinning model: `omega(t) = n + (omega_0 - n) * exp(-t/tau)`, where
+tau is calibrated so the moon reaches synchronous rotation at the
+computed lock time. Display distinguishes "(locked)" vs "(est.)".
+
+**Store** (ui/store.js)
+
+Schema version bumped from 52 to 53. New field:
+`initialRotationPeriodHours` (default `null` → engine uses 12 h).
+
+**Tests** (tests/moon.test.js)
+
+- 5 new tests: backwards compatibility (default 12 h), null handling,
+  slower spin locks faster, faster spin locks slower, unlocked moon
+  shows estimated rotation period
+
+### Radioisotope Abundance Override
+
+**New engine feature** (engine/planet.js, engine/tectonics.js)
+
+Added configurable radioisotope abundance for rocky planets. The
+parameter scales four core geophysics formulas:
+
+- Volcanic activity: `exp(-0.15 * age / A)` — higher abundance
+  sustains volcanism longer
+- Elastic lithosphere: `sqrt(age / A)` — more heat thins the
+  lithosphere
+- Internal heat budget: `44 TW × mass × A` — direct linear scaling
+- Core solidification: `τ_base × A` — extends dynamo lifetime
+
+Default is 1.0× (Earth). Range: 0.1–3.0× in simple mode.
+
+**Per-isotope mode** (engine/planet.js)
+
+Added advanced per-isotope mode with individual sliders for U-238
+(39% of Earth heat, t½ = 4.47 Gyr), U-235 (4%, 0.70 Gyr), Th-232
+(40%, 14.05 Gyr), and K-40 (17%, 1.25 Gyr). The effective abundance
+is the weighted sum: `A = Σ(aᵢ × wᵢ)`. All isotopes at 1.0 gives
+A = 1.0. Per-isotope range: 0.0–5.0×.
+
+New constant: `ISOTOPE_HEAT_FRACTIONS` (`{ u238: 0.39, u235: 0.04,
+th232: 0.40, k40: 0.17 }`).
+
+**UI** (ui/planetPage.js)
+
+New "Internal Heat" section with isotope detail toggle (Simple /
+Per-Isotope). Simple mode shows a single Radioisotope Abundance
+slider. Per-Isotope mode reveals four individual isotope sliders
+with a computed "Effective abundance" readout. Added tooltips with
+half-lives and heat contributions for each isotope.
+
+**Store** (ui/store.js)
+
+Schema version bumped from 53 to 55. New fields:
+`radioisotopeAbundance` (v54, default `null` → 1.0),
+`radioisotopeMode` (v55, default `"simple"`),
+`u238Abundance`, `u235Abundance`, `th232Abundance`, `k40Abundance`
+(v55, default `null` → 1.0 each).
+
+**Science page** (ui/sciencePage.js)
+
+Updated Volcanic Activity, Elastic Lithosphere Thickness, Core
+Solidification Timescale, and Moon Tidal Heating formulas to include
+radioisotope abundance parameter. Added new "Radioisotope Abundance"
+formula section documenting the weighted-sum computation and
+per-isotope heat fractions.
+
+**Tests** (tests/planet.test.js, tests/tectonics.test.js)
+
+- 7 new tectonics tests: abundance scaling for volcanic activity
+  (increase, decrease, default), lithosphere thickness (thin, thick,
+  default), calcTectonics integration
+- 9 new planet tests: null default, internal heat scaling, dynamo
+  extension, display format, advanced mode all-1x, all-2x equals
+  simple, selective Th-232 boost, zero floors at 0.01, simple mode
+  ignores per-isotope fields
+
+### Pill Toggle UI Unification
+
+**UI improvement** (ui/planetPage.js, ui/starPage.js)
+
+Replaced four `viz-switch` (iOS-style checkbox) toggles with
+`physics-duo-toggle` (segmented pill radio) controls, matching the
+debris disk page style:
+
+- Planet page: Vegetation (Auto / Manual), Internal Heat isotope
+  detail (Simple / Per-Isotope)
+- Star page: Stellar Evolution (Off / On), Physics Mode (Simple /
+  Advanced)
+
+Added bold section headers ("Stellar Evolution", "Physics Mode")
+above the star page pill toggles with new tooltip entries, matching
+the planet page pattern.
+
+### Moon Surface Temperature
+
+**New derived output** (engine/moon.js, ui/moonPage.js)
+
+Added equilibrium and surface temperature calculations for moons.
+Equilibrium temperature uses the Stefan-Boltzmann formula for an
+airless body: `T_eq = (L★(1−a) / 16πσd²)^0.25`. Surface temperature
+adds tidal heating and radiogenic heating flux: `σT⁴ = F_star +
+F_tidal + F_radio`.
+
+Radiogenic heat flux scales from Earth's 44 TW by moon mass and
+radioisotope abundance: `F_radio = 44 TW × (M/M⊕) × A / 4πR²`.
+
+Two new output rows: Equilibrium Temp and Surface Temp (displayed in
+both K and °C).
+
+**Validation** — Earth's Moon: 270 K (exact). Titan: 84 K vs 85 K
+observed (−1.2%). Triton: 36 K vs 38 K (−5.3%).
+
+### Magnetospheric Radiation
+
+**New derived output** (engine/moon.js, ui/moonPage.js)
+
+Added charged-particle radiation dose from the host planet's
+magnetosphere. Dipole field at the moon's orbit:
+`B(r) = B_surface × (R_planet / r)³`. Radiation dose scales as B³,
+calibrated to Jupiter-Europa (~540 rem/day):
+`D = 3.97×10⁹ × B³ rem/day`.
+
+Magnetopause standoff uses Chapman-Ferraro scaling for rocky planets,
+or pre-computed values from the gas giant engine. Moons beyond the
+magnetopause receive zero trapped-particle radiation.
+
+**Magnetopause shadowing** — energetic particle drift orbits that
+intersect the magnetopause deplete the outer radiation belts. Applied
+as a logistic attenuation: `D_eff = D / (1 + exp(25(L/L_mp − 0.3)))`.
+Rolloff onset at 30% of magnetopause distance, calibrated to Callisto.
+
+| Moon     | Model         | Observed | Ratio |
+| -------- | ------------- | -------- | ----- |
+| Europa   | 538 rem/day   | 540      | 1.00× |
+| Ganymede | 7.5 rem/day   | 8        | 0.94× |
+| Callisto | 0.011 rem/day | 0.01     | 1.09× |
+
+Labels: Negligible / Low / Moderate / High / Very High / Extreme.
+
+**Gas giant magnetic field passthrough** (ui/moonPage.js)
+
+Extended `buildParentOverride` to include `surfaceFieldEarths`,
+`magnetopauseRp`, and `radioisotopeAbundance` from the gas giant
+engine, enabling radiation calculations for gas giant moons.
+
+### Tidal-Thermal Feedback
+
+**New engine feature** (engine/moon.js)
+
+Added automatic tidal-thermal feedback for rocky moons (ρ ≥ 3.2
+g/cm³). When tidal flux exceeds a critical threshold (0.02 W/m²),
+the model recognises that the interior is partially molten and
+automatically lowers rigidity μ and quality factor Q via a smooth
+logistic blend: `f = 1 / (1 + (F_crit/F₀)³)`.
+
+This models the positive feedback loop behind Io's extreme volcanism
+in the Laplace resonance — intense tidal heating melts the interior,
+which lowers Q, which further amplifies dissipation.
+
+| Moon      | Before             | After              | Observed   |
+| --------- | ------------------ | ------------------ | ---------- |
+| Io        | 1.5×10¹³ W (0.15×) | 1.0×10¹⁴ W (1.01×) | 10¹⁴ W     |
+| Moon      | 2.7×10⁹ W          | 2.7×10⁹ W          | —          |
+| Enceladus | 1.8×10¹⁰ W         | 1.8×10¹⁰ W         | 1.6×10¹⁰ W |
+
+Guard rails: only fires for rocky densities without a manual
+composition override. Icy moons, manually overridden compositions,
+and cold moons are unaffected.
+
+**Science page** (ui/sciencePage.js)
+
+Added three new formula sections: Moon Surface Temperature,
+Tidal-Thermal Feedback, and Magnetospheric Radiation.
+
+**Tests** (tests/moon.test.js)
+
+- 8 new tests for temperature, radiogenic heating, display strings,
+  magnetospheric radiation (Europa-like, beyond magnetopause, no
+  field), and 4 tests for tidal-thermal feedback (no feedback for
+  cold moons, Io auto-melting, override skips feedback, Europa
+  excluded by density)
+
+**References**
+
+- Moore, W. B. (2003), "Tidal heating and convection on Io",
+  J. Geophys. Res. 108, 5096
+- Segatz, M. et al. (1988), "Tidal dissipation, surface heat flow,
+  and figure of viscoelastic models of Io", Icarus 75, 187–206
+- Paranicas, C. et al. (2009), "Europa's radiation environment",
+  Europa (U. Arizona Press), 529–544
+- Divine, N. & Garrett, H. B. (1983), "Charged particle
+  distributions in Jupiter's magnetosphere", J. Geophys. Res. 88,
+  6889–6903
+
+### Local Cluster Limits
+
+**Improved limits** (engine/localCluster.js, ui/localClusterPage.js)
+
+Tightened local cluster input ranges to scientifically reasonable
+values and raised the system rendering cap from 99 to 750:
+
+| Parameter         | Before   | After    |
+| ----------------- | -------- | -------- |
+| Max radius        | 500 ly   | 25 ly    |
+| Max density       | 1.0 /ly³ | 0.1 /ly³ |
+| System render cap | 99       | 750      |
+
+The old 500 ly radius produced millions of unrenderable systems at
+any realistic density. The new 25 ly max covers the full local
+neighbourhood at default density (~193 systems) with room to spare.
+The density cap of 0.1 /ly³ covers all habitable environments up to
+young open clusters; the old 1.0 /ly³ was globular-core territory
+where isolated planetary systems are dynamically unstable.
+
+The 750-system cap means most configurations within the new ranges
+display all generated systems. At 25 ly / 0.1 /ly³ (~4,800 systems)
+the cap limits the rendered subset; the "systems omitted" counter
+already reports the difference.
+
+**Tests** (tests/localCluster.test.js)
+
+- Updated `systemsOmitted` test to use the new 751-total threshold
+  (density 0.1, radius 25)
+
 ## 1.15.0 — 2026-03-02
 
 ### Tectonics Phase 2 — Science Enhancements

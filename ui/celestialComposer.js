@@ -50,7 +50,7 @@ function rgba(hex, alpha = 1, fallback = "#bdb8aa") {
 }
 
 const LAYER_FIELD_CACHE = new Map();
-const LAYER_FIELD_CACHE_MAX = 14;
+const LAYER_FIELD_CACHE_MAX = 32;
 
 function lerp(a, b, t) {
   return a + (b - a) * clamp(Number(t), 0, 1);

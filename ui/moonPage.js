@@ -73,7 +73,7 @@ const TIP_LABEL = {
   "Orbital Period (synodic)":
     "The time between successive occurrences of the same lunar phase (e.g. full moon to full moon).\n\nThis value represents a lunar month on the planet.",
   "Rotation Period":
-    'The time it takes the moon to complete one full rotation about its axis.\n\nIf this shows "Not tidally locked", the moon is not tidally locked to the planet, so this model does not calculate a fixed rotation period.',
+    "The time it takes the moon to complete one full rotation about its axis.\n\nIf tidally locked, the rotation period equals the synodic orbital period (the moon always shows the same face to the planet).\n\nIf not yet locked, an estimated current period is shown based on exponential tidal despinning from the initial rotation period.",
   "Total Tidal Force":
     "Total tidal force exerted on the planet by the moon and the star, relative to the tidal forces exerted on Earth.\n\n<1 = tides less extreme than Earth.\n~1 = tides comparable to Earth.\n>1 = tides more extreme than Earth.",
   "Moon Contribution":
@@ -98,8 +98,11 @@ const TIP_LABEL = {
     "Inferred from bulk density as a proxy for rock/ice fraction. Controls the material rigidity (\u03BC) and tidal quality factor (Q) used in tidal lock and heating calculations.\n\nDensity alone is often enough for cold, geologically quiet moons. But moons with extreme internal states \u2014 active volcanism or subsurface oceans \u2014 have much softer interiors than their bulk density implies. Use the Composition Override dropdown to select a special class when your moon has one of these conditions.\n\nIron-rich (>5 g/cm\u00B3): Dense metallic core, like Mercury.\nRocky (3.2\u20135 g/cm\u00B3): Solid silicate mantle. Earth\u2019s Moon, Io (cold).\nMixed rock/ice (2\u20133.2 g/cm\u00B3): Roughly equal rock and ice. Europa.\nIcy (1\u20132 g/cm\u00B3): Mostly water ice with some rock. Ganymede, Titan.\nVery icy (<1 g/cm\u00B3): Dominated by volatile ices. Cometary bodies.\n\nSpecial overrides (see Composition Override tooltip):\nSubsurface ocean: Liquid layer decouples the ice shell (\u03BC = 0.3 GPa, Q = 2).\nPartially molten: Magma interior from extreme tidal heating (\u03BC = 10 GPa, Q = 10).",
   "Composition Override":
     "Override the density-derived composition class with a specific interior state. Density is a good proxy for cold, solid moons, but it underestimates tidal heating by 10\u2013100\u00D7 for moons with extreme interiors.\n\nAuto (from density): Default. Best for geologically quiet moons.\n\nVery icy: Cometary or outer solar system bodies dominated by volatile ices. Low density (<1 g/cm\u00B3).\n\nIcy: Mostly water ice with some rock. Ganymede, Callisto, Rhea. Density 1\u20132 g/cm\u00B3.\n\nSubsurface ocean: A global liquid ocean beneath a thin ice shell dramatically softens the body and amplifies tidal dissipation. Use for moons showing signs of geological activity despite low density (cryovolcanism, plumes, young surface). Calibrated to Enceladus: predicted heating matches Cassini observations within 10%. WARNING: over-predicts for large moons like Titan (\u223C37\u00D7 too high) \u2014 use Icy for those.\n\nMixed rock/ice: Roughly half rock, half ice. Europa\u2019s density (3.0 g/cm\u00B3) places it here. Good default for moons of giant planets with intermediate density.\n\nRocky: Solid silicate mantle, like Earth\u2019s Moon (3.34 g/cm\u00B3). Appropriate for tidally quiet rocky moons.\n\nPartially molten: Extreme tidal heating has melted the interior, creating a magma ocean or mushy mantle. This makes the body much softer than solid rock, dramatically increasing dissipation. Use for moons in strong orbital resonances with high volcanic activity. Calibrated to Io: predicted heating matches observed 10\u00B9\u2074 W within 1%.\n\nIron-rich: Dense metallic body (>5 g/cm\u00B3). Very stiff, dissipates little energy. Mercury-like composition.",
+  Dynamics: "Optional inputs that affect tidal evolution timescales.",
+  "Initial Rotation Period":
+    "Primordial spin period of the moon before tidal braking. Faster spin (shorter period) means more angular momentum to dissipate and a longer time to reach tidal lock.\n\nDefault: 12 hours (model assumption from accretion dynamics). Range varies widely \u2014 fast-spinning bodies can be as short as 2\u20133 hours (near breakup), while captured moons may spin much slower.\n\nThis value feeds directly into the tidal locking timescale calculation.",
   "Tidal Heating":
-    "Surface heat flux from tidal deformation of the moon by its parent body. Uses the Wisdom (2008) formula with higher-order eccentricity corrections that remain accurate up to e \u2248 0.8.\n\nHigher eccentricity and closer orbits produce more heating. Io: ~0.3\u20132 W/m\u00B2 (highest in the Solar System). Earth's geothermal flux: 0.09 W/m\u00B2.",
+    "Surface heat flux from tidal deformation of the moon by its parent body. Uses the Wisdom (2008) formula with higher-order eccentricity corrections that remain accurate up to e \u2248 0.8.\n\nHigher eccentricity and closer orbits produce more heating. Io: ~0.3\u20132 W/m\u00B2 (highest in the Solar System). Earth's geothermal flux: 0.09 W/m\u00B2.\n\nTidal-thermal feedback: for rocky moons (\u03C1 \u2265 3.2), when tidal flux exceeds ~0.02 W/m\u00B2 the model automatically lowers Q and \u03BC toward partially-molten values, modelling the positive feedback loop that drives Io-like volcanism in orbital resonances.",
   "Tidal Heating (\u00D7 Earth)":
     "Tidal surface heat flux normalised to Earth's mean geothermal heat flux (0.09 W/m\u00B2).\n\n<1 = less than Earth's internal heat. >1 = more. Io \u2248 4\u00D7 Earth (equilibrium model).",
   "Orbital Recession":
@@ -107,6 +110,26 @@ const TIP_LABEL = {
   "Orbital Fate":
     "Linear extrapolation of the current recession rate to estimate when the moon reaches the Roche limit (tidal disruption) or escapes the Hill sphere.\n\nThis is a rough estimate \u2014 real orbital evolution is non-linear and depends on changing tidal parameters over geological time.",
   Limits: "Derived orbital limits and lock times for the selected moon.",
+  "Equilibrium Temp":
+    "Temperature from stellar radiation alone, assuming no atmosphere (airless body)." +
+    "\n\nUses the Stefan-Boltzmann equilibrium: T = (L(1\u2212a) / 16\u03C0\u03C3d\u00B2)\u00BC, " +
+    "where a is Bond albedo and d is star distance.",
+  "Surface Temp":
+    "Estimated mean surface temperature including stellar radiation, tidal heating, " +
+    "and radiogenic heating." +
+    "\n\nFor airless bodies, this equals the radiative equilibrium. Tidal heating " +
+    "dominates for close-orbit moons like Io; radiogenic heating matters for " +
+    "cold outer-system moons.",
+  "Radiogenic Heating":
+    "Internal heat from radioactive decay (U, Th, K) on the moon\u2019s surface." +
+    "\n\nScales from Earth\u2019s 44 TW by moon mass and the system\u2019s radioisotope " +
+    "abundance setting. Typically small compared to tidal heating.",
+  "Magnetospheric Radiation":
+    "Charged-particle radiation dose from the host planet\u2019s magnetosphere." +
+    "\n\nScales as B\u00B3 at the moon\u2019s orbit (dipole field), calibrated to " +
+    "Jupiter\u2013Europa (~540 rem/day). Zero if the moon orbits outside the " +
+    "magnetopause. Upper estimate \u2014 actual doses may be lower due to ring " +
+    "absorption and loss processes.",
 };
 
 export function initMoonPage(mountEl) {
@@ -214,6 +237,10 @@ export function initMoonPage(mountEl) {
             </select>
           </div>
 
+          <div style="height:8px"></div>
+          <div class="label">Dynamics ${tipIcon(TIP_LABEL["Dynamics"] || "")}</div>
+          ${numWithSlider("initRot", "Initial Rotation Period", "hours", "", 2, 1000, 0.1, "Initial Rotation Period")}
+
           <div class="button-row">
             <button class="primary" id="btn-apply">Apply</button>
             <button id="btn-default">Reset to Defaults</button>
@@ -263,6 +290,7 @@ export function initMoonPage(mountEl) {
   const densityEl = wrap.querySelector("#density");
   const albedoEl = wrap.querySelector("#albedo");
   const compOverrideEl = wrap.querySelector("#compOverride");
+  const initRotEl = wrap.querySelector("#initRot");
 
   const kpisEl = wrap.querySelector("#kpis");
   const limitsEl = wrap.querySelector("#limits");
@@ -274,6 +302,7 @@ export function initMoonPage(mountEl) {
   bindPair("m", mEl, 0.001, 1000, 0.001, "auto");
   bindPair("density", densityEl, 0.1, 20, 0.01, "auto");
   bindPair("albedo", albedoEl, 0, 0.95, 0.001, "auto");
+  bindPair("initRot", initRotEl, 2, 1000, 0.1, "auto");
 
   function bindPair(id, numberEl, min, max, step, mode) {
     const sliderEl = wrap.querySelector(`#${id}_slider`);
@@ -332,6 +361,7 @@ export function initMoonPage(mountEl) {
       densityGcm3: Number(densityEl.value),
       albedo: Number(albedoEl.value),
       compositionOverride: compOverrideEl.value || null,
+      initialRotationPeriodHours: Number(initRotEl.value) || null,
     };
   }
 
@@ -416,6 +446,9 @@ export function initMoonPage(mountEl) {
         densityGcm3: ggModel.physical.densityGcm3,
         radiusEarth: ggModel.physical.radiusEarth,
         gravityG: ggModel.physical.gravityG,
+        surfaceFieldEarths: ggModel.magnetic.surfaceFieldGauss / 0.31,
+        magnetopauseRp: ggModel.magnetic.magnetopauseRp,
+        radioisotopeAbundance: 1,
       },
     };
   }
@@ -472,6 +505,8 @@ export function initMoonPage(mountEl) {
       { label: "Gravity", value: model.display.gravity, meta: "" },
       { label: "Escape Velocity", value: model.display.esc, meta: "" },
       { label: "Albedo", value: fmt(state.moon.albedo, 3), meta: "" },
+      { label: "Equilibrium Temp", value: model.display.equilibriumTemp, meta: "" },
+      { label: "Surface Temp", value: model.display.surfaceTemp, meta: "" },
 
       // MAJOR MOON ORBITAL CHARACTERISTICS
       { label: "Moon Zone (Inner)", value: model.display.zoneInner, meta: "" },
@@ -482,6 +517,7 @@ export function initMoonPage(mountEl) {
       { label: "Orbital Period (sidereal)", value: model.display.sidereal, meta: "" },
       { label: "Orbital Period (synodic)", value: model.display.synodic, meta: "" },
       { label: "Rotation Period", value: model.display.rot, meta: "" },
+      { label: "Initial Rotation Period", value: model.display.initialRot, meta: "" },
 
       // TIDES CALCULATOR
       { label: "Total Tidal Force", value: model.display.tides, meta: "" },
@@ -494,11 +530,17 @@ export function initMoonPage(mountEl) {
         meta: model.display.tidalHeatingTotal,
       },
       { label: "Tidal Heating (\u00D7 Earth)", value: model.display.tidalHeatingXEarth, meta: "" },
+      { label: "Radiogenic Heating", value: model.display.radiogenicHeating, meta: "" },
       { label: "Orbital Recession", value: model.display.recession, meta: "" },
       { label: "Orbital Fate", value: model.display.orbitalFate, meta: "" },
       { label: "Moon locked to Planet?", value: model.display.moonLocked, meta: "" },
       { label: "Planet locked to Moon?", value: model.display.planetLockedMoon, meta: "" },
       { label: "Planet locked to Star?", value: model.display.planetLockedStar, meta: "" },
+      {
+        label: "Magnetospheric Radiation",
+        value: model.display.magnetosphericRad,
+        meta: model.display.magnetosphericLabel,
+      },
     ];
 
     const prevMoonCanvas = kpisEl.querySelector(".moon-preview-canvas");
@@ -595,8 +637,9 @@ export function initMoonPage(mountEl) {
     densityEl.value = state.moon.densityGcm3;
     albedoEl.value = state.moon.albedo;
     compOverrideEl.value = state.moon.compositionOverride || "";
+    initRotEl.value = state.moon.initialRotationPeriodHours || 12;
 
-    ["a", "e", "inc", "m", "density", "albedo"].forEach((id) => {
+    ["a", "e", "inc", "m", "density", "albedo", "initRot"].forEach((id) => {
       wrap.querySelector(`#${id}`).dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
@@ -707,6 +750,7 @@ export function initMoonPage(mountEl) {
       massMoon: 1.0,
       densityGcm3: 3.34,
       albedo: 0.11,
+      initialRotationPeriodHours: null,
     };
     const wNow = loadWorld();
     updateMoon(wNow.moons.selectedId, {
