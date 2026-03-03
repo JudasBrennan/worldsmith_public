@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.16.0</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.16.1</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -68,7 +68,12 @@ export function initAboutPage(mountEl) {
         </ul>
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
-        <p class="hint"><i>Note: version 1.5.0 was a duplicate release of 1.4.0 and has been removed. Numbering continues from 1.4.0.</i></p>
+        <p><b>Version 1.16.1</b> (from 1.16.0)</p>
+        <ul>
+          <li><b>Internal Heat UI</b> &mdash; Added the missing Internal Heat input section to the planet page with Simple (single slider) and Per-Isotope (U-238, U-235, Th-232, K-40) modes.</li>
+          <li><b>Toggle Consistency</b> &mdash; Atmospheric Escape and Vegetation toggles converted to pill-style controls matching the rest of the app.</li>
+          <li><b>Cluster Visualiser Export</b> &mdash; Fixed PNG and GIF exports producing blank images in cluster mode.</li>
+        </ul>
 
         <p><b>Version 1.16.0</b> (from 1.15.0)</p>
         <ul>

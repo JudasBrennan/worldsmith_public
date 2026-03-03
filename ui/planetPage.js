@@ -1,4 +1,4 @@
-import { calcPlanetExact } from "../engine/planet.js";
+import { calcPlanetExact, ISOTOPE_HEAT_FRACTIONS } from "../engine/planet.js";
 import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";
 import { calcGasGiant } from "../engine/gasGiant.js";
@@ -114,6 +114,18 @@ const TIP_LABEL = {
     "Atmospheric escape analysis combining Jeans thermal escape with non-thermal processes (charge exchange, polar wind, ion pickup).\n\nComputes the Jeans escape parameter \u03BB for each gas species based on escape velocity and exobase temperature. For H\u2082 and He, enhanced thresholds account for non-thermal loss channels that operate on all warm terrestrial planets (T_exo > 100 K).\n\nWhen enabled, gases classified as \u2018Lost\u2019 are automatically zeroed before computing greenhouse effect, partial pressures, and density. The original composition inputs are preserved.\n\nExobase temperature includes a pressure-dependent XUV absorption term \u2014 thin atmospheres absorb less XUV.\n\nH\u2082: Retained \u03BB \u2265 18 | Marginal 9\u201318 | Lost < 9\nHe: Retained \u03BB \u2265 30 | Marginal 15\u201330 | Lost < 15\nOthers: Retained \u03BB \u2265 6 | Marginal 3\u20136 | Lost < 3",
   "Vegetation override":
     "Override the auto-calculated vegetation colours with manually chosen pale and deep hex values. In Auto mode, colours are derived from the star's spectrum, atmospheric pressure, insolation, and tidal lock status.",
+  "Internal Heat":
+    "Radioisotope abundance relative to Earth. Scales four geophysics formulas: volcanic activity, elastic lithosphere thickness, internal heat budget, and core solidification timescale.\n\nHigher abundance sustains volcanism longer, thins the lithosphere, and extends dynamo lifetime. Default is 1.0\u00d7 (Earth).",
+  "Radioisotope Abundance":
+    "Bulk radioisotope abundance as a single multiplier of Earth\u2019s present-day radiogenic heat production (44 TW).\n\nRange: 0.1\u20133.0\u00d7 Earth.",
+  "U-238":
+    "Uranium-238 abundance relative to Earth. Contributes 39% of Earth\u2019s radiogenic heat.\n\nt\u00bd = 4.47 Gyr. Range: 0.0\u20135.0\u00d7.",
+  "U-235":
+    "Uranium-235 abundance relative to Earth. Contributes 4% of Earth\u2019s radiogenic heat.\n\nt\u00bd = 0.70 Gyr. Range: 0.0\u20135.0\u00d7.",
+  "Th-232":
+    "Thorium-232 abundance relative to Earth. Contributes 40% of Earth\u2019s radiogenic heat.\n\nt\u00bd = 14.05 Gyr. Range: 0.0\u20135.0\u00d7.",
+  "K-40":
+    "Potassium-40 abundance relative to Earth. Contributes 17% of Earth\u2019s radiogenic heat.\n\nt\u00bd = 1.25 Gyr. Range: 0.0\u20135.0\u00d7.",
   Moons: "Major moons currently assigned to this body.",
 
   // â”€â”€ Rocky planet outputs â”€â”€
@@ -512,24 +524,22 @@ export function initPlanetPage(mountEl) {
 
       <div style="height:8px"></div>
       <div class="label">Atmospheric Escape ${tipIcon(TIP_LABEL["Atmospheric Escape"])}</div>
-      <div class="viz-switch" style="margin:4px 0 6px">
-        <div class="viz-switch__text">Atmospheric escape filter</div>
-        <label class="viz-switch__control" for="atmEscape">
-          <input type="checkbox" id="atmEscape" ${p.atmosphericEscape ? "checked" : ""} />
-          <span class="viz-switch__slider" aria-hidden="true"></span>
-        </label>
-        <span class="viz-switch__mode-label" id="atmEscapeLabel">${p.atmosphericEscape ? "On" : "Off"}</span>
+      <div class="physics-duo-toggle" id="atmEscapePills" style="margin:4px 0 6px">
+        <input type="radio" name="atmEscape" id="atmEscapeOff" value="off" ${!p.atmosphericEscape ? "checked" : ""} />
+        <label for="atmEscapeOff">Off</label>
+        <input type="radio" name="atmEscape" id="atmEscapeOn" value="on" ${p.atmosphericEscape ? "checked" : ""} />
+        <label for="atmEscapeOn">On</label>
+        <span></span>
       </div>
 
       <div style="height:8px"></div>
       <div class="label">Vegetation ${tipIcon(TIP_LABEL["Vegetation override"])}</div>
-      <div class="viz-switch" style="margin:4px 0 6px">
-        <div class="viz-switch__text">Colour mode</div>
-        <label class="viz-switch__control" for="vegOverride">
-          <input type="checkbox" id="vegOverride" ${p.vegOverride ? "checked" : ""} />
-          <span class="viz-switch__slider" aria-hidden="true"></span>
-        </label>
-        <span class="viz-switch__mode-label">${p.vegOverride ? "Manual" : "Auto"}</span>
+      <div class="physics-duo-toggle" id="vegModePills" style="margin:4px 0 6px">
+        <input type="radio" name="vegMode" id="vegModeAuto" value="auto" ${!p.vegOverride ? "checked" : ""} />
+        <label for="vegModeAuto">Auto</label>
+        <input type="radio" name="vegMode" id="vegModeManual" value="manual" ${p.vegOverride ? "checked" : ""} />
+        <label for="vegModeManual">Manual</label>
+        <span></span>
       </div>
       <div id="vegManualInputs" class="veg-manual-inputs" ${p.vegOverride ? "" : 'style="display:none"'}>
         <div class="form-row">
@@ -542,6 +552,26 @@ export function initPlanetPage(mountEl) {
         </div>
         <div class="veg-override-preview" id="vegOverridePreview"
           style="background:linear-gradient(to right, ${p.vegPaleHexOverride || "#4a7c32"}, ${p.vegDeepHexOverride || "#1a3d0c"})"></div>
+      </div>
+
+      <div style="height:8px"></div>
+      <div class="label">Internal Heat ${tipIcon(TIP_LABEL["Internal Heat"])}</div>
+      <div class="physics-duo-toggle" id="isoModePills" style="margin:4px 0 6px">
+        <input type="radio" name="isoMode" id="isoSimple" value="simple" ${(p.radioisotopeMode || "simple") !== "advanced" ? "checked" : ""} />
+        <label for="isoSimple">Simple</label>
+        <input type="radio" name="isoMode" id="isoAdvanced" value="advanced" ${(p.radioisotopeMode || "simple") === "advanced" ? "checked" : ""} />
+        <label for="isoAdvanced">Per-Isotope</label>
+        <span></span>
+      </div>
+      <div id="isoSimpleInputs" ${(p.radioisotopeMode || "simple") === "advanced" ? 'style="display:none"' : ""}>
+        ${numWithSlider("isoAbundance", "Radioisotope Abundance", "\u00d7 Earth", "", 0.1, 3, 0.01, "Radioisotope Abundance")}
+      </div>
+      <div id="isoAdvancedInputs" ${(p.radioisotopeMode || "simple") !== "advanced" ? 'style="display:none"' : ""}>
+        ${numWithSlider("isoU238", "U-238", "\u00d7", "", 0, 5, 0.01, "U-238")}
+        ${numWithSlider("isoU235", "U-235", "\u00d7", "", 0, 5, 0.01, "U-235")}
+        ${numWithSlider("isoTh232", "Th-232", "\u00d7", "", 0, 5, 0.01, "Th-232")}
+        ${numWithSlider("isoK40", "K-40", "\u00d7", "", 0, 5, 0.01, "K-40")}
+        <div class="derived-readout" id="isoEffective"></div>
       </div>
 
       <div style="height:8px"></div>
@@ -656,6 +686,11 @@ export function initPlanetPage(mountEl) {
       he: p.hePct,
       so2: p.so2Pct,
       nh3: p.nh3Pct,
+      isoAbundance: p.radioisotopeAbundance ?? 1,
+      isoU238: p.u238Abundance ?? 1,
+      isoU235: p.u235Abundance ?? 1,
+      isoTh232: p.th232Abundance ?? 1,
+      isoK40: p.k40Abundance ?? 1,
     };
     const sliderBindings = {
       mass: [0.0001, 1000, 0.0001],
@@ -680,6 +715,11 @@ export function initPlanetPage(mountEl) {
       he: [0, 50, 0.1],
       so2: [0, 1, 0.001],
       nh3: [0, 1, 0.001],
+      isoAbundance: [0.1, 3, 0.01],
+      isoU238: [0, 5, 0.01],
+      isoU235: [0, 5, 0.01],
+      isoTh232: [0, 5, 0.01],
+      isoK40: [0, 5, 0.01],
     };
     const inputKeyMap = {
       mass: "massEarth",
@@ -704,6 +744,11 @@ export function initPlanetPage(mountEl) {
       he: "hePct",
       so2: "so2Pct",
       nh3: "nh3Pct",
+      isoAbundance: "radioisotopeAbundance",
+      isoU238: "u238Abundance",
+      isoU235: "u235Abundance",
+      isoTh232: "th232Abundance",
+      isoK40: "k40Abundance",
     };
 
     for (const [id, val] of Object.entries(fieldMap)) {
@@ -792,14 +837,13 @@ export function initPlanetPage(mountEl) {
       scheduleRender();
     });
 
-    // Atmospheric escape toggle
-    const atmEscapeToggle = bodyInputsEl.querySelector("#atmEscape");
-    const atmEscapeLabel = bodyInputsEl.querySelector("#atmEscapeLabel");
-    if (atmEscapeToggle) {
-      atmEscapeToggle.addEventListener("change", () => {
+    // Atmospheric escape pill toggle
+    const atmEscapePillsEl = bodyInputsEl.querySelector("#atmEscapePills");
+    if (atmEscapePillsEl) {
+      atmEscapePillsEl.addEventListener("change", () => {
         if (hydrating) return;
-        const on = atmEscapeToggle.checked;
-        if (atmEscapeLabel) atmEscapeLabel.textContent = on ? "On" : "Off";
+        const checked = atmEscapePillsEl.querySelector('input[name="atmEscape"]:checked');
+        const on = checked?.value === "on";
         const w = loadWorld();
         updatePlanet(w.planets.selectedId, { inputs: { atmosphericEscape: on } });
         updateWorld({ planet: { atmosphericEscape: on } });
@@ -807,10 +851,9 @@ export function initPlanetPage(mountEl) {
       });
     }
 
-    // Vegetation override toggle + colour pickers
-    const vegToggle = bodyInputsEl.querySelector("#vegOverride");
+    // Vegetation pill toggle + colour pickers
+    const vegPillsEl = bodyInputsEl.querySelector("#vegModePills");
     const vegManual = bodyInputsEl.querySelector("#vegManualInputs");
-    const vegModeLabel = bodyInputsEl.querySelector(".viz-switch__mode-label");
     const vegPaleEl = bodyInputsEl.querySelector("#vegPaleColour");
     const vegDeepEl = bodyInputsEl.querySelector("#vegDeepColour");
     const vegPreview = bodyInputsEl.querySelector("#vegOverridePreview");
@@ -821,50 +864,52 @@ export function initPlanetPage(mountEl) {
       }
     };
 
-    vegToggle.addEventListener("change", () => {
-      if (hydrating) return;
-      const on = vegToggle.checked;
-      vegManual.style.display = on ? "" : "none";
-      if (vegModeLabel) vegModeLabel.textContent = on ? "Manual" : "Auto";
-      const w = loadWorld();
-      const pid = w.planets.selectedId;
-      if (on) {
-        // Default override colours to current auto-calculated values
-        const selPlanet = getSelectedPlanet(w);
-        const sov = getStarOverrides(w.star);
-        const m = calcPlanetExact({
-          starMassMsol: Number(w.star.massMsol),
-          starAgeGyr: Number(w.star.ageGyr),
-          starRadiusRsolOverride: sov.r,
-          starLuminosityLsolOverride: sov.l,
-          starTempKOverride: sov.t,
-          starEvolutionMode: sov.ev,
-          planet: { ...selPlanet.inputs, vegOverride: false },
-          moons: listMoons(w)
-            .filter((mm) => mm.planetId === selPlanet.id)
-            .map((mm) => mm.inputs),
-        });
-        const pale = m.derived.vegetationPaleHex || "#4a7c32";
-        const deep = m.derived.vegetationDeepHex || "#1a3d0c";
-        vegPaleEl.value = pale;
-        vegDeepEl.value = deep;
-        updatePlanet(pid, {
-          inputs: { vegOverride: true, vegPaleHexOverride: pale, vegDeepHexOverride: deep },
-        });
-        updateWorld({
-          planet: { vegOverride: true, vegPaleHexOverride: pale, vegDeepHexOverride: deep },
-        });
-      } else {
-        updatePlanet(pid, {
-          inputs: { vegOverride: false, vegPaleHexOverride: null, vegDeepHexOverride: null },
-        });
-        updateWorld({
-          planet: { vegOverride: false, vegPaleHexOverride: null, vegDeepHexOverride: null },
-        });
-      }
-      updateVegPreview();
-      scheduleRender(true);
-    });
+    if (vegPillsEl) {
+      vegPillsEl.addEventListener("change", () => {
+        if (hydrating) return;
+        const checked = vegPillsEl.querySelector('input[name="vegMode"]:checked');
+        const on = checked?.value === "manual";
+        if (vegManual) vegManual.style.display = on ? "" : "none";
+        const w = loadWorld();
+        const pid = w.planets.selectedId;
+        if (on) {
+          // Default override colours to current auto-calculated values
+          const selPlanet = getSelectedPlanet(w);
+          const sov = getStarOverrides(w.star);
+          const m = calcPlanetExact({
+            starMassMsol: Number(w.star.massMsol),
+            starAgeGyr: Number(w.star.ageGyr),
+            starRadiusRsolOverride: sov.r,
+            starLuminosityLsolOverride: sov.l,
+            starTempKOverride: sov.t,
+            starEvolutionMode: sov.ev,
+            planet: { ...selPlanet.inputs, vegOverride: false },
+            moons: listMoons(w)
+              .filter((mm) => mm.planetId === selPlanet.id)
+              .map((mm) => mm.inputs),
+          });
+          const pale = m.derived.vegetationPaleHex || "#4a7c32";
+          const deep = m.derived.vegetationDeepHex || "#1a3d0c";
+          vegPaleEl.value = pale;
+          vegDeepEl.value = deep;
+          updatePlanet(pid, {
+            inputs: { vegOverride: true, vegPaleHexOverride: pale, vegDeepHexOverride: deep },
+          });
+          updateWorld({
+            planet: { vegOverride: true, vegPaleHexOverride: pale, vegDeepHexOverride: deep },
+          });
+        } else {
+          updatePlanet(pid, {
+            inputs: { vegOverride: false, vegPaleHexOverride: null, vegDeepHexOverride: null },
+          });
+          updateWorld({
+            planet: { vegOverride: false, vegPaleHexOverride: null, vegDeepHexOverride: null },
+          });
+        }
+        updateVegPreview();
+        scheduleRender(true);
+      });
+    }
 
     vegPaleEl.addEventListener("input", () => {
       if (hydrating) return;
@@ -942,6 +987,49 @@ export function initPlanetPage(mountEl) {
       });
     }
 
+    // Internal Heat mode toggle
+    const isoModePillsEl = bodyInputsEl.querySelector("#isoModePills");
+    const isoSimpleEl = bodyInputsEl.querySelector("#isoSimpleInputs");
+    const isoAdvancedEl = bodyInputsEl.querySelector("#isoAdvancedInputs");
+    if (isoModePillsEl) {
+      isoModePillsEl.addEventListener("change", () => {
+        if (hydrating) return;
+        const checked = isoModePillsEl.querySelector('input[name="isoMode"]:checked');
+        const mode = checked ? checked.value : "simple";
+        if (isoSimpleEl) isoSimpleEl.style.display = mode === "advanced" ? "none" : "";
+        if (isoAdvancedEl) isoAdvancedEl.style.display = mode === "advanced" ? "" : "none";
+        const w = loadWorld();
+        const pid = w.planets.selectedId;
+        updatePlanet(pid, { inputs: { radioisotopeMode: mode } });
+        updateWorld({ planet: { radioisotopeMode: mode } });
+        scheduleRender(true);
+      });
+    }
+
+    // Effective abundance readout for per-isotope mode
+    function updateIsoEffective() {
+      const el = bodyInputsEl.querySelector("#isoEffective");
+      if (!el) return;
+      const u238El = bodyInputsEl.querySelector("#isoU238");
+      const u235El = bodyInputsEl.querySelector("#isoU235");
+      const th232El = bodyInputsEl.querySelector("#isoTh232");
+      const k40El = bodyInputsEl.querySelector("#isoK40");
+      const a =
+        (Number(u238El?.value) || 1) * ISOTOPE_HEAT_FRACTIONS.u238 +
+        (Number(u235El?.value) || 1) * ISOTOPE_HEAT_FRACTIONS.u235 +
+        (Number(th232El?.value) || 1) * ISOTOPE_HEAT_FRACTIONS.th232 +
+        (Number(k40El?.value) || 1) * ISOTOPE_HEAT_FRACTIONS.k40;
+      el.textContent = `Effective abundance: ${fmt(Math.max(a, 0.01), 2)}\u00d7 Earth`;
+    }
+    // Update on any isotope slider input
+    for (const id of ["isoU238", "isoU235", "isoTh232", "isoK40"]) {
+      const el = bodyInputsEl.querySelector(`#${id}`);
+      const slEl = bodyInputsEl.querySelector(`#${id}_slider`);
+      if (el) el.addEventListener("input", updateIsoEffective);
+      if (slEl) slEl.addEventListener("input", updateIsoEffective);
+    }
+    updateIsoEffective();
+
     hydrating = false;
   }
 
@@ -976,6 +1064,13 @@ export function initPlanetPage(mountEl) {
       cmfEl.value = Math.round(resolved * 10) / 10;
       cmfSliderEl.value = resolved;
       updateCmfAutoState();
+    }
+
+    // Update effective abundance readout
+    const isoEffEl = bodyInputsEl.querySelector("#isoEffective");
+    if (isoEffEl) {
+      const a = d.radioisotopeAbundance;
+      isoEffEl.textContent = `Effective abundance: ${fmt(Math.max(a, 0.01), 2)}\u00d7 Earth`;
     }
 
     const items = [
@@ -2337,6 +2432,12 @@ Circularisation: ${m.display.circularisation}</div>
           o2Pct: 20.95,
           co2Pct: 0.04,
           arPct: 0.93,
+          radioisotopeAbundance: 1.0,
+          radioisotopeMode: "simple",
+          u238Abundance: 1.0,
+          u235Abundance: 1.0,
+          th232Abundance: 1.0,
+          k40Abundance: 1.0,
         };
         updatePlanet(w.planets.selectedId, { name: "Earth", inputs });
         updateWorld({ planet: inputs });

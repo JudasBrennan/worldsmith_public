@@ -54,7 +54,7 @@ const SECONDS_TO_GYR = 3.171e-17;
 const EARTH_INTERNAL_HEAT_W = 44e12;
 
 // Present-day fractional contribution of each isotope to Earth's radiogenic heat.
-const ISOTOPE_HEAT_FRACTIONS = { u238: 0.39, u235: 0.04, th232: 0.4, k40: 0.17 };
+export const ISOTOPE_HEAT_FRACTIONS = { u238: 0.39, u235: 0.04, th232: 0.4, k40: 0.17 };
 
 // Atmospheric thermal-tide calibration constant.
 // Dimensionless ratio b_atm = C_ATM_TIDE × P_s × S / (g × T_eq),
@@ -286,8 +286,9 @@ function magneticFieldModel({
     return { ...none, dynamoReason: "No significant iron core (CMF < 1%)" };
   }
 
-  // Core solidification timescale (Gyr) — empirical estimate.
-  // Larger cores in larger planets retain heat longer.
+  // Core solidification timescale (Gyr) — empirical fit calibrated to
+  // reproduce Earth (liquid outer core at 4.6 Gyr) and Mars (solidified).
+  // √M scaling approximates volume-to-surface-area cooling ratio.
   // Moon tidal heating extends core lifetime by offsetting radiative cooling.
   const tauCoreBase = (2 + 12 * cmf * Math.sqrt(massEarth)) * Math.max(radioisotopeAbundance, 0.01);
   const tauCore = tidalFraction >= 1 ? Infinity : tauCoreBase / Math.max(0.01, 1 - tidalFraction);

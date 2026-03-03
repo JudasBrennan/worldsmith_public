@@ -2,6 +2,40 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.16.1 — 2026-03-03
+
+### Bug Fixes
+
+- **Internal Heat UI** (ui/planetPage.js) — Added the missing Internal
+  Heat input section to the planet page. The radioisotope abundance
+  engine logic (simple and per-isotope modes) was fully wired in v1.15.0
+  but the UI controls were never rendered. Users can now adjust
+  radioisotope abundance via a single slider (Simple mode) or four
+  per-isotope sliders (Per-Isotope mode) with a live effective-abundance
+  readout.
+
+- **Internal Heat slider defaults** (ui/planetPage.js) — Fixed isotope
+  sliders initialising empty when no value was stored. All five sliders
+  now default to 1.0× (Earth-equivalent). Added radioisotope fields to
+  the Earth preset in the Sol system.
+
+- **Atmospheric Escape / Vegetation toggles** (ui/planetPage.js) —
+  Replaced the iOS-style viz-switch checkboxes with segmented pill
+  toggles (`physics-duo-toggle`), matching the Internal Heat section and
+  the rest of the app's toggle convention.
+
+- **Cluster visualiser PNG/GIF export** (ui/visualizerPage.js) — Fixed
+  blank exports in cluster mode. All cluster visuals are drawn on the 2D
+  overlay canvas, but the export captured only the WebGL canvas (which
+  renders a blank dark frame in cluster mode). Both PNG and GIF exports
+  now target the correct canvas per mode.
+
+**Tests** (tests/planet-nasa-validation.test.js, tests/tectonics.test.js)
+
+- 15 new NASA-calibrated validation tests for internal heat, dynamo
+  state, volcanic activity, elastic lithosphere thickness, per-isotope
+  fractions, and abundance scaling.
+
 ## 1.16.0 — 2026-03-02
 
 ### Atmospheric Escape

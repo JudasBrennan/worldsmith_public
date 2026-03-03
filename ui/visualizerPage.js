@@ -7025,7 +7025,8 @@ export function initVisualiserPage(root, options = {}) {
     if (state.exportingGif) return;
     try {
       draw();
-      await downloadCanvasPng(canvas, exportFileName("png"));
+      const target = state.mode === "cluster" ? overlayCanvas : canvas;
+      await downloadCanvasPng(target, exportFileName("png"));
     } catch (err) {
       console.error("[viz] Could not export PNG image.", err);
     }
@@ -7046,9 +7047,10 @@ export function initVisualiserPage(root, options = {}) {
       rafId = null;
     }
 
+    const gifTarget = state.mode === "cluster" ? overlayCanvas : canvas;
     try {
       await captureCanvasGif({
-        canvas,
+        canvas: gifTarget,
         filename: exportFileName("gif"),
         fps: 12,
         seconds: 4,

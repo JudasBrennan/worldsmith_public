@@ -88,6 +88,8 @@ const ICE_YIELD_STRESS_PA = 10e6;
 const FLEXURAL_C = 7.7e6;
 
 // ── Radiogenic heat decay (per Gyr) ──────────────────────
+// ≈ ln(2) / 4.468 (U-238 half-life), the dominant long-term heat source.
+// General-purpose: applies to any rocky body via abundance scaling.
 const HEAT_DECAY_RATE = 0.15;
 
 // ── Convergence rate scaling ─────────────────────────────

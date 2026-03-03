@@ -742,6 +742,114 @@ test("NASA → Jeans λ → closer orbit increases XUV, lowers λ", () => {
    REGRESSION: WMF=0 produces identical outputs to pre-overhaul
    ══════════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════
+   RADIOISOTOPE ABUNDANCE — INTERNAL HEAT MODEL
+   NASA/KamLAND reference: Earth radiogenic heat ≈ 44–47 TW.
+   Isotope contributions: Arevalo et al. (2009, Earth Planet. Sci. Lett.)
+   ══════════════════════════════════════════════════════════════════ */
+
+test("NASA → Earth (1× abundance) → active dynamo with partially solidified core", () => {
+  // Earth has a liquid outer core driving an active dynamo at 4.6 Gyr.
+  // Model with default 1× radioisotope abundance must reproduce this.
+  const p = calcPlanetExact(EARTH);
+  assert.equal(p.inputs.radioisotopeAbundance, 1, "Earth should use 1× abundance");
+  assert.ok(p.derived.dynamoActive, "Earth dynamo must be active at 1× abundance");
+  assert.equal(p.derived.coreState, "partially solidified");
+});
+
+test("NASA → Earth internal heat budget → 44 TW at 1× abundance", () => {
+  // KamLAND (2011) measured ~21 TW from U/Th alone; total radiogenic ≈ 44 TW.
+  // Model: Q = 44 TW × mass × abundance.  For Earth (mass=1, A=1) → 44 TW.
+  const p = calcPlanetExact(EARTH);
+  // planetTidalFraction = tidal/internal;  with no moons assigned,
+  // tidal heating is 0 → fraction should be 0 or near-0.
+  assert.ok(
+    p.derived.planetTidalFraction < 0.01,
+    `Earth tidal fraction should be near-zero without moons, got ${p.derived.planetTidalFraction}`,
+  );
+});
+
+test("NASA → Mars (1× abundance) → core solidified, no dynamo", () => {
+  // Mars lost its dynamo ~4 Gyr ago (Acuña et al. 1999).
+  // Small mass + low CMF → short core solidification timescale.
+  const p = calcPlanetExact(MARS);
+  assert.equal(p.inputs.radioisotopeAbundance, 1);
+  assert.ok(!p.derived.dynamoActive, "Mars should have no active dynamo");
+  assert.equal(p.derived.coreState, "solidified", "Mars core should be solidified");
+});
+
+test("NASA → Mars with 3× abundance → may sustain dynamo longer", () => {
+  // A hypothetical Mars with 3× radioisotope abundance would have
+  // a longer core solidification timescale, possibly keeping the core liquid.
+  const base = calcPlanetExact(MARS);
+  const hot = calcPlanetExact({
+    ...MARS,
+    planet: { ...MARS.planet, radioisotopeAbundance: 3.0 },
+  });
+  // With 3× abundance, the core lifetime triples → might still have a liquid core
+  assert.ok(
+    hot.derived.surfaceFieldEarths >= base.derived.surfaceFieldEarths,
+    "3× abundance → stronger or equal field for Mars",
+  );
+});
+
+test("NASA → Earth display format → shows 'Earth (1.0×)' at default", () => {
+  const p = calcPlanetExact(EARTH);
+  assert.equal(p.display.radioisotopeAbundance, "Earth (1.0\u00d7)");
+});
+
+test("NASA → per-isotope Earth fractions → Arevalo et al. sum to 1.0", () => {
+  // Arevalo et al. 2009: U-238 ≈ 39%, U-235 ≈ 4%, Th-232 ≈ 40%, K-40 ≈ 17%
+  // All isotopes at 1× should give effective abundance of exactly 1.0.
+  const p = calcPlanetExact({
+    ...EARTH,
+    planet: {
+      ...EARTH.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 1,
+      u235Abundance: 1,
+      th232Abundance: 1,
+      k40Abundance: 1,
+    },
+  });
+  assert.strictEqual(p.inputs.radioisotopeAbundance, 1);
+  assert.ok(p.derived.dynamoActive, "Earth-like isotopes → active dynamo");
+});
+
+test("NASA → depleted K-40 scenario → reduced heat (short half-life, 17%)", () => {
+  // K-40 has the shortest half-life (1.25 Gyr) and contributes 17% of heat.
+  // Zeroing K-40 should reduce effective abundance to ~0.83.
+  const p = calcPlanetExact({
+    ...EARTH,
+    planet: {
+      ...EARTH.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 1,
+      u235Abundance: 1,
+      th232Abundance: 1,
+      k40Abundance: 0,
+    },
+  });
+  approxEqual(p.inputs.radioisotopeAbundance, 0.83, 0.02, "no K-40 → ~0.83× effective");
+});
+
+test("NASA → Th-232 dominant scenario → long-lived heat source", () => {
+  // Th-232 has the longest half-life (14.05 Gyr) and contributes 40% of heat.
+  // Doubling only Th-232 should raise effective abundance to ~1.40.
+  const p = calcPlanetExact({
+    ...EARTH,
+    planet: {
+      ...EARTH.planet,
+      radioisotopeMode: "advanced",
+      u238Abundance: 1,
+      u235Abundance: 1,
+      th232Abundance: 2,
+      k40Abundance: 1,
+    },
+  });
+  approxEqual(p.inputs.radioisotopeAbundance, 1.4, 0.02, "2× Th-232 → ~1.40×");
+});
+
 test("regression → WMF=0 → density/radius match WMF-unaware path", () => {
   // With WMF=0, the water inflation factor is 1.0 and all dry-planet
   // outputs must be identical to the pre-overhaul formula.

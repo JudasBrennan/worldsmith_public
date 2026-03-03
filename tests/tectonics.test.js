@@ -655,6 +655,71 @@ test("calcTectonics → radioisotopeAbundance propagates to activity and lithosp
   );
 });
 
+// ── radioisotope abundance NASA validation ──────────────
+
+test("NASA → Earth elastic lithosphere → ~30–50 km (Watts 2001)", () => {
+  // Watts (2001, "Isostasy and Flexure of the Lithosphere"):
+  // Earth's effective elastic lithosphere thickness (Te) ranges
+  // from ~5 km at mid-ocean ridges to ~100 km under old cratons,
+  // with a global mean of ~30–50 km for oceanic lithosphere.
+  // Model calibration targets ~43 km for Earth (4.6 Gyr, 1 M⊕, 1× abundance).
+  const te = elasticLithosphereThicknessKm(4.6, 1.0, 0, 1);
+  assert.ok(te >= 30, `Earth Te should be >= 30 km, got ${te.toFixed(1)}`);
+  assert.ok(te <= 55, `Earth Te should be <= 55 km, got ${te.toFixed(1)}`);
+});
+
+test("NASA → Mars elastic lithosphere → plausible range (McGovern 2002)", () => {
+  // McGovern et al. (2002, JGR): Mars Te under Olympus Mons ~50–200 km.
+  // Low mass (0.107 M⊕) → M^0.3 factor reduces Te.
+  // Model should give a plausible range for a small rocky body.
+  const mars = elasticLithosphereThicknessKm(4.6, 0.107, 0, 1);
+  assert.ok(mars >= 5, `Mars Te should be >= 5 km, got ${mars.toFixed(1)}`);
+  assert.ok(mars <= 50, `Mars Te should be <= 50 km, got ${mars.toFixed(1)}`);
+});
+
+test("NASA → Earth volcanic activity → high at 4.6 Gyr", () => {
+  // Earth is volcanically active (>50 active volcanoes, ~0.1 km³/yr output).
+  // At 4.6 Gyr with 1× abundance: exp(-0.15 × 4.6 / 1) ≈ 0.50
+  const v = volcanicActivity(4.6, 0, 1);
+  assert.ok(v >= 0.4, `Earth volcanic activity should be >= 0.4, got ${v.toFixed(3)}`);
+  assert.ok(v <= 0.7, `Earth volcanic activity should be <= 0.7, got ${v.toFixed(3)}`);
+});
+
+test("NASA → young planet (0.5 Gyr) → near-maximum volcanic activity", () => {
+  // Early Earth (Hadean/Archean): extreme volcanism, magma oceans.
+  // exp(-0.15 × 0.5 / 1) ≈ 0.93
+  const v = volcanicActivity(0.5, 0, 1);
+  assert.ok(v >= 0.85, `Young planet activity should be >= 0.85, got ${v.toFixed(3)}`);
+});
+
+test("NASA → old planet (10 Gyr) → low volcanic activity without radioisotope boost", () => {
+  // A 10 Gyr planet with 1× abundance: exp(-0.15 × 10 / 1) ≈ 0.22
+  const v = volcanicActivity(10, 0, 1);
+  assert.ok(v <= 0.3, `Old planet activity should be <= 0.3, got ${v.toFixed(3)}`);
+  assert.ok(v >= 0.1, `Old planet activity should not be near-zero, got ${v.toFixed(3)}`);
+});
+
+test("NASA → old planet with 2× abundance → volcanism sustained longer", () => {
+  // 10 Gyr planet with 2× abundance: exp(-0.15 × 10 / 2) ≈ 0.47
+  // vs 1× abundance: exp(-0.15 × 10 / 1) ≈ 0.22
+  const low = volcanicActivity(10, 0, 1);
+  const high = volcanicActivity(10, 0, 2);
+  assert.ok(
+    high > low * 1.5,
+    `2× abundance should substantially boost activity at 10 Gyr: ${high.toFixed(3)} vs ${low.toFixed(3)}`,
+  );
+});
+
+test("NASA → 2× abundance → lithosphere thins by ~29% (√2 factor)", () => {
+  // Formula: Te = 20 × √(age / A) × M^0.3
+  // Ratio: Te(A=2) / Te(A=1) = √(1/2) ≈ 0.707
+  // So lithosphere should be ~29% thinner with 2× abundance.
+  const base = elasticLithosphereThicknessKm(4.6, 1.0, 0, 1);
+  const hot = elasticLithosphereThicknessKm(4.6, 1.0, 0, 2);
+  const ratio = hot / base;
+  approxEqual(ratio, 1 / Math.sqrt(2), 0.02, "Te ratio at 2× abundance");
+});
+
 // ── maxPeakHeight with composition ───────────────────────
 
 test("maxPeakHeight → ice world gives lower peak", () => {
