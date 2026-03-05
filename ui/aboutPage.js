@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.19.0</b> is a browser-based sci-fi worldbuilding toolkit by <b>Judas Brennan</b>.
+          <b>WorldSmith Web 1.19.0</b> is a browser-based worldbuilding toolkit by <b>Judas Brennan</b>.
           Design stars, planetary systems, rocky worlds, gas giants, moons, and debris disks with
           real astrophysics. Model tectonics, climate zones, atmospheres, populations, and calendars.
           Explore your creations in an interactive 3D visualiser with procedural textures, or study

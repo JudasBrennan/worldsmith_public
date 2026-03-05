@@ -7,7 +7,40 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net ws: wss:; worker-src 'self' blob:"
     />
-    <title>WorldSmith</title>
+    <title>WorldSmith — Worldbuilding Toolkit</title>
+    <meta
+      name="description"
+      content="A free browser-based toolkit for worldbuilders. Design stars, planetary systems, moons, climates, calendars, and more with real astrophysics."
+    />
+    <link rel="canonical" href="https://thebrokenwheel.co.uk/worldsmith/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="WorldSmith — Worldbuilding Toolkit" />
+    <meta
+      property="og:description"
+      content="A free browser-based toolkit for worldbuilders. Design stars, planetary systems, moons, climates, calendars, and more with real astrophysics."
+    />
+    <meta property="og:url" content="https://thebrokenwheel.co.uk/worldsmith/" />
+    <meta
+      property="og:image"
+      content="https://thebrokenwheel.co.uk/worldsmith/assets/worldsmith.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="WorldSmith" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WorldSmith — Worldbuilding Toolkit" />
+    <meta
+      name="twitter:description"
+      content="A free browser-based toolkit for worldbuilders. Design stars, planetary systems, moons, climates, calendars, and more with real astrophysics."
+    />
+    <meta
+      name="twitter:image"
+      content="https://thebrokenwheel.co.uk/worldsmith/assets/worldsmith.png"
+    />
     <script>
       /* Apply saved theme before first paint to prevent dark→light flash */
       (function () {
@@ -16,12 +49,52 @@
         if (t) document.documentElement.setAttribute("data-theme", t);
       })();
     </script>
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "WorldSmith",
+        "url": "https://thebrokenwheel.co.uk/worldsmith/",
+        "description": "A free browser-based toolkit for worldbuilders. Design stars, planetary systems, moons, climates, calendars, and more with real astrophysics.",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Person",
+          "name": "Judas Brennan"
+        }
+      }
+    </script>
+
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="stylesheet" href="./styles.css?release=1.19.0" />
     <!-- Keep version in sync with ui/threeBridge2d.js THREE_VERSION -->
     <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/+esm" />
   </head>
   <body>
+    <noscript>
+      <div
+        style="
+          max-width: 600px;
+          margin: 40px auto;
+          padding: 20px;
+          font-family: system-ui, sans-serif;
+        "
+      >
+        <h1>WorldSmith — Worldbuilding Toolkit</h1>
+        <p>
+          WorldSmith is a free browser-based toolkit for worldbuilders. Design stars, planetary
+          systems, moons, climates, calendars, and more — all grounded in real astrophysics.
+        </p>
+        <p>This application requires JavaScript to run. Please enable JavaScript and reload.</p>
+      </div>
+    </noscript>
+
     <header class="app-header">
       <button class="nav-hamburger" id="navHamburger" aria-label="Open navigation">&#9776;</button>
       <div class="brand">
