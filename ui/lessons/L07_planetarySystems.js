@@ -146,8 +146,7 @@ export function buildLesson07(mode) {
       ${analogy("Building a giant planet is like making a snowball large enough to start an avalanche. If there is more snow (heavy elements) on the ground, it is much easier to roll a big enough ball to get the avalanche going.")}
       ${keyIdea("Metal-rich stars are far more likely to have giant planets. Metallicity is one of the strongest predictors of giant planet occurrence.")}`,
 
-      `<p>Fischer and Valenti (2005) analysed 850 FGK stars in the Keck, Lick,
-      and Anglo-Australian planet search programs and found that the
+      `<p>Fischer and Valenti (2005) analysed 850 FGK stars and found that the
       probability of hosting a giant planet scales exponentially with
       metallicity:</p>
       ${eq("P(\\text{giant}) \\propto 10^{2 [\\text{Fe/H}]}")}
@@ -155,24 +154,26 @@ export function buildLesson07(mode) {
         ["P(\\text{giant})", "probability of hosting a detected giant planet"],
         ["[\\text{Fe/H}]", "logarithmic iron abundance relative to the Sun"],
       ])}
-      <p>At solar metallicity ${iq("[\\text{Fe/H}] = 0")}, about 3% of stars
-      host a detected giant planet. At ${iq("[\\text{Fe/H}] = +0.3")}
-      (twice solar), the rate rises to roughly 25%.</p>
+      <p>At solar metallicity ${iq("[\\text{Fe/H}] = 0")}, Kepler-era surveys
+      find about 7% of solar-type stars host a giant planet. At
+      ${iq("[\\text{Fe/H}] = +0.3")} (twice solar), the rate rises to
+      roughly 28%. Giant planets are also more common around higher-mass
+      stars (Johnson et al. 2010).</p>
       ${dataTable(
-        ["[Fe/H]", "Giant planet rate"],
+        ["[Fe/H]", "Giant planet rate (1 M\u2609)"],
         [
-          ["-0.5", "~0.3%"],
-          ["0.0", "~3%"],
-          ["+0.2", "~10%"],
-          ["+0.3", "~25%"],
-          ["+0.5", "~30%+"],
+          ["-0.5", "~0.7%"],
+          ["0.0", "~7%"],
+          ["+0.2", "~18%"],
+          ["+0.3", "~28%"],
+          ["+0.5", "~70%"],
         ],
       )}
-      <p>This "planet-metallicity correlation" strongly supports the
+      <p>This &ldquo;planet-metallicity correlation&rdquo; strongly supports the
       core-accretion model of giant planet formation, in which a
       ${iq("\\sim 10 M_\\oplus")} solid core must form before runaway gas
       accretion can begin.</p>
-      ${cite("Fischer, D. A. & Valenti, J. (2005), ApJ 622, 1102.")}`,
+      ${cite("Fischer, D. A. & Valenti, J. (2005), ApJ 622, 1102; Johnson, J. A. et al. (2010), PASP 122, 905; Petigura, E. A. et al. (2018), AJ 155, 89.")}`,
       mode,
     ),
   ].join("");

@@ -247,7 +247,8 @@ export const SCIENCE_GRAPH_NODES = Object.freeze([
     row: 1,
     summary:
       "Probability that a star hosts a giant planet, estimated from stellar metallicity. This is a direct star-model output and a useful bridge between stellar chemistry and system architecture.",
-    formula: "P scales approximately as 10^(2*[Fe/H]) with a solar baseline near 10%.",
+    formula:
+      "P = clamp(0.07 * M * 10^(2*[Fe/H]), 0, 1). M is stellar mass in Msol (defaults to 1 in cluster view).",
     engineRefs: ["engine/star.js", "ui/localClusterPage.js"],
     docs: [
       { label: "Science - Stellar Physics", href: "#/science" },
@@ -1040,6 +1041,14 @@ export const SCIENCE_GRAPH_EDGES = Object.freeze([
     evidence: "runtime",
     relationship: "drives",
     summary: "Higher metallicity increases the estimated occurrence of giant planets.",
+    engineRefs: ["engine/star.js"],
+  },
+  {
+    sourceId: "stellar_mass",
+    targetId: "giant_planet_probability",
+    evidence: "runtime",
+    relationship: "modulates",
+    summary: "Higher-mass stars host giant planets more frequently (Johnson et al. 2010).",
     engineRefs: ["engine/star.js"],
   },
   {

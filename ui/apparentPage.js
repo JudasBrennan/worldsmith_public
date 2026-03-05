@@ -266,7 +266,7 @@ export function initApparentPage(mountEl) {
   wrap.innerHTML = `
     <div class="panel">
       <div class="panel__header">
-        <h1 class="panel__title"><span class="ws-icon icon--apparent" aria-hidden="true"></span><span>Apparent Size & Brightness</span></h1>
+        <h1 class="panel__title"><span class="ws-icon icon--apparent" aria-hidden="true"></span><span>Apparent Size</span></h1>
         <button id="apparentTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">

@@ -176,9 +176,13 @@ function buildStellarPhysics() {
 
     formula(
       "Giant Planet Probability",
-      `<div class="sci-formula__eq">${eq("P = \\text{clamp}\\left(0.1 \\times 10^{2[\\text{Fe/H}]},\\; 0,\\; 1\\right)")}</div>
-      <p>Probability of hosting a giant planet (&gt;0.3 M<sub>Jup</sub>) as a function of stellar metallicity. ~10% baseline at solar metallicity ([Fe/H] = 0).</p>
-      ${cite("Fischer &amp; Valenti (2005) ApJ 622, 1102; Cumming et al. (2008) PASP 120, 531")}`,
+      `<div class="sci-formula__eq">${eq("P = \\text{clamp}\\left(0.07 \\times M_\\star \\times 10^{2[\\text{Fe/H}]},\\; 0,\\; 1\\right)")}</div>
+      <p>Probability of hosting a giant planet (&gt;0.3 M<sub>Jup</sub>) as a function of stellar metallicity and mass.
+      ~7% baseline at solar mass and metallicity ([Fe/H]&nbsp;=&nbsp;0, M&nbsp;=&nbsp;1&nbsp;M<sub>&odot;</sub>).
+      The metallicity exponent is from Fischer &amp; Valenti (2005); the linear stellar mass factor
+      is from Johnson et al. (2010): giant planets are ~3&times; more common around 2&nbsp;M<sub>&odot;</sub>
+      A-type stars than 0.5&nbsp;M<sub>&odot;</sub> M&nbsp;dwarfs.</p>
+      ${cite("Fischer &amp; Valenti (2005) ApJ 622, 1102; Johnson et al. (2010) PASP 122, 905; Petigura et al. (2018) AJ 155, 89")}`,
     ),
 
     formula(
@@ -968,7 +972,12 @@ function buildLagrangePoints() {
       "L4 and L5 (Trojans)",
       `<div class="sci-formula__eq">${eq("r = a, \\quad \\theta = \\theta_{\\text{body}} \\pm 60°")}</div>
       <p>Equilateral triangle points leading (+60&deg;, L4) and trailing (&minus;60&deg;, L5) the body
-      in its orbit. Stable when ${iq("m/M_\\star < 1/25")}.</p>`,
+      in its orbit.</p>
+      <div class="sci-formula__eq">${eq("\\mu = \\frac{m}{m + M_\\star} < \\mu_{\\text{crit}} = \\frac{1 - \\sqrt{69}/9}{2} \\approx 0.0385")}</div>
+      <p>Gascheau (1843) stability criterion: L4/L5 are linearly stable only when the
+      secondary mass ratio &mu; is below &mu;<sub>crit</sub>. This simplifies to roughly
+      ${iq("m/M_\\star < 1/25")} for planetary masses. In the visualiser, unstable Trojans
+      are shown as dimmed amber diamonds.</p>`,
     ),
   ].join("");
 }

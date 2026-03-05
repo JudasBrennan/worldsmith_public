@@ -109,6 +109,27 @@ export function normalizeNameList(raw, count, fallbackPrefix) {
 }
 
 /**
+ * Validates and normalises an array of per-month day-count overrides.
+ * Entries that are null, undefined, or non-positive fall back to the
+ * base daysPerMonth (represented as null in the output).
+ *
+ * @param {(number|string|null|undefined)[]|undefined} overrides - Raw
+ *   per-month override values (one per month).
+ * @param {number} monthsPerYear - Number of months in the calendar year.
+ * @returns {(number|null)[]} Array of exactly `monthsPerYear` entries.
+ */
+export function normalizeMonthLengthOverrides(overrides, monthsPerYear) {
+  const count = positiveInt(monthsPerYear, 1);
+  const source = Array.isArray(overrides) ? overrides : [];
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const n = toInt(source[i], NaN);
+    out.push(Number.isFinite(n) && n >= 1 ? Math.min(n, 500) : null);
+  }
+  return out;
+}
+
+/**
  * Validates and normalises an array of leap-year intercalation rules.
  * Each rule specifies a cycle length, offset year, target month, and
  * day delta. Rules with a zero delta are discarded.
@@ -175,12 +196,23 @@ function isLeapRuleActive(rule, year) {
  *   getCalendarBasisMetrics).
  * @param {number} [options.year=1] - Target year (1-based).
  * @param {object[]} [options.leapRules=[]] - Leap rule definitions.
+ * @param {(number|null)[]} [options.monthLengthOverrides=[]] - Per-month
+ *   day-count overrides (null entries use base daysPerMonth).
  * @returns {number[]} Array of month lengths (one entry per month).
  */
-export function getMonthLengthsForYear({ metrics, year = 1, leapRules = [] }) {
+export function getMonthLengthsForYear({
+  metrics,
+  year = 1,
+  leapRules = [],
+  monthLengthOverrides = [],
+}) {
   const monthsPerYear = positiveInt(metrics?.monthsPerYear, 12);
   const baseDaysPerMonth = Math.max(1, positiveInt(metrics?.daysPerMonth, 30));
-  const monthLengths = Array(monthsPerYear).fill(baseDaysPerMonth);
+  const overrides = normalizeMonthLengthOverrides(monthLengthOverrides, monthsPerYear);
+  const monthLengths = Array.from(
+    { length: monthsPerYear },
+    (_, i) => overrides[i] ?? baseDaysPerMonth,
+  );
   const intercalaryDays = toInt(metrics?.intercalaryDays, 0);
   if (intercalaryDays !== 0) {
     monthLengths[monthsPerYear - 1] = Math.max(
@@ -198,13 +230,17 @@ export function getMonthLengthsForYear({ metrics, year = 1, leapRules = [] }) {
   return monthLengths;
 }
 
-function daysBeforeYear(metrics, year, leapRules) {
+function daysBeforeYear(metrics, year, leapRules, monthLengthOverrides = []) {
   const target = Math.max(1, positiveInt(year, 1));
   if (target <= 1) return 0;
   const monthsPerYear = positiveInt(metrics?.monthsPerYear, 12);
   const baseDaysPerMonth = Math.max(1, positiveInt(metrics?.daysPerMonth, 30));
   const intercalaryDays = toInt(metrics?.intercalaryDays, 0);
-  const baseMonths = Array(monthsPerYear).fill(baseDaysPerMonth);
+  const overrides = normalizeMonthLengthOverrides(monthLengthOverrides, monthsPerYear);
+  const baseMonths = Array.from(
+    { length: monthsPerYear },
+    (_, i) => overrides[i] ?? baseDaysPerMonth,
+  );
   if (intercalaryDays !== 0) {
     baseMonths[monthsPerYear - 1] = Math.max(1, baseMonths[monthsPerYear - 1] + intercalaryDays);
   }
@@ -216,7 +252,7 @@ function daysBeforeYear(metrics, year, leapRules) {
   if (normalized.some((rule) => rule.dayDelta < 0)) {
     let total = 0;
     for (let y = 1; y < target; y++) {
-      total += getMonthLengthsForYear({ metrics, year: y, leapRules }).reduce(
+      total += getMonthLengthsForYear({ metrics, year: y, leapRules, monthLengthOverrides }).reduce(
         (sum, d) => sum + d,
         0,
       );
@@ -260,10 +296,11 @@ export function getYearStartDayIndex({
   year = 1,
   firstYearStartDayIndex = 0,
   leapRules = [],
+  monthLengthOverrides = [],
 }) {
   const daysPerWeek = positiveInt(metrics?.daysPerWeek, 7);
   const startDay = mod(toInt(firstYearStartDayIndex, 0), daysPerWeek);
-  const offset = daysBeforeYear(metrics, year, leapRules);
+  const offset = daysBeforeYear(metrics, year, leapRules, monthLengthOverrides);
   return mod(startDay + offset, daysPerWeek);
 }
 
@@ -365,13 +402,19 @@ export function buildUsableCalendarMonth({
   weekNames = [],
   moonSynodicDays = 29.5306,
   moonEpochOffsetDays = 0,
+  monthLengthOverrides = [],
 }) {
   const monthsPerYear = positiveInt(metrics?.monthsPerYear, 12);
   const daysPerWeek = positiveInt(metrics?.daysPerWeek, 7);
   const safeYear = Math.max(1, positiveInt(year, 1));
   const safeMonthIndex = clamp(toInt(monthIndex, 0), 0, monthsPerYear - 1);
   const safeWeekStart = mod(toInt(weekStartDayIndex, 0), daysPerWeek);
-  const monthLengths = getMonthLengthsForYear({ metrics, year: safeYear, leapRules });
+  const monthLengths = getMonthLengthsForYear({
+    metrics,
+    year: safeYear,
+    leapRules,
+    monthLengthOverrides,
+  });
   const monthLength = monthLengths[safeMonthIndex];
 
   const normalizedDayNames = normalizeNameList(dayNames, daysPerWeek, "Day");
@@ -384,6 +427,7 @@ export function buildUsableCalendarMonth({
     year: safeYear,
     firstYearStartDayIndex,
     leapRules,
+    monthLengthOverrides,
   });
   const daysBeforeMonth = monthLengths.slice(0, safeMonthIndex).reduce((sum, d) => sum + d, 0);
   const monthStartWeekday = mod(yearStart + daysBeforeMonth, daysPerWeek);
@@ -395,7 +439,8 @@ export function buildUsableCalendarMonth({
   );
 
   const allCells = [];
-  const absoluteMonthStartDay = daysBeforeYear(metrics, safeYear, leapRules) + daysBeforeMonth;
+  const absoluteMonthStartDay =
+    daysBeforeYear(metrics, safeYear, leapRules, monthLengthOverrides) + daysBeforeMonth;
 
   for (let i = 0; i < leadingEmptyCount; i++) {
     allCells.push(null);

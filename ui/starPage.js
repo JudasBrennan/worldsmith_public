@@ -44,7 +44,7 @@ const TIP_LABEL = {
   "Metallicity [Fe/H]":
     "Stellar metallicity measures heavy-element abundance relative to the Sun.\n\n[Fe/H] = log\u2081\u2080(Fe/H)_star \u2212 log\u2081\u2080(Fe/H)_sun\n\nSun = 0.0 by definition. Positive = metal-rich, negative = metal-poor.\n\nTypical range:\n\u2022 Metal-rich inner disk: +0.1 to +0.5\n\u2022 Solar neighbourhood: \u22120.2 to +0.1\n\u2022 Old thin disk: \u22120.7 to \u22120.3\n\u2022 Halo / globular clusters: \u22122.5 to \u22121.0\n\nMetallicity does not modify the Eker mass\u2013luminosity or mass\u2013radius relations (their empirical scatter already includes metallicity variation). Instead it drives downstream effects like giant planet probability.",
   "Giant Planet Probability":
-    "Probability that a solar-type star hosts at least one giant planet (\u22650.3 M_Jup).\n\nBased on Fischer & Valenti (2005, ApJ 622, 1102): P \u221d 10^(2*[Fe/H]).\nBaseline ~10% at solar metallicity (Cumming et al. 2008, PASP 120, 531).\n\nMetal-rich stars are dramatically more likely to host giant planets \u2014 a +0.3 dex increase in [Fe/H] roughly quadruples the probability.",
+    "Probability that a star hosts at least one giant planet (\u22650.3 M_Jup).\n\nMetallicity scaling P \u221d 10^(2*[Fe/H]) from Fischer & Valenti (2005, ApJ 622, 1102). Stellar mass scaling P \u221d M from Johnson et al. (2010, PASP 122, 905).\nBaseline ~7% at solar mass and metallicity (Petigura et al. 2018, AJ 155, 89).\n\nM dwarfs host fewer giant planets; A/F stars host more. A +0.3 dex increase in [Fe/H] roughly quadruples the probability.",
   "Stellar Population":
     "A broad classification based on metallicity.\n\nPopulation I (solar neighbourhood): [Fe/H] > \u22120.3 \u2014 young-to-middle-aged disk stars like the Sun\nIntermediate (old thin disk): \u22121.0 < [Fe/H] \u2264 \u22120.3\nPopulation II (metal-poor): [Fe/H] \u2264 \u22121.0 \u2014 old halo and thick-disk stars\nMetal-rich (inner disk): [Fe/H] > +0.15 \u2014 stars formed in the metal-enriched inner galaxy",
   "Activity Regime":
@@ -503,7 +503,7 @@ export function initStarPage(mountEl) {
       {
         label: "Giant Planet Probability",
         value: `${fmt(model.giantPlanetProbability * 100, 1)}%`,
-        meta: "Fischer & Valenti (2005)",
+        meta: "Fischer & Valenti (2005); Johnson et al. (2010)",
       },
       {
         label: "Population",

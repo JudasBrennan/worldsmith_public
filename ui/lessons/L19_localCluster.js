@@ -155,8 +155,9 @@ export function buildLesson19(mode) {
       <p>Planet formation correlates with metallicity: the probability of
         hosting a gas giant scales as approximately
         ${iq("P \\propto 10^{2[\\text{Fe/H}]}")} (Fischer & Valenti 2005),
-        while rocky planet occurrence is less metallicity-dependent.</p>
-      ${cite("Nordstr\u00f6m et al. (2004, A&A 418, 989); Fischer & Valenti (2005, ApJ 622, 1102)")}`,
+        with a baseline near 7% at solar metallicity, while rocky planet
+        occurrence is less metallicity-dependent.</p>
+      ${cite("Nordstr\u00f6m et al. (2004, A&A 418, 989); Fischer & Valenti (2005, ApJ 622, 1102); Johnson et al. (2010, PASP 122, 905)")}`,
       mode,
     ),
 

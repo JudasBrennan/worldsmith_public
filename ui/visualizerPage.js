@@ -204,7 +204,7 @@ const TIP_LABEL = {
   "Hill spheres":
     "Show the Hill sphere \u2014 the gravitational sphere of influence \u2014 around each planet and gas giant. Defines the maximum region where stable satellite orbits can exist.",
   "Lagrange points":
-    "Show L1\u2013L5 equilibrium positions for each star\u2013body pair. L4 and L5 (leading and trailing Trojans, \u00b160\u00b0) are stable and shown for all bodies. Click a body to reveal all five points including L1/L2 (near the body) and L3 (opposite side of star).",
+    "Show L1\u2013L5 equilibrium positions for each star\u2013body pair. L4 and L5 (leading and trailing Trojans, \u00b160\u00b0) are shown for all bodies; stable points appear in cyan, unstable ones (body exceeds the Gascheau mass limit \u03bc \u2248 0.0385) are dimmed in amber. Click a body to reveal all five points including L1/L2 (near the body) and L3 (opposite side of star).",
   "Frost line":
     "Show the H\u2082O frost line \u2014 the distance beyond which water ice can condense.",
   Distances: "Show orbital distance (AU) alongside body name labels.",
@@ -2271,6 +2271,24 @@ export function initVisualiserPage(root, options = {}) {
     };
     const addLagrangeMarkerNative = (screenX, screenY, label, mode) => {
       const p = toThreeXY(metrics, screenX, screenY);
+      if (mode === "trojan-unstable") {
+        const s = 4;
+        const geom = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(p.x, p.y - s, 9.5),
+          new THREE.Vector3(p.x + s, p.y, 9.5),
+          new THREE.Vector3(p.x, p.y + s, 9.5),
+          new THREE.Vector3(p.x - s, p.y, 9.5),
+          new THREE.Vector3(p.x, p.y - s, 9.5),
+        ]);
+        const mat = new THREE.LineBasicMaterial({
+          color: 0xffd37c,
+          transparent: true,
+          opacity: 0.3,
+          depthWrite: false,
+        });
+        nativeThree.systemGroup.add(new THREE.Line(geom, mat));
+        return;
+      }
       if (mode === "trojan") {
         const s = 4;
         const geom = new THREE.BufferGeometry().setFromPoints([
@@ -4002,7 +4020,8 @@ export function initVisualiserPage(root, options = {}) {
             cx,
             cy,
           );
-          addLagrangeMarkerNative(sp.x, sp.y, pt.label, isFocused ? "full" : "trojan");
+          const mode = !pt.stable ? "trojan-unstable" : isFocused ? "full" : "trojan";
+          addLagrangeMarkerNative(sp.x, sp.y, pt.label, mode);
         }
         if (isFocused) {
           for (const key of ["L1", "L2", "L3"]) {
@@ -4039,7 +4058,8 @@ export function initVisualiserPage(root, options = {}) {
             cx,
             cy,
           );
-          addLagrangeMarkerNative(sp.x, sp.y, pt.label, isFocused ? "full" : "trojan");
+          const mode = !pt.stable ? "trojan-unstable" : isFocused ? "full" : "trojan";
+          addLagrangeMarkerNative(sp.x, sp.y, pt.label, mode);
         }
         if (isFocused) {
           for (const key of ["L1", "L2", "L3"]) {

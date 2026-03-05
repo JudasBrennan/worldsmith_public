@@ -267,14 +267,18 @@ export function calcHabitableZoneAu({ luminosityLsol, teffK }) {
 }
 
 // ---------------------------------------------------------------------------
-// Giant Planet Probability: Fischer & Valenti (2005, ApJ 622, 1102)
+// Giant Planet Probability
 // ---------------------------------------------------------------------------
-// Probability that a solar-type star hosts a giant planet (>0.3 Mjup) scales
-// as P ∝ 10^(2·[Fe/H]).  Baseline ~10% at solar metallicity for FGK dwarfs
-// (Cumming et al. 2008, PASP 120, 531).  Clamped to [0, 1].
-export function giantPlanetProbability(metallicityFeH) {
+// Probability that a star hosts at least one giant planet (>0.3 Mjup).
+// Metallicity scaling: P ∝ 10^(2·[Fe/H]) (Fischer & Valenti 2005, still
+// broadly accepted).  Baseline refined to ~7% at solar mass and metallicity
+// from Kepler-era surveys (Petigura et al. 2018; Zink et al. 2023).
+// Stellar mass dependence: f(M) ≈ M (Johnson et al. 2010, PASP 122, 905).
+// Optional massMsol defaults to 1.0 for backwards compatibility.
+export function giantPlanetProbability(metallicityFeH, massMsol) {
   const feH = clamp(toFinite(metallicityFeH, 0), -3, 1);
-  return clamp(0.1 * 10 ** (2 * feH), 0, 1);
+  const mass = clamp(toFinite(massMsol, 1), 0.075, 10);
+  return clamp(0.07 * mass * 10 ** (2 * feH), 0, 1);
 }
 
 // Stellar population label based on [Fe/H].
@@ -682,7 +686,7 @@ export function calcStar({
     },
 
     earthLikeLifePossible,
-    giantPlanetProbability: giantPlanetProbability(metallicityFeH),
+    giantPlanetProbability: giantPlanetProbability(metallicityFeH, m),
     populationLabel: populationLabel(metallicityFeH),
 
     metric: {

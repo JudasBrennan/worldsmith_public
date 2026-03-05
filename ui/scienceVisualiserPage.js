@@ -620,7 +620,7 @@ export function initScienceVisualiserPage(mountEl) {
       <div class="panel science-viz-panel">
         <div class="panel__header">
           <h1 class="panel__title">
-            <span class="ws-icon icon--science" aria-hidden="true"></span>
+            <span class="ws-icon icon--science-viz" aria-hidden="true"></span>
             <span>Science Visualiser</span>
           </h1>
           <div class="viz-canvas-actions science-viz__actions">

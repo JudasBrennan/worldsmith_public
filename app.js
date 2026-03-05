@@ -141,9 +141,9 @@ function route() {
   const [_, path] = hash.split("#/");
   const key = (path || "star").split("?")[0];
 
-  // highlight nav (simple)
+  // highlight nav
   const navKey = key === "cluster-viz" ? "viz" : key;
-  document.querySelectorAll(".top-nav__link, .side-nav__item").forEach((a) => {
+  document.querySelectorAll(".side-nav__item").forEach((a) => {
     if (!a.getAttribute("href")) return;
     a.classList.toggle("is-active", a.getAttribute("href") === `#/${navKey}`);
   });
@@ -240,7 +240,62 @@ function maybeShowStartupSolPresetPrompt() {
 
 window.addEventListener("hashchange", route);
 
+/* ── Collapsible sidebar / mobile drawer ─────────────── */
+
+function initNav() {
+  const sideNav = document.querySelector(".side-nav");
+  const hamburger = document.getElementById("navHamburger");
+  const backdrop = document.getElementById("navBackdrop");
+
+  // Always start collapsed
+  sideNav?.classList.add("is-collapsed");
+
+  // Click the collapsed rail to expand
+  sideNav?.addEventListener("click", (e) => {
+    if (!sideNav.classList.contains("is-collapsed")) return;
+    // Don't expand if user clicked a nav link (let navigation happen)
+    if (e.target.closest(".side-nav__item")) return;
+    sideNav.classList.remove("is-collapsed");
+  });
+
+  // Click outside the expanded sidebar to collapse
+  document.addEventListener("click", (e) => {
+    if (!sideNav || sideNav.classList.contains("is-collapsed")) return;
+    if (sideNav.contains(e.target)) return;
+    sideNav.classList.add("is-collapsed");
+  });
+
+  // Collapse after clicking a nav link
+  sideNav?.addEventListener("click", (e) => {
+    if (e.target.closest(".side-nav__item")) {
+      sideNav.classList.add("is-collapsed");
+    }
+  });
+
+  // Escape key collapses sidebar
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      sideNav?.classList.add("is-collapsed");
+      closeMobileNav();
+    }
+  });
+
+  function closeMobileNav() {
+    sideNav?.classList.remove("is-open");
+    backdrop?.classList.remove("is-visible");
+  }
+
+  hamburger?.addEventListener("click", () => {
+    sideNav?.classList.add("is-open");
+    backdrop?.classList.add("is-visible");
+  });
+
+  backdrop?.addEventListener("click", closeMobileNav);
+  window.addEventListener("hashchange", closeMobileNav);
+}
+
 function startApp() {
+  initNav();
   route();
   maybeShowStartupSolPresetPrompt();
 }

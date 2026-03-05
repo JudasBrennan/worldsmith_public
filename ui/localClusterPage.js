@@ -54,7 +54,7 @@ const TIP_LABEL = {
   "[Fe/H]":
     "Iron abundance relative to the Sun on a logarithmic scale. [Fe/H] = 0 is solar; +0.3 means twice solar iron; -1.0 means one-tenth.\n\nGenerated from galactic position (radial gradient -0.06 dex/kpc, vertical gradient -0.30 dex/kpc) plus Gaussian scatter (sigma 0.20 dex). The home system uses the value set on the Star page.\n\nReferences: Nordstrom et al. (2004); Luck & Lambert (2011); Schlesinger et al. (2014).",
   "P(giant)":
-    "Estimated probability of hosting at least one giant planet (> 0.3 Mjup), based on the Fischer & Valenti (2005) metallicity-planet correlation: P = 0.1 * 10^(2*[Fe/H]), clamped to 0-100%.\n\nMetal-rich stars are far more likely to host gas giants; at [Fe/H] = +0.3 the probability is ~40%.",
+    "Estimated probability of hosting at least one giant planet (> 0.3 Mjup), based on the Fischer & Valenti (2005) metallicity-planet correlation with Kepler-era baseline: P = 0.07 * M * 10^(2*[Fe/H]), clamped to 0\u2013100%. Assumes 1 Msol in cluster view (mass dependence not applied).\n\nMetal-rich stars are far more likely to host gas giants; at [Fe/H] = +0.3 the probability is ~28%.",
 };
 
 function formatLy(value, dp = 2) {

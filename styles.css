@@ -51,36 +51,36 @@ html {
     "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-/* ── Light theme ─────────────────────────────────────────── */
+/* ── Light theme (Paper Dashboard: E1DADE / 88C6E8 / 369AEC / EAAB54 / 37455E) */
 [data-theme="light"] {
-  --bg: #f0f1f5;
-  --panel: #ffffff;
-  --panel-2: #f5f6fa;
-  --text: #1a1d2e;
-  --muted: #5a5f7a;
+  --bg: #e1dade;
+  --panel: #ede9e7;
+  --panel-2: #e6e2df;
+  --text: #37455e;
+  --muted: #6a7588;
   --overlay-color: 0, 0, 0;
-  --bg-rgb: 240, 241, 245;
-  --panel-rgb: 255, 255, 255;
-  --accent-rgb: 48, 112, 200;
-  --good-rgb: 26, 138, 72;
+  --bg-rgb: 225, 218, 222;
+  --panel-rgb: 237, 233, 231;
+  --accent-rgb: 54, 154, 236;
+  --good-rgb: 42, 128, 72;
   --bad-rgb: 200, 48, 80;
-  --warn-rgb: 176, 122, 0;
-  --border: rgba(0, 0, 0, 0.12);
-  --focus: rgba(var(--accent-rgb), 0.35);
-  --good: #1a8a48;
-  --warn: #b07a00;
+  --warn-rgb: 176, 132, 40;
+  --border: rgba(55, 69, 94, 0.14);
+  --focus: rgba(136, 198, 232, 0.45);
+  --good: #2a8048;
+  --warn: #b08428;
   --bad: #c83050;
-  --accent: #3070c8;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  --moon-c0: #2a6ea0;
-  --moon-c1: #b07020;
-  --moon-c2: #7040a8;
-  --moon-c3: #208050;
-  --astro-default: #2a70a8;
+  --accent: #369aec;
+  --shadow: 0 10px 30px rgba(55, 69, 94, 0.1);
+  --moon-c0: #2a7aaa;
+  --moon-c1: #a08020;
+  --moon-c2: #6a40a0;
+  --moon-c3: #2a7a50;
+  --astro-default: #2a80b8;
   --astro-vernal: #1a7a3a;
   --astro-summer: #a08518;
   --astro-autumn: #a86818;
-  --astro-winter: #2a78a0;
+  --astro-winter: #2a80b8;
   --astro-solar-eclipse: #b04a20;
   --astro-lunar-eclipse: #6838a0;
 }
@@ -135,17 +135,9 @@ a:hover {
   text-decoration: underline;
 }
 
+/* ── Mobile-only header ───────────────────────────────── */
 .app-header {
-  flex-shrink: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--gap);
-  padding: 14px 18px;
-  background: rgba(var(--bg-rgb), 0.75);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
+  display: none;
 }
 
 .brand {
@@ -169,6 +161,9 @@ a:hover {
   border-radius: 14px;
   box-shadow: var(--shadow);
 }
+[data-theme="light"] .brand__mark {
+  background-image: url(favicon-light.svg);
+}
 .brand__title {
   font-weight: 700;
   letter-spacing: 0.2px;
@@ -179,31 +174,56 @@ a:hover {
   margin-top: 2px;
 }
 
-.top-nav {
-  display: flex;
-  gap: 10px;
-}
-.top-nav__link {
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-}
-.top-nav__link:hover {
+/* ── Hamburger button (mobile only) ───────────────────── */
+.nav-hamburger {
+  display: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
   background: rgba(var(--overlay-color), 0.06);
-  border-color: var(--border);
-  text-decoration: none;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
 }
+.nav-hamburger:hover {
+  background: rgba(var(--overlay-color), 0.12);
+  border-color: rgba(var(--overlay-color), 0.18);
+}
+
 .is-disabled {
   opacity: 0.45;
   pointer-events: none;
 }
 
-/* ── Theme toggle ──────────────────────────────────────── */
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* ── Theme / splash toggles ───────────────────────────── */
+.discord-link {
   flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(var(--overlay-color), 0.06);
+  color: #5865f2;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
+}
+.discord-link:hover {
+  background: rgba(88, 101, 242, 0.15);
+  border-color: rgba(88, 101, 242, 0.35);
+}
+.discord-link__icon {
+  width: 20px;
+  height: 20px;
 }
 .splash-toggle {
   display: inline-flex;
@@ -281,41 +301,141 @@ a:hover {
   overflow-y: auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: auto 1fr;
   gap: var(--gap);
   padding: 18px max(18px, calc((100% - 1264px) / 2));
   width: 100%;
 }
 
+/* ── Side navigation / icon rail ──────────────────────── */
 .side-nav {
   position: sticky;
   top: 0;
   align-self: start;
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+  width: 240px;
   background: rgba(var(--panel-rgb), 0.65);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 6px;
   box-shadow: var(--shadow);
+  transition: width 200ms ease;
+  overflow: hidden;
+}
+.side-nav__scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+.side-nav.is-collapsed {
+  width: 52px;
+}
+
+/* Brand area at top of sidebar */
+.side-nav__brand {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  overflow: hidden;
+}
+.side-nav__brand-text {
+  transition:
+    opacity 120ms ease,
+    height 120ms ease,
+    margin 120ms ease;
+}
+.side-nav.is-collapsed .side-nav__brand {
+  padding: 4px 0 8px;
+  border-bottom: none;
+}
+.side-nav.is-collapsed .side-nav__brand-text {
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Controls area at bottom of sidebar */
+.side-nav__footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 6px 2px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+.side-nav__footer > .version-tag {
+  width: 100%;
+  text-align: center;
+}
+.side-nav.is-collapsed .side-nav__footer {
+  display: none;
 }
 
 .side-nav__group {
-  padding: 8px;
+  padding: 2px 6px;
 }
+.side-nav.is-collapsed .side-nav__group {
+  padding: 4px 0;
+}
+
 .side-nav__label {
   font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin: 6px 6px 10px;
+  margin: 2px 6px 2px;
+  transition:
+    opacity 120ms ease,
+    height 120ms ease,
+    margin 120ms ease;
+  white-space: nowrap;
 }
+.side-nav.is-collapsed .side-nav__label {
+  opacity: 0;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .side-nav__item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 10px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
   border: 1px solid transparent;
 }
+.side-nav.is-collapsed .side-nav__item {
+  justify-content: center;
+  padding: 4px 0;
+  gap: 0;
+}
+
+.side-nav__item-label {
+  transition: opacity 120ms ease;
+  white-space: nowrap;
+}
+.side-nav.is-collapsed .side-nav__item-label {
+  opacity: 0;
+  width: 0;
+  pointer-events: none;
+}
+
 .side-nav__item:hover {
   background: rgba(var(--overlay-color), 0.06);
   border-color: var(--border);
@@ -325,9 +445,110 @@ a:hover {
   background: rgba(var(--accent-rgb), 0.1);
   border-color: rgba(var(--accent-rgb), 0.3);
 }
-.top-nav__link.is-active {
-  background: rgba(var(--accent-rgb), 0.1);
-  border-color: rgba(var(--accent-rgb), 0.3);
+
+/* Expanded sidebar shows pointer on collapsed rail */
+.side-nav.is-collapsed {
+  cursor: pointer;
+}
+
+/* Expand hint (collapsed only) */
+.side-nav__expand-hint {
+  display: none;
+}
+.side-nav.is-collapsed .side-nav__expand-hint {
+  display: block;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 4px 0 2px;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* ── Light-mode sidebar overrides ───────────────────── */
+[data-theme="light"] .side-nav {
+  background: rgba(var(--panel-rgb), 0.88);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+[data-theme="light"] .icon--star {
+  background-image: url("./assets/icons/light/star.svg");
+}
+[data-theme="light"] .icon--system {
+  background-image: url("./assets/icons/light/system.svg");
+}
+[data-theme="light"] .icon--inner-planets {
+  background-image: url("./assets/icons/light/inner-planets.svg");
+}
+[data-theme="light"] .icon--outer-objects {
+  background-image: url("./assets/icons/light/outer-objects.svg");
+}
+[data-theme="light"] .icon--moons {
+  background-image: url("./assets/icons/light/moons.svg");
+}
+[data-theme="light"] .icon--visualiser {
+  background-image: url("./assets/icons/light/visualiser.svg");
+}
+[data-theme="light"] .icon--local-cluster {
+  background-image: url("./assets/icons/light/local-cluster.svg");
+}
+[data-theme="light"] .icon--local-cluster-viz {
+  background-image: url("./assets/icons/light/local-cluster-viz.svg");
+}
+[data-theme="light"] .icon--import-export {
+  background-image: url("./assets/icons/light/import-export.svg");
+}
+[data-theme="light"] .icon--about {
+  background-image: url("./assets/icons/light/about.svg");
+}
+[data-theme="light"] .icon--apparent {
+  background-image: url("./assets/icons/light/apparent.svg");
+}
+[data-theme="light"] .icon--calendar {
+  background-image: url("./assets/icons/light/calendar.svg");
+}
+[data-theme="light"] .icon--science {
+  background-image: url("./assets/icons/light/science.svg");
+}
+[data-theme="light"] .icon--science-viz {
+  background-image: url("./assets/icons/light/science-viz.svg");
+}
+[data-theme="light"] .icon--tectonics {
+  background-image: url("./assets/icons/light/tectonics.svg");
+}
+[data-theme="light"] .icon--climate {
+  background-image: url("./assets/icons/light/climate.svg");
+}
+[data-theme="light"] .icon--population {
+  background-image: url("./assets/icons/light/population.svg");
+}
+[data-theme="light"] .icon--lessons {
+  background-image: url("./assets/icons/light/lessons.svg");
+}
+[data-theme="light"] .side-nav__item {
+  color: var(--text);
+}
+[data-theme="light"] .side-nav__label {
+  color: var(--muted);
+  font-weight: 600;
+}
+[data-theme="light"] .side-nav__item.is-active {
+  background: rgba(var(--accent-rgb), 0.14);
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+[data-theme="light"] .side-nav__expand-hint {
+  color: var(--text);
+}
+
+/* ── Mobile nav backdrop ─────────────────────────────── */
+.nav-backdrop {
+  display: none;
+}
+.nav-backdrop.is-visible {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .content {
@@ -410,6 +631,9 @@ a:hover {
 }
 .icon--science {
   background-image: url("./assets/icons/science.svg");
+}
+.icon--science-viz {
+  background-image: url("./assets/icons/science-viz.svg");
 }
 .icon--tectonics {
   background-image: url("./assets/icons/tectonics.svg");
@@ -718,41 +942,86 @@ button.primary:hover {
   opacity: 0.5;
 }
 
-@media (max-width: 1640px) {
-  .top-nav__link {
-    font-size: 14px;
-  }
-}
-@media (max-width: 1505px) {
-  .top-nav__link {
-    font-size: 12px;
-  }
-}
 @media (max-width: 980px) {
   .app-header {
-    flex-direction: column;
-    align-items: stretch;
+    display: flex;
+    align-items: center;
     gap: 10px;
+    padding: 10px 14px;
+    background: rgba(var(--bg-rgb), 0.75);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
   }
-  .top-nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .top-nav__link {
-    flex: 0 0 auto;
-  }
-  .header-controls {
-    justify-content: flex-end;
+  .nav-hamburger {
+    display: grid;
   }
   .app-main {
     grid-template-columns: 1fr;
   }
-  .side-nav {
-    position: static;
+  /* Hide sidebar entirely on mobile — no collapsed rail */
+  .side-nav,
+  .side-nav.is-collapsed {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    bottom: 8px;
+    z-index: 100;
+    width: 240px;
+    max-height: none;
+    padding: 6px;
+    background: rgba(var(--panel-rgb), 0.95);
+    backdrop-filter: blur(12px);
+    transform: translateX(calc(-100% - 16px));
+    transition: transform 200ms ease;
+    overflow-y: auto;
+    cursor: default;
+  }
+  .side-nav.is-open {
+    transform: translateX(0);
+  }
+  /* Reset all collapsed overrides so drawer looks like desktop expanded */
+  .side-nav.is-collapsed .side-nav__item-label,
+  .side-nav.is-open .side-nav__item-label {
+    opacity: 1;
+    width: auto;
+    pointer-events: auto;
+  }
+  .side-nav.is-collapsed .side-nav__label,
+  .side-nav.is-open .side-nav__label {
+    opacity: 1;
+    height: auto;
+    margin: 2px 6px 2px;
+    overflow: visible;
+    pointer-events: auto;
+  }
+  .side-nav.is-collapsed .side-nav__brand-text,
+  .side-nav.is-open .side-nav__brand-text {
+    opacity: 1;
+    height: auto;
+    overflow: visible;
+    pointer-events: auto;
+  }
+  .side-nav.is-collapsed .side-nav__item,
+  .side-nav.is-open .side-nav__item {
+    justify-content: flex-start;
+    padding: 4px 8px;
+    gap: 8px;
+  }
+  .side-nav.is-collapsed .side-nav__group,
+  .side-nav.is-open .side-nav__group {
+    padding: 2px 6px;
+  }
+  .side-nav.is-collapsed .side-nav__brand,
+  .side-nav.is-open .side-nav__brand {
+    border-bottom: 1px solid var(--border);
+    padding: 4px 6px 6px;
+  }
+  .side-nav.is-collapsed .side-nav__footer,
+  .side-nav.is-open .side-nav__footer {
+    display: flex;
+  }
+  .side-nav__expand-hint {
+    display: none !important;
   }
   .grid-2 {
     grid-template-columns: 1fr;
@@ -788,7 +1057,7 @@ body::before {
   background: radial-gradient(ellipse at 50% 30%, #141834 0%, #0b0e1a 70%);
 }
 [data-theme="light"] body::before {
-  background: radial-gradient(ellipse at 50% 30%, #f4f5fa 0%, #e6e7f0 70%);
+  background: radial-gradient(ellipse at 50% 30%, #e8e2df 0%, #d6cfcc 70%);
 }
 
 /* Ensure app content sits above the fixed background */
@@ -2458,6 +2727,9 @@ input.auto-value {
   overflow: hidden;
   --sun-kpi-text-shadow:
     0 2px 6px rgba(0, 0, 0, 0.98), 0 0 16px rgba(0, 0, 0, 0.84), 0 0 2px rgba(0, 0, 0, 0.95);
+}
+[data-theme="light"] .kpi.kpi--sun-preview {
+  --sun-kpi-text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
 .kpi.kpi--sun-preview > .kpi__label {
@@ -4328,6 +4600,249 @@ input.auto-value {
   background: rgba(var(--panel-rgb), 0.96);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
+
+/* ── Changelog toast ──────────────────────────────────────── */
+.changelog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  animation: changelog-fade-in 0.15s ease-out;
+}
+@keyframes changelog-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.changelog-toast {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(var(--panel-rgb), 0.96);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  animation: changelog-slide-in 0.2s ease-out;
+}
+@keyframes changelog-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+.changelog-toast__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.changelog-toast__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.changelog-toast__close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.changelog-toast__close:hover {
+  color: var(--text);
+}
+.changelog-toast__body {
+  overflow-y: auto;
+  padding: 8px 20px 20px;
+  scrollbar-width: thin;
+}
+.changelog-release {
+  border-bottom: 1px solid var(--border);
+}
+.changelog-release:last-child {
+  border-bottom: none;
+}
+.changelog-release__summary {
+  padding: 10px 0;
+  cursor: pointer;
+  font-size: 14px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.changelog-release__summary::-webkit-details-marker {
+  display: none;
+}
+.changelog-release__summary::before {
+  content: "\25B6";
+  font-size: 9px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+.changelog-release[open] > .changelog-release__summary::before {
+  transform: rotate(90deg);
+}
+.changelog-release__note {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.changelog-release ul {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.changelog-release li {
+  margin-bottom: 4px;
+}
+.changelog-scientist {
+  margin: 8px 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(var(--overlay-color), 0.04);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.changelog-scientist__title {
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.changelog-scientist__detail {
+  color: var(--muted);
+}
+.changelog-scientist__summary {
+  color: var(--muted);
+  margin-top: 2px;
+  font-style: italic;
+}
+[data-theme="light"] .changelog-toast {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Light-mode content contrast fixes ─────────────────
+   Many components use hardcoded light-on-dark text colours
+   (rgba(220–240, 225–245, 240–255, 0.85–0.95)) that are
+   invisible against light backgrounds. This block resets
+   them to theme-aware variables.
+   ────────────────────────────────────────────────────── */
+
+/* Dark inner backgrounds → lighter tint in light mode */
+[data-theme="light"] .calendar-grid-wrap,
+[data-theme="light"] .calendar-holiday-filter-bar,
+[data-theme="light"] .calendar-selected-day,
+[data-theme="light"] .calendar-date-tools,
+[data-theme="light"] .calendar-moon-legend,
+[data-theme="light"] .calendar-season-band,
+[data-theme="light"] .calendar-item-row,
+[data-theme="light"] .calendar-compact-card,
+[data-theme="light"] .calendar-compact-events {
+  background: rgba(var(--overlay-color), 0.05);
+}
+
+/* Hardcoded light text → theme variable */
+[data-theme="light"] .calendar-mini-day,
+[data-theme="light"] .calendar-day-btn,
+[data-theme="light"] .calendar-chip,
+[data-theme="light"] .calendar-holiday-chip,
+[data-theme="light"] .calendar-holiday-filter,
+[data-theme="light"] .calendar-holiday-attr,
+[data-theme="light"] .calendar-selected-day__line,
+[data-theme="light"] .calendar-date-tools__row label,
+[data-theme="light"] .calendar-compact-events ul,
+[data-theme="light"] .calendar-season-band__meta,
+[data-theme="light"] .calendar-season-band__tick-label,
+[data-theme="light"] .calendar-collapse-toggle,
+[data-theme="light"] .calendar-selected-day__holiday-cat,
+[data-theme="light"] .calendar-week-col,
+[data-theme="light"] .calendar-grid-table thead th,
+[data-theme="light"] .calendar-mini-grid th,
+[data-theme="light"] .calendar-moon-legend__item {
+  color: var(--text);
+}
+
+/* Day mini text and festival overrides */
+[data-theme="light"] .calendar-mini-day.is-festival,
+[data-theme="light"] .calendar-mini-day.is-festival .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-mini-day__holiday--astro,
+[data-theme="light"] .calendar-mini-day__holiday--cycle {
+  color: var(--text);
+}
+
+/* Holiday marks: use opaque colours instead of translucent light tones */
+[data-theme="light"] .calendar-selected-day__holiday-mark,
+[data-theme="light"] .calendar-mini-day__holiday {
+  color: #7a5a00;
+  border-color: rgba(180, 140, 40, 0.45);
+  background: rgba(220, 180, 60, 0.2);
+}
+
+/* Moon phase colours */
+[data-theme="light"] .calendar-day-btn.is-full-moon .calendar-day-btn__phase {
+  color: #2a6ea0;
+}
+[data-theme="light"] .calendar-day-btn.is-new-moon .calendar-day-btn__phase {
+  color: #6838a0;
+}
+
+/* Pill-toggle checked label text */
+[data-theme="light"] .physics-trio-toggle input[type="radio"]:checked + label,
+[data-theme="light"] .physics-duo-toggle input[type="radio"]:checked + label {
+  color: var(--text);
+}
+
+/* Holiday tag colours — darken for light backgrounds */
+[data-theme="light"] .holiday-tag-gold .calendar-day-btn__holiday,
+[data-theme="light"] .holiday-tag-gold .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-holiday-chip.holiday-tag-gold {
+  color: #7a5a00;
+  border-color: rgba(180, 140, 40, 0.45);
+}
+[data-theme="light"] .holiday-tag-azure .calendar-day-btn__holiday,
+[data-theme="light"] .holiday-tag-azure .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-holiday-chip.holiday-tag-azure {
+  color: #1a5a9a;
+  border-color: rgba(40, 100, 180, 0.45);
+}
+[data-theme="light"] .holiday-tag-emerald .calendar-day-btn__holiday,
+[data-theme="light"] .holiday-tag-emerald .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-holiday-chip.holiday-tag-emerald {
+  color: #1a7a3a;
+  border-color: rgba(40, 150, 80, 0.45);
+}
+[data-theme="light"] .holiday-tag-violet .calendar-day-btn__holiday,
+[data-theme="light"] .holiday-tag-violet .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-holiday-chip.holiday-tag-violet {
+  color: #5a2a9a;
+  border-color: rgba(120, 60, 200, 0.45);
+}
+[data-theme="light"] .holiday-tag-rose .calendar-day-btn__holiday,
+[data-theme="light"] .holiday-tag-rose .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-holiday-chip.holiday-tag-rose {
+  color: #9a2a5a;
+  border-color: rgba(180, 60, 120, 0.45);
+}
+[data-theme="light"] .holiday-tag-slate .calendar-day-btn__holiday,
+[data-theme="light"] .holiday-tag-slate .calendar-mini-day__holiday,
+[data-theme="light"] .calendar-holiday-chip.holiday-tag-slate {
+  color: var(--text);
+  border-color: rgba(var(--overlay-color), 0.2);
+}
+
 @media (max-width: 640px) {
   .ws-tutorial {
     right: 8px;
@@ -4633,7 +5148,6 @@ input.auto-value {
   gap: 12px;
   padding: 14px 16px;
   background: rgba(var(--overlay-color), 0.03);
-  border-bottom: 1px solid var(--border);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -4647,9 +5161,6 @@ input.auto-value {
   color: var(--muted);
   transition: transform 0.15s;
   flex-shrink: 0;
-}
-.les-section[open] > .les-section__summary {
-  border-bottom: 1px solid var(--border);
 }
 .les-section[open] > .les-section__summary::before {
   transform: rotate(90deg);

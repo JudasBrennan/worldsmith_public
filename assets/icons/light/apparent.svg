@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <linearGradient id="g-app" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a78b8" />
+      <stop offset="1" stop-color="#1a68a8" />
+    </linearGradient>
+  </defs>
+  <path
+    d="M2.2 12c2.2-3.5 5.8-5.5 9.8-5.5S19.6 8.5 21.8 12c-2.2 3.5-5.8 5.5-9.8 5.5S4.4 15.5 2.2 12Z"
+    stroke="url(#g-app)"
+    stroke-width="1.7"
+    stroke-linejoin="round"
+  />
+  <circle cx="12" cy="12" r="2.3" fill="url(#g-app)" />
+  <path
+    d="M6.1 5.2h4.2M6.1 5.2v3.4M10.3 5.2v3.4M6.1 8.6h4.2"
+    stroke="#c08a20"
+    stroke-width="1.4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

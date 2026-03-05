@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Blackboard frame -->
+  <rect x="2" y="3" width="20" height="15" rx="1.5" fill="#1c2a45" stroke="#6f93d8" stroke-width="1.1"/>
+  <!-- Chalk tray -->
+  <rect x="4" y="18.5" width="16" height="1.6" rx="0.8" fill="#6f93d8" opacity="0.5"/>
+  <!-- Easel legs -->
+  <line x1="7" y1="20.5" x2="5.5" y2="23" stroke="#6f93d8" stroke-width="1.1" stroke-linecap="round"/>
+  <line x1="17" y1="20.5" x2="18.5" y2="23" stroke="#6f93d8" stroke-width="1.1" stroke-linecap="round"/>
+  <!-- Graph line on board -->
+  <path d="M5 14l3-3 2.5 2 3-4 2.5 1.5L19 7" stroke="#ffd36e" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Axis lines -->
+  <line x1="5" y1="14.5" x2="19" y2="14.5" stroke="#8de0c8" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>
+  <line x1="5" y1="5.5" x2="5" y2="14.5" stroke="#8de0c8" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>
+  <!-- Small equation/formula hint -->
+  <text x="14" y="6.8" font-family="serif" font-style="italic" font-size="3.5" fill="#9fd1ff" opacity="0.7">E=mc²</text>
+</svg>

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -7,122 +7,159 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net ws: wss:; worker-src 'self' blob:"
     />
-    <title>WorldSmith Web</title>
+    <title>WorldSmith</title>
+    <script>
+      /* Apply saved theme before first paint to prevent dark→light flash */
+      (function () {
+        var t = localStorage.getItem("worldsmith.theme");
+        if (!t && window.matchMedia("(prefers-color-scheme: light)").matches) t = "light";
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?release=1.18.2" />
+    <link rel="stylesheet" href="./styles.css?release=1.19.0" />
     <!-- Keep version in sync with ui/threeBridge2d.js THREE_VERSION -->
     <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/+esm" />
   </head>
   <body>
     <header class="app-header">
+      <button class="nav-hamburger" id="navHamburger" aria-label="Open navigation">&#9776;</button>
       <div class="brand">
         <div class="brand__mark">WS</div>
         <div class="brand__text">
           <div class="brand__title">WorldSmith Web</div>
-          <div class="brand__subtitle">
-            Worldbuilding calculators <span id="versionTag" class="version-tag">1.18.2</span>
-          </div>
         </div>
-      </div>
-
-      <nav class="top-nav" aria-label="Primary">
-        <a class="top-nav__link" href="#/star">Star</a>
-        <a class="top-nav__link" href="#/system">Planetary System</a>
-        <a class="top-nav__link" href="#/planet">Planets</a>
-        <a class="top-nav__link" href="#/moon">Moons</a>
-        <a class="top-nav__link" href="#/outer">Other Objects</a>
-        <a class="top-nav__link" href="#/cluster">Local Cluster</a>
-        <a class="top-nav__link" href="#/viz">Visualiser</a>
-        <a class="top-nav__link" href="#/io">Import/Export</a>
-        <a class="top-nav__link" href="#/about">About WorldSmith</a>
-        <a class="top-nav__link" href="#/lessons">Lessons</a>
-        <a class="top-nav__link" href="#/science">Science &amp; Maths</a>
-      </nav>
-      <div class="header-controls">
-        <label class="splash-toggle" for="splashToggle" title="Enable splash screen at startup">
-          <input
-            id="splashToggle"
-            class="splash-toggle__input"
-            type="checkbox"
-            aria-label="Enable splash screen at startup"
-          />
-          <span class="splash-toggle__label">Splash</span>
-        </label>
-        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">
-          <span class="theme-toggle__sun">&#9788;</span>
-          <span class="theme-toggle__moon">&#9789;</span>
-        </button>
       </div>
     </header>
 
     <main class="app-main">
-      <aside class="side-nav" aria-label="Sections">
-        <div class="side-nav__group">
-          <div class="side-nav__label">Core</div>
-          <a class="side-nav__item" href="#/star"
-            ><span class="ws-icon icon--star" aria-hidden="true"></span><span>Star</span></a
-          >
-          <a class="side-nav__item" href="#/system"
-            ><span class="ws-icon icon--system" aria-hidden="true"></span
-            ><span>Planetary System</span></a
-          >
-          <a class="side-nav__item" href="#/planet"
-            ><span class="ws-icon icon--inner-planets" aria-hidden="true"></span
-            ><span>Planets</span></a
-          >
-          <a class="side-nav__item" href="#/moon"
-            ><span class="ws-icon icon--moons" aria-hidden="true"></span><span>Moons</span></a
-          >
-          <a class="side-nav__item" href="#/outer"
-            ><span class="ws-icon icon--outer-objects" aria-hidden="true"></span
-            ><span>Other Objects</span></a
-          >
-          <a class="side-nav__item" href="#/cluster"
-            ><span class="ws-icon icon--local-cluster" aria-hidden="true"></span
-            ><span>Local Cluster</span></a
-          >
-          <a class="side-nav__item" href="#/viz"
-            ><span class="ws-icon icon--visualiser" aria-hidden="true"></span
-            ><span>Visualiser</span></a
-          >
-          <a class="side-nav__item" href="#/io"
-            ><span class="ws-icon icon--import-export" aria-hidden="true"></span
-            ><span>Import/Export</span></a
-          >
+      <div class="nav-backdrop" id="navBackdrop"></div>
+      <aside class="side-nav is-collapsed" aria-label="Sections">
+        <div class="side-nav__brand">
+          <div class="brand__mark">WS</div>
+          <div class="side-nav__brand-text">
+            <div class="brand__title">WorldSmith</div>
+          </div>
         </div>
 
-        <div class="side-nav__group">
-          <div class="side-nav__label">Extra</div>
-          <a class="side-nav__item" href="#/apparent"
-            ><span class="ws-icon icon--apparent" aria-hidden="true"></span
-            ><span>Apparent Size &amp; Brightness</span></a
-          >
-          <a class="side-nav__item" href="#/tectonics"
-            ><span class="ws-icon icon--tectonics" aria-hidden="true"></span
-            ><span>Tectonics</span></a
-          >
-          <a class="side-nav__item" href="#/climate"
-            ><span class="ws-icon icon--climate" aria-hidden="true"></span
-            ><span>Climate Zones</span></a
-          >
-          <a class="side-nav__item" href="#/population"
-            ><span class="ws-icon icon--population" aria-hidden="true"></span
-            ><span>Population</span></a
-          >
-          <a class="side-nav__item" href="#/calendar"
-            ><span class="ws-icon icon--calendar" aria-hidden="true"></span><span>Calendar</span></a
-          >
-          <a class="side-nav__item" href="#/lessons"
-            ><span class="ws-icon icon--lessons" aria-hidden="true"></span><span>Lessons</span></a
-          >
-          <a class="side-nav__item" href="#/science"
-            ><span class="ws-icon icon--science" aria-hidden="true"></span
-            ><span>Science &amp; Maths</span></a
-          >
-          <a class="side-nav__item" href="#/science-viz"
-            ><span class="ws-icon icon--science" aria-hidden="true"></span
-            ><span>Science Visualiser</span></a
-          >
+        <div class="side-nav__scroll">
+          <div class="side-nav__group">
+            <div class="side-nav__label">Cosmos</div>
+            <a class="side-nav__item" href="#/star" title="Star"
+              ><span class="ws-icon icon--star" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Star</span></a
+            >
+            <a class="side-nav__item" href="#/system" title="Planetary System"
+              ><span class="ws-icon icon--system" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Planetary System</span></a
+            >
+            <a class="side-nav__item" href="#/cluster" title="Local Cluster"
+              ><span class="ws-icon icon--local-cluster" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Local Cluster</span></a
+            >
+          </div>
+
+          <div class="side-nav__group">
+            <div class="side-nav__label">Bodies</div>
+            <a class="side-nav__item" href="#/planet" title="Planets"
+              ><span class="ws-icon icon--inner-planets" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Planets</span></a
+            >
+            <a class="side-nav__item" href="#/moon" title="Moons"
+              ><span class="ws-icon icon--moons" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Moons</span></a
+            >
+            <a class="side-nav__item" href="#/outer" title="Other Objects"
+              ><span class="ws-icon icon--outer-objects" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Other Objects</span></a
+            >
+          </div>
+
+          <div class="side-nav__group">
+            <div class="side-nav__label">Surface</div>
+            <a class="side-nav__item" href="#/tectonics" title="Tectonics"
+              ><span class="ws-icon icon--tectonics" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Tectonics</span></a
+            >
+            <a class="side-nav__item" href="#/climate" title="Climate Zones"
+              ><span class="ws-icon icon--climate" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Climate Zones</span></a
+            >
+            <a class="side-nav__item" href="#/population" title="Population"
+              ><span class="ws-icon icon--population" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Population</span></a
+            >
+          </div>
+
+          <div class="side-nav__group">
+            <div class="side-nav__label">Time &amp; Light</div>
+            <a class="side-nav__item" href="#/calendar" title="Calendar"
+              ><span class="ws-icon icon--calendar" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Calendar</span></a
+            >
+            <a class="side-nav__item" href="#/apparent" title="Apparent Size"
+              ><span class="ws-icon icon--apparent" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Apparent Size</span></a
+            >
+          </div>
+
+          <div class="side-nav__group">
+            <div class="side-nav__label">Tools</div>
+            <a class="side-nav__item" href="#/viz" title="Visualiser"
+              ><span class="ws-icon icon--visualiser" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Visualiser</span></a
+            >
+            <a class="side-nav__item" href="#/science" title="Science &amp; Maths"
+              ><span class="ws-icon icon--science" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Science &amp; Maths</span></a
+            >
+            <a class="side-nav__item" href="#/science-viz" title="Science Visualiser"
+              ><span class="ws-icon icon--science-viz" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Science Visualiser</span></a
+            >
+            <a class="side-nav__item" href="#/lessons" title="Lessons"
+              ><span class="ws-icon icon--lessons" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Lessons</span></a
+            >
+          </div>
+
+          <div class="side-nav__group">
+            <a class="side-nav__item" href="#/io" title="Import/Export"
+              ><span class="ws-icon icon--import-export" aria-hidden="true"></span
+              ><span class="side-nav__item-label">Import/Export</span></a
+            >
+            <a class="side-nav__item" href="#/about" title="About WorldSmith"
+              ><span class="ws-icon icon--about" aria-hidden="true"></span
+              ><span class="side-nav__item-label">About WorldSmith</span></a
+            >
+          </div>
+        </div>
+
+        <div class="side-nav__expand-hint" aria-hidden="true">&raquo;</div>
+
+        <div class="side-nav__footer">
+          <a
+            class="discord-link"
+            href="https://discord.gg/f63SfkW7vh"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Join our Discord"
+            ><img class="discord-link__icon" src="./assets/icons/discord.svg" alt="Discord"
+          /></a>
+          <label class="splash-toggle" for="splashToggle" title="Enable splash screen at startup">
+            <input
+              id="splashToggle"
+              class="splash-toggle__input"
+              type="checkbox"
+              aria-label="Enable splash screen at startup"
+            />
+            <span class="splash-toggle__label">Splash</span>
+          </label>
+          <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode">
+            <span class="theme-toggle__sun">&#9788;</span>
+            <span class="theme-toggle__moon">&#9789;</span>
+          </button>
+          <span id="versionTag" class="version-tag">1.19.0</span>
         </div>
       </aside>
 
@@ -130,6 +167,6 @@
       <footer class="app-footer">Judas Brennan &middot; 2026</footer>
     </main>
 
-    <script type="module" src="./app.js?release=1.18.2"></script>
+    <script type="module" src="./app.js?release=1.19.0"></script>
   </body>
 </html>

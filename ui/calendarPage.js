@@ -8,6 +8,7 @@ import {
   getMonthLengthsForYear,
   getYearStartDayIndex,
   normalizeLeapRules,
+  normalizeMonthLengthOverrides,
   normalizeNameList,
 } from "../engine/usableCalendar.js";
 import { bindNumberAndSlider } from "./bind.js";
@@ -185,6 +186,11 @@ const TIPS = {
   "Day names": "Custom day names, one per line. Missing entries are auto-filled.",
   "Week names": "Custom week labels, one per line. Missing entries are auto-filled.",
   "Month names": "Custom month names, one per line. Missing entries are auto-filled.",
+  "Month lengths":
+    "Enable this to set a custom day count for each month, one per line. " +
+    "Blank or missing lines fall back to the base Days per month value. " +
+    "Leap rules still add or remove days on top of these overrides. " +
+    "Uncheck to revert to uniform month lengths without losing your entries.",
   "Year display mode":
     "Choose how years are shown: custom number, named eras, or pre/post calendar eras (for example BCE/CE).",
   "Pre-calendar schema":
@@ -397,7 +403,9 @@ const TUTORIAL_STEPS = [
     body:
       "In the Structure tab, adjust months per year, days per month, and days per " +
       "week. By default these are derived from orbital data. Override any slider " +
-      "for a custom calendar. The structure readout shows the resulting year length.",
+      "for a custom calendar. Enable Month lengths to set irregular day counts " +
+      "per month (like Earth's 31/28/31/30 pattern). The structure readout shows " +
+      "the resulting year length.",
   },
   {
     title: "Naming Days, Months, and Eras",
@@ -458,6 +466,27 @@ function namesText(arr) {
   return (Array.isArray(arr) ? arr : [])
     .map((x) => String(x || "").trim())
     .filter(Boolean)
+    .join("\n");
+}
+
+function splitMonthLengths(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== "string") return [];
+  return raw.split(/\r?\n/g).map((x) => {
+    const trimmed = x.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  });
+}
+function monthLengthOverridesText(arr) {
+  if (!Array.isArray(arr) || !arr.length) return "";
+  return arr
+    .map((v) =>
+      v != null && Number.isFinite(Number(v)) && Number(v) >= 1
+        ? String(Math.round(Number(v)))
+        : "",
+    )
     .join("\n");
 }
 
@@ -873,6 +902,8 @@ function defaultState(world) {
       dayNames: [],
       weekNames: [],
       monthNames: [],
+      monthLengthOverridesEnabled: false,
+      monthLengthOverrides: [],
       yearDisplayMode: "numeric",
       yearOffset: 0,
       yearPrefix: "",
@@ -955,6 +986,10 @@ function normalizeSingleProfile(world, rawProfile) {
       dayNames: splitNames(ru.dayNames),
       weekNames: splitNames(ru.weekNames),
       monthNames: splitNames(ru.monthNames),
+      monthLengthOverridesEnabled: !!(
+        ru.monthLengthOverridesEnabled ?? d.ui.monthLengthOverridesEnabled
+      ),
+      monthLengthOverrides: splitMonthLengths(ru.monthLengthOverrides),
       yearDisplayMode: ["numeric", "era", "pre-calendar"].includes(String(ru.yearDisplayMode || ""))
         ? String(ru.yearDisplayMode)
         : d.ui.yearDisplayMode,
@@ -1841,18 +1876,21 @@ function buildAstronomyMarkers(ctx) {
   return out;
 }
 
-function yearDaysForYear(metrics, leapRules, y) {
-  return getMonthLengthsForYear({ metrics, year: y, leapRules }).reduce((a, b) => a + b, 0);
+function yearDaysForYear(metrics, leapRules, y, monthLengthOverrides) {
+  return getMonthLengthsForYear({ metrics, year: y, leapRules, monthLengthOverrides }).reduce(
+    (a, b) => a + b,
+    0,
+  );
 }
 
-function daysBeforeYear(metrics, leapRules, year) {
+function daysBeforeYear(metrics, leapRules, year, monthLengthOverrides) {
   let total = 0;
   const y = Math.max(1, I(year, 1));
   if (y <= 1) return 0;
   // Cap iteration to prevent UI freezes
   const cap = Math.min(y, 50001);
   for (let yy = 1; yy < cap; yy++) {
-    total += yearDaysForYear(metrics, leapRules, yy);
+    total += yearDaysForYear(metrics, leapRules, yy, monthLengthOverrides);
   }
   if (cap < y) {
     // Estimate remaining years using last computed year length
@@ -1862,22 +1900,27 @@ function daysBeforeYear(metrics, leapRules, year) {
   return total;
 }
 
-function toAbsoluteDay(metrics, leapRules, year, monthIndex, dayOfMonth) {
+function toAbsoluteDay(metrics, leapRules, year, monthIndex, dayOfMonth, monthLengthOverrides) {
   const safeYear = Math.max(1, I(year, 1));
   const monthsPerYear = Math.max(1, I(metrics?.monthsPerYear, 12));
   const safeMonth = clampI(monthIndex, 0, monthsPerYear - 1);
-  const monthLengths = getMonthLengthsForYear({ metrics, year: safeYear, leapRules });
+  const monthLengths = getMonthLengthsForYear({
+    metrics,
+    year: safeYear,
+    leapRules,
+    monthLengthOverrides,
+  });
   const safeDay = clampI(dayOfMonth, 1, monthLengths[safeMonth] || 1);
-  const beforeYear = daysBeforeYear(metrics, leapRules, safeYear);
+  const beforeYear = daysBeforeYear(metrics, leapRules, safeYear, monthLengthOverrides);
   const beforeMonth = monthLengths.slice(0, safeMonth).reduce((a, b) => a + b, 0);
   return beforeYear + beforeMonth + safeDay - 1;
 }
 
-function fromAbsoluteDay(metrics, leapRules, absoluteDayInput) {
+function fromAbsoluteDay(metrics, leapRules, absoluteDayInput, monthLengthOverrides) {
   let absoluteDay = Math.max(0, I(absoluteDayInput, 0));
 
   // Estimate year using average year length to avoid O(n) iteration for large values
-  const sampleYear1Days = yearDaysForYear(metrics, leapRules, 1);
+  const sampleYear1Days = yearDaysForYear(metrics, leapRules, 1, monthLengthOverrides);
   const avgYearDays = Math.max(1, sampleYear1Days);
   let year = Math.max(1, Math.floor(absoluteDay / avgYearDays));
   // Rewind slightly to ensure we don't overshoot
@@ -1885,17 +1928,17 @@ function fromAbsoluteDay(metrics, leapRules, absoluteDayInput) {
 
   // Subtract all days before estimated year
   if (year > 1) {
-    const daysBefore = daysBeforeYear(metrics, leapRules, year);
+    const daysBefore = daysBeforeYear(metrics, leapRules, year, monthLengthOverrides);
     absoluteDay -= daysBefore;
     // If we overshot, go back
     while (absoluteDay < 0 && year > 1) {
       year -= 1;
-      absoluteDay += yearDaysForYear(metrics, leapRules, year);
+      absoluteDay += yearDaysForYear(metrics, leapRules, year, monthLengthOverrides);
     }
   }
 
   while (true) {
-    const lengths = getMonthLengthsForYear({ metrics, year, leapRules });
+    const lengths = getMonthLengthsForYear({ metrics, year, leapRules, monthLengthOverrides });
     const yearDays = lengths.reduce((a, b) => a + b, 0);
     if (absoluteDay < yearDays) {
       let monthIndex = 0;
@@ -1954,6 +1997,7 @@ function buildMonthModel(params) {
     firstYearStartDayIndex,
     weekStartDayIndex,
     leapRules,
+    monthLengthOverrides,
     dayNames,
     weekNames,
     monthNames,
@@ -1978,7 +2022,12 @@ function buildMonthModel(params) {
     const cacheKey = `${yearValue}:${monthValue}`;
     if (monthCoreCache.has(cacheKey)) return monthCoreCache.get(cacheKey);
 
-    const monthLengths = getMonthLengthsForYear({ metrics, year: yearValue, leapRules });
+    const monthLengths = getMonthLengthsForYear({
+      metrics,
+      year: yearValue,
+      leapRules,
+      monthLengthOverrides,
+    });
     const monthLength = monthLengths[monthValue];
     const yearLength = monthLengths.reduce((sum, days) => sum + days, 0);
     const yearStart = getYearStartDayIndex({
@@ -1986,10 +2035,12 @@ function buildMonthModel(params) {
       year: yearValue,
       firstYearStartDayIndex,
       leapRules,
+      monthLengthOverrides,
     });
     const daysBeforeMonth = monthLengths.slice(0, monthValue).reduce((sum, days) => sum + days, 0);
     const monthStartWeekday = mod(yearStart + daysBeforeMonth, daysPerWeek);
-    const absoluteMonthStart = daysBeforeYear(metrics, leapRules, yearValue) + daysBeforeMonth;
+    const absoluteMonthStart =
+      daysBeforeYear(metrics, leapRules, yearValue, monthLengthOverrides) + daysBeforeMonth;
     const days = [];
     for (let dayNumber = 1; dayNumber <= monthLength; dayNumber++) {
       const absoluteDay = absoluteMonthStart + dayNumber - 1;
@@ -2061,7 +2112,7 @@ function buildMonthModel(params) {
   const getAbsoluteDayMeta = (absoluteDay) => {
     const safeAbsoluteDay = Math.max(0, I(absoluteDay, 0));
     if (absoluteDayMetaCache.has(safeAbsoluteDay)) return absoluteDayMetaCache.get(safeAbsoluteDay);
-    const loc = fromAbsoluteDay(metrics, leapRules, safeAbsoluteDay);
+    const loc = fromAbsoluteDay(metrics, leapRules, safeAbsoluteDay, monthLengthOverrides);
     const core = getMonthCore(loc.year, loc.monthIndex);
     const dayNumber = clampI(loc.dayOfMonth, 1, core.monthLength);
     const dayIndex = dayNumber - 1;
@@ -3032,6 +3083,9 @@ function buildContext(world, state) {
   state.ui.exportAnchorDate = normalizeIsoDate(state.ui.exportAnchorDate);
   state.ui.icsIncludes = normalizeIcsIncludes(state.ui.icsIncludes);
   const leapRules = normalizeLeapRules(state.ui.leapRules, metrics.monthsPerYear);
+  const monthLengthOverrides = state.ui.monthLengthOverridesEnabled
+    ? normalizeMonthLengthOverrides(state.ui.monthLengthOverrides, metrics.monthsPerYear)
+    : [];
   const monthModel = buildMonthModel({
     metrics,
     year: state.ui.year,
@@ -3039,6 +3093,7 @@ function buildContext(world, state) {
     firstYearStartDayIndex: state.ui.startDayOfYear,
     weekStartDayIndex: state.ui.weekStartsOn,
     leapRules,
+    monthLengthOverrides,
     dayNames,
     weekNames: state.ui.weekNames,
     monthNames,
@@ -3074,6 +3129,7 @@ function buildContext(world, state) {
     weekendDayIndexes,
     astronomySettings,
     leapRules,
+    monthLengthOverrides,
     monthModel,
     holidayIssueById: monthModel.holidayIssueById || {},
   };
@@ -3258,6 +3314,7 @@ function recommendLeapRuleFromOrbit(ctx) {
     metrics: ctx?.metrics,
     year: 1,
     leapRules: [],
+    monthLengthOverrides: ctx?.monthLengthOverrides,
   }).reduce((sum, days) => sum + days, 0);
   const delta = localYearActual - baseYearLength;
   const absDelta = Math.abs(delta);
@@ -3574,6 +3631,8 @@ export function initCalendarPage(mountEl) {
           <div class="form-row calendar-name-row"><div><div class="label">Day names ${tipIcon(TIPS["Day names"] || "")}</div><div class="hint">One per line.</div></div><textarea id="calDayNames" class="calendar-textarea"></textarea></div>
           <div class="form-row calendar-name-row"><div><div class="label">Week names ${tipIcon(TIPS["Week names"] || "")}</div><div class="hint">One per line.</div></div><textarea id="calWeekNames" class="calendar-textarea"></textarea></div>
           <div class="form-row calendar-name-row"><div><div class="label">Month names ${tipIcon(TIPS["Month names"] || "")}</div><div class="hint">One per line.</div></div><textarea id="calMonthNames" class="calendar-textarea"></textarea></div>
+          <div class="form-row"><div><div class="label">Month lengths ${tipIcon(TIPS["Month lengths"] || "")}</div></div><div class="calendar-holiday-attrs__list"><label class="calendar-holiday-attr"><input id="calMonthLengthOverridesEnabled" type="checkbox" />Enable</label></div></div>
+          <div class="form-row calendar-name-row" id="calMonthLengthOverridesRow"><div><div class="hint">One number per line. Blank = base.</div></div><textarea id="calMonthLengthOverrides" class="calendar-textarea" placeholder="e.g.\n31\n28\n31\n30"></textarea></div>
 
           <div class="label">Eras ${tipIcon(TIPS["Era list"] || "")}</div>
           <div class="form-row"><div><div class="label">Era label ${tipIcon(TIPS["Era label"] || "")}</div></div><input id="calEraName" type="text" /></div>
@@ -3793,6 +3852,9 @@ export function initCalendarPage(mountEl) {
     dayNames: $("#calDayNames"),
     weekNames: $("#calWeekNames"),
     monthNames: $("#calMonthNames"),
+    monthLengthOverridesEnabled: $("#calMonthLengthOverridesEnabled"),
+    monthLengthOverridesRow: $("#calMonthLengthOverridesRow"),
+    monthLengthOverrides: $("#calMonthLengthOverrides"),
     eraName: $("#calEraName"),
     eraStartYear: $("#calEraStartYear"),
     eraAdd: $("#calEraAdd"),
@@ -4190,6 +4252,7 @@ export function initCalendarPage(mountEl) {
         firstYearStartDayIndex: state.ui.startDayOfYear,
         weekStartDayIndex: state.ui.weekStartsOn,
         leapRules: ctx.leapRules,
+        monthLengthOverrides: ctx.monthLengthOverrides,
         dayNames: ctx.dayNames,
         weekNames: state.ui.weekNames,
         monthNames: ctx.monthNames,
@@ -4696,6 +4759,7 @@ export function initCalendarPage(mountEl) {
       metrics: ctx.metrics,
       year: state.ui.year,
       leapRules: state.ui.leapRules || [],
+      monthLengthOverrides: ctx.monthLengthOverrides,
     });
     const actualBaseYear = actualMonthLengths.reduce((a, b) => a + b, 0);
     const lastMonthLen = actualMonthLengths[actualMonthLengths.length - 1];
@@ -4796,6 +4860,12 @@ export function initCalendarPage(mountEl) {
       els.weekNames.value = namesText(state.ui.weekNames);
     if (document.activeElement !== els.monthNames)
       els.monthNames.value = namesText(state.ui.monthNames);
+    const mloEnabled = !!state.ui.monthLengthOverridesEnabled;
+    els.monthLengthOverridesEnabled.checked = mloEnabled;
+    els.monthLengthOverrides.disabled = !mloEnabled;
+    els.monthLengthOverridesRow.style.opacity = mloEnabled ? "" : "0.4";
+    if (document.activeElement !== els.monthLengthOverrides)
+      els.monthLengthOverrides.value = monthLengthOverridesText(state.ui.monthLengthOverrides);
     if (document.activeElement !== els.jsonText && !els.jsonText.value.trim()) {
       els.jsonText.value = currentCalendarJsonText();
     }
@@ -5107,7 +5177,7 @@ export function initCalendarPage(mountEl) {
 
   function jumpToAbsoluteDay(absDay) {
     const ctx = buildContext(loadWorld(), state);
-    const converted = fromAbsoluteDay(ctx.metrics, ctx.leapRules, absDay);
+    const converted = fromAbsoluteDay(ctx.metrics, ctx.leapRules, absDay, ctx.monthLengthOverrides);
     state.ui.jumpAbsoluteDay = converted.absoluteDay;
     state.ui.jumpYear = converted.year;
     state.ui.jumpMonthIndex = converted.monthIndex;
@@ -5125,9 +5195,17 @@ export function initCalendarPage(mountEl) {
       metrics: ctx.metrics,
       year: safeYear,
       leapRules: ctx.leapRules,
+      monthLengthOverrides: ctx.monthLengthOverrides,
     });
     const safeDay = clampI(dayOfMonth, 1, lengths[safeMonth] || 1);
-    const abs = toAbsoluteDay(ctx.metrics, ctx.leapRules, safeYear, safeMonth, safeDay);
+    const abs = toAbsoluteDay(
+      ctx.metrics,
+      ctx.leapRules,
+      safeYear,
+      safeMonth,
+      safeDay,
+      ctx.monthLengthOverrides,
+    );
     state.ui.jumpAbsoluteDay = abs;
     state.ui.jumpYear = safeYear;
     state.ui.jumpMonthIndex = safeMonth;
@@ -5506,12 +5584,22 @@ export function initCalendarPage(mountEl) {
   [els.dayNames, els.weekNames, els.monthNames].forEach((el) =>
     el.addEventListener("input", applyNamesLive),
   );
+  els.monthLengthOverridesEnabled.addEventListener("change", () => {
+    state.ui.monthLengthOverridesEnabled = els.monthLengthOverridesEnabled.checked;
+    render();
+  });
+  els.monthLengthOverrides.addEventListener("input", () => {
+    state.ui.monthLengthOverrides = splitMonthLengths(els.monthLengthOverrides.value);
+    render();
+  });
   els.resetNames.addEventListener("click", () => {
     state.ui.calendarName = "Calendar";
     state.profileName = "Calendar";
     state.ui.dayNames = [];
     state.ui.weekNames = [];
     state.ui.monthNames = [];
+    state.ui.monthLengthOverridesEnabled = false;
+    state.ui.monthLengthOverrides = [];
     state.ui.yearPrefix = "";
     state.ui.yearSuffix = "";
     state.ui.yearOffset = 0;

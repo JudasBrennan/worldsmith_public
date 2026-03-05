@@ -2,7 +2,65 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
-## 1.18.2 — Unreleased
+## 1.19.0 — 2026-03-05
+
+### Collapsible Sidebar Navigation
+
+**Single-sidebar navigation with icon rail and mobile drawer**
+(index.html, styles.css, app.js, STYLE_GUIDE.md)
+
+Replaced the dual-nav design (horizontal top nav + sidebar) with a
+single collapsible sidebar. The top nav is removed entirely.
+
+- **Desktop:** sidebar starts collapsed as a 52px icon-only rail. Click
+  the rail to expand to full 240px width with text labels; click outside
+  or click a nav link to collapse back. A `»` chevron hint at the bottom
+  indicates the rail is expandable.
+- **Mobile (≤ 980px):** sidebar is fully off-screen (no collapsed rail).
+  A hamburger button in the header opens it as a fixed drawer with a
+  backdrop overlay. Tapping a link, the backdrop, or pressing Escape
+  closes the drawer.
+- Brand mark and title moved to sidebar top; version tag, splash toggle,
+  and theme toggle moved to sidebar footer. Footer controls hidden when
+  collapsed.
+- Nav items reorganised into six semantic groups: Cosmos, Bodies,
+  Surface, Time & Light, Tools, and ungrouped utilities (Import/Export,
+  About).
+- New blackboard-style SVG icon for the Science Visualiser page
+  (`assets/icons/science-viz.svg`).
+- "Apparent Size & Brightness" renamed to "Apparent Size" in the nav
+  and page title.
+
+### Light Mode Overhaul
+
+**Paper Dashboard colour palette and theme-aware icons**
+(styles.css, index.html, ui/aboutPage.js, assets/icons/)
+
+Replaced the grey light theme with a warm-cream palette derived from the
+Paper Dashboard scheme (E1DADE / 88C6E8 / 369AEC / EAAB54 / 37455E).
+
+- New light palette: warm cream background (`#e1dade`), lighter cream
+  panels (`#ede9e7`), dark slate text (`#37455e`), bright blue accent
+  (`#369aec`), golden amber warnings.
+- Created 18 light-mode icon variants in `assets/icons/light/` with
+  darkened, saturated colours designed for the cream background. CSS
+  swaps icons per-class via `[data-theme="light"]` selectors, replacing
+  the previous `filter: brightness()` hack.
+- Light-mode favicon (`favicon-light.svg`) with cream background, blue
+  planet, and amber moon.
+- Inline `<script>` in `<head>` reads theme from localStorage before
+  first paint, eliminating the dark-to-light flash on page load.
+- Sidebar starts with `is-collapsed` class in the HTML to prevent the
+  expanded-to-collapsed flash on load.
+- Star visualiser KPI text shadow overridden in light mode (white glow
+  instead of heavy black shadow).
+- Other Objects icon redesigned from gas giant to comet + debris
+  fragments (both dark and light variants).
+- Discord invite link added to the sidebar footer with the official
+  Blurple icon.
+- Changelog moved from inline About page content to a modal toast
+  overlay with collapsible `<details>` releases; latest release starts
+  expanded.
 
 ### Schweitzer M-dwarf Radius
 
@@ -18,6 +76,35 @@ quadratic.
 - Added blend zone (0.5–0.7 Msol) interpolating Schweitzer → Eker.
 - Low-mass benchmark RMSE improves (Proxima Cen, Barnard's Star).
 - Updated Science & Maths page, Lesson 1, and Star page tooltip.
+
+### L4/L5 Stability (Gascheau Criterion)
+
+**Gascheau (1843) stability flag for Trojan points** (engine/lagrange.js)
+
+L4 and L5 Lagrange points are now flagged as stable or unstable based on
+the Gascheau criterion: μ = m/(m + M★) < (1 − √69/9)/2 ≈ 0.0385.
+
+- `calcLagrangePoints` returns `stability: { mu, muCrit, l45Stable }`
+  and `stable` booleans on L4/L5 point objects.
+- Visualiser shows unstable Trojans as dimmed amber diamonds instead of
+  cyan.
+- Science page formula updated with the exact Gascheau criterion.
+
+### Updated Giant Planet Occurrence Probability
+
+**Kepler-era baseline + stellar mass dependence** (engine/star.js)
+
+Updated `giantPlanetProbability` from the Fischer & Valenti (2005)
+metallicity-only formula to include stellar mass scaling from
+Johnson et al. (2010) and a revised 7% baseline from Kepler-era
+surveys.
+
+- Formula: `P = clamp(0.07 × M★ × 10^(2·[Fe/H]), 0, 1)`.
+- Optional `massMsol` parameter (defaults to 1.0 for backwards
+  compatibility).
+- `calcStar` now passes stellar mass to the probability function.
+- Updated tooltips, Science & Maths page, Lessons 7 and 19, and
+  science graph (new `stellar_mass → giant_planet_probability` edge).
 
 ---
 
