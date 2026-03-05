@@ -16,7 +16,7 @@ const LEGACY_KEY = "worldsmith.world";
 let volatileWorldRaw = null;
 
 // Schema version for migrations
-const SCHEMA_VERSION = 55;
+const SCHEMA_VERSION = 56;
 // Practical giant-planet radius bounds in Jupiter radii (Rj):
 // lower bound ~= Neptune-size (~0.35 Rj), upper bound ~= inflated HAT-P-67 b (2.14 Rj).
 export const GAS_GIANT_RADIUS_MIN_RJ = 0.35;
@@ -139,6 +139,15 @@ function normalizeGasGiant(raw, idx = 1) {
   const metallicity =
     rawMet != null && Number.isFinite(parsedMet) && parsedMet > 0 ? parsedMet : null;
   const appearanceRecipeId = String(raw?.appearanceRecipeId || raw?.recipeId || "").trim();
+  // Orbital eccentricity — optional (null = circular)
+  const rawEcc = Number(raw?.eccentricity ?? raw?.ecc);
+  const eccentricity = Number.isFinite(rawEcc) && rawEcc >= 0 && rawEcc <= 0.99 ? rawEcc : null;
+  // Orbital inclination (°) — optional (null = 0°)
+  const rawInc = Number(raw?.inclinationDeg ?? raw?.inclination);
+  const inclinationDeg = Number.isFinite(rawInc) && rawInc >= 0 && rawInc <= 180 ? rawInc : null;
+  // Axial tilt / obliquity (°) — optional (null = 0°)
+  const rawTilt = Number(raw?.axialTiltDeg ?? raw?.axialTilt ?? raw?.obliquity);
+  const axialTiltDeg = Number.isFinite(rawTilt) && rawTilt >= 0 && rawTilt <= 180 ? rawTilt : null;
   return {
     id: String(raw?.id || `gg${idx}`),
     name: String(raw?.name || `Gas giant ${idx}`),
@@ -150,6 +159,9 @@ function normalizeGasGiant(raw, idx = 1) {
     massMjup,
     rotationPeriodHours,
     metallicity,
+    eccentricity,
+    inclinationDeg,
+    axialTiltDeg,
     appearanceRecipeId: appearanceRecipeId || "",
   };
 }

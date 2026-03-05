@@ -27,8 +27,9 @@
 //          numeric derived values for downstream use, and pre-formatted
 //          display strings for the UI.
 
-import { clamp, eccentricityFactor, fmt, k2LoveNumber } from "./utils.js";
+import { clamp, eccentricityFactor, fmt, k2LoveNumber, spinOrbitResonance } from "./utils.js";
 import { calcStar } from "./star.js";
+import { findNearestResonance } from "./debrisDisk.js";
 
 const PI = Math.PI;
 
@@ -63,6 +64,17 @@ export const ISOTOPE_HEAT_FRACTIONS = { u238: 0.39, u235: 0.04, th232: 0.4, k40:
 // Reference: Leconte et al. (2015), Ingersoll & Dobrovolskis (1978).
 const C_ATM_TIDE = 12;
 
+// Surface sublimation temperatures (K) at low pressures (~10⁻⁵ atm).
+// Distinct from nebular condensation temperatures in debrisDisk.js.
+// Reference: Fray & Schmitt (2009, PSS 57, 2053).
+const SUBLIMATION_TABLE = [
+  { species: "N\u2082", tempK: 63, label: "nitrogen" },
+  { species: "CO", tempK: 68, label: "carbon monoxide" },
+  { species: "CH\u2084", tempK: 91, label: "methane" },
+  { species: "H\u2082O", tempK: 170, label: "water ice" },
+  { species: "CO\u2082", tempK: 195, label: "carbon dioxide" },
+];
+
 // --- Composition-dependent rigidity and quality factor ---
 // Replaces the old fixed TIDAL_RIGIDITY (30 GPa) and Q_ROCKY (13).
 // Iron-rich cores are stiffer; water layers reduce effective rigidity.
@@ -90,22 +102,7 @@ function atmosphereTideRatio(pressureAtm, insolationEarth, gravityMs2, tEqK) {
   return (C_ATM_TIDE * pressureAtm * insolationEarth) / (gravityMs2 * tEqK);
 }
 
-// --- Spin-orbit resonance selection ---
-// Goldreich & Peale (1966) eccentricity functions H(p, e) determine the
-// width of each resonance.  Higher eccentricity enables higher-order
-// resonances (3:2, 2:1, 5:2).  Returns { ratio, p, rotationFactor }
-// where p = spin rate in units of mean motion (1.5 for 3:2 etc.) and
-// rotationFactor = 1/p (multiply orbital period to get rotation period).
-function spinOrbitResonance(eccentricity) {
-  const e = eccentricity;
-  const H_52 = (845 / 48) * e ** 3; // Goldreich & Peale (1966) Table 1
-  const H_21 = (17 / 2) * e ** 2; // Goldreich & Peale (1966) Table 1
-  const H_32 = (7 / 2) * e; // Goldreich & Peale (1966) Table 1
-  if (H_52 > 0.5) return { ratio: "5:2", p: 2.5 };
-  if (H_21 > 0.5) return { ratio: "2:1", p: 2.0 };
-  if (H_32 > 0.25) return { ratio: "3:2", p: 1.5 };
-  return { ratio: "1:1", p: 1.0 };
-}
+// spinOrbitResonance(eccentricity) — imported from utils.js
 
 // --- Moon tidal heating on the planet ---
 
@@ -181,6 +178,44 @@ function waterRegime(wmf) {
 // Mercury (0.055 M⊕) is a planet; Eris (0.0028 M⊕) is a dwarf planet.
 function bodyClass(massEarth) {
   return massEarth < 0.01 ? "Dwarf planet" : "Planet";
+}
+
+// --- Climate state classification ---
+// Flags extreme climate regimes using absorbed flux and surface temperature.
+// Reference: Goldblatt et al. (2013, Nature Geoscience 6, 661);
+//            Kasting (1988, Icarus 74, 472); Budyko (1969).
+function classifyClimateState(surfaceTempK, absorbedFluxWm2, hasWater) {
+  if (!hasWater) return "Stable";
+  if (absorbedFluxWm2 > 282) return "Runaway greenhouse";
+  if (surfaceTempK > 340) return "Moist greenhouse";
+  if (surfaceTempK < 240) return "Snowball";
+  return "Stable";
+}
+
+// --- Volatile sublimation analysis (dwarf planets / icy bodies) ---
+// Compares periapsis and apoapsis equilibrium temperatures against
+// sublimation thresholds to flag transient or persistent atmospheres.
+function analyseVolatiles(tEqPeriK, tEqApoK) {
+  return SUBLIMATION_TABLE.map(({ species, tempK, label }) => {
+    const periAbove = tEqPeriK >= tempK;
+    const apoAbove = tEqApoK >= tempK;
+    let note;
+    if (!periAbove) {
+      note = `${species} ice stable`;
+    } else if (!apoAbove) {
+      note = `Transient ${label} atmosphere near periapsis`;
+    } else {
+      note = `${label} sublimation throughout orbit`;
+    }
+    return {
+      species,
+      tempK,
+      canSublimate: periAbove,
+      transient: periAbove && !apoAbove,
+      persistent: periAbove && apoAbove,
+      note,
+    };
+  });
 }
 
 // --- Zeng+Sasselov (2016) water-layer radius correction ---
@@ -1445,6 +1480,7 @@ export function calcPlanetExact({
   starEvolutionMode,
   planet,
   moons,
+  gasGiants,
 }) {
   const star = calcStar({
     massMsol: starMassMsol,
@@ -1807,6 +1843,12 @@ export function calcPlanetExact({
   const liquidWaterPossible =
     pressureAtm >= 0.006 && tKel >= 273 && tKel <= waterBoilingK(pressureAtm);
 
+  // Absorbed stellar flux (W/m²) — globally averaged after albedo
+  const absorbedFluxWm2 = (insolationEarth * 1361 * (1 - albedoBond)) / 4;
+
+  // Climate state classification (snowball / greenhouse flags)
+  const climateState = classifyClimateState(tKel, absorbedFluxWm2, watRegime !== "Dry");
+
   // Sky colours (after gravity + temperature are known for column-density correction)
   const sky = skyColoursFromSpectralAndPressure({
     starTempK: star.tempK,
@@ -1847,6 +1889,28 @@ export function calcPlanetExact({
   // Orbit characteristics (PLANET C34..C37, F36..F37)
   const periapsisAu = semiMajorAxisAu * (1 - eccentricity);
   const apoapsisAu = semiMajorAxisAu * (1 + eccentricity);
+
+  // Equilibrium temperature at periapsis and apoapsis (blackbody + albedo,
+  // no greenhouse).  Same formula as tEqK (line above) but substituting
+  // the actual distance at orbital extremes.
+  const tEqPeriK =
+    periapsisAu > 0
+      ? (278 * star.luminosityLsol ** 0.25 * (1 - albedoBond) ** 0.25) / Math.sqrt(periapsisAu)
+      : tEqK;
+  const tEqApoK =
+    apoapsisAu > 0
+      ? (278 * star.luminosityLsol ** 0.25 * (1 - albedoBond) ** 0.25) / Math.sqrt(apoapsisAu)
+      : tEqK;
+
+  // Volatile sublimation analysis (dwarf planets only)
+  const isDwarfPlanet = massEarth < 0.01;
+  const volatileFlags = isDwarfPlanet ? analyseVolatiles(tEqPeriK, tEqApoK) : null;
+
+  // Nearest gas giant mean-motion resonance
+  const nearestResonance = findNearestResonance(
+    semiMajorAxisAu,
+    Array.isArray(gasGiants) ? gasGiants : [],
+  );
 
   const orbitalPeriodEarthYears = Math.sqrt(semiMajorAxisAu ** 3 / starMassMsol); // F36
   const orbitalPeriodEarthDays = orbitalPeriodEarthYears * DAYS_PER_YEAR; // F37
@@ -2009,11 +2073,17 @@ export function calcPlanetExact({
 
       surfaceTempK: tKel,
       surfaceTempC: tC,
+      absorbedFluxWm2,
+      climateState,
 
       horizonKm,
 
       periapsisAu,
       apoapsisAu,
+      tEqPeriK: Math.round(tEqPeriK),
+      tEqApoK: Math.round(tEqApoK),
+      volatileFlags,
+      nearestResonance,
       orbitalPeriodEarthYears,
       orbitalPeriodEarthDays,
       localDaysPerYear,
@@ -2120,6 +2190,23 @@ export function calcPlanetExact({
       horizon: fmt(horizonKm, 2) + " km",
       peri: fmt(periapsisAu, 4) + " AU",
       apo: fmt(apoapsisAu, 4) + " AU",
+      tempPeri:
+        eccentricity > 0.005
+          ? fmt(Math.round(tEqPeriK), 0) + " K (" + fmt(Math.round(tEqPeriK) - 273, 0) + " \u00b0C)"
+          : null,
+      tempApo:
+        eccentricity > 0.005
+          ? fmt(Math.round(tEqApoK), 0) + " K (" + fmt(Math.round(tEqApoK) - 273, 0) + " \u00b0C)"
+          : null,
+      volatileSummary: volatileFlags
+        ? volatileFlags
+            .filter((v) => v.canSublimate)
+            .map((v) => v.note)
+            .join("; ") || "All surface ices stable"
+        : null,
+      resonance: nearestResonance
+        ? `${nearestResonance.label} (${fmt(nearestResonance.resonanceAu, 3)} AU, ${fmt(nearestResonance.deltaPct * 100, 1)}% off)`
+        : "No nearby resonance",
       yearDays: fmt(orbitalPeriodEarthDays, 2) + " days",
       localDays: fmt(localDaysPerYear, 2) + " local days",
       pressureKpa: fmt(pressureKpa, 2) + " kPa",
@@ -2137,6 +2224,8 @@ export function calcPlanetExact({
       bodyClass: bClass,
       compositionClass: compClass,
       waterRegime: watRegime,
+      climateState,
+      absorbedFlux: fmt(absorbedFluxWm2, 1) + " W/m\u00b2",
       coreRadius: `${fmt(coreRadiusFraction, 2)} R (${fmt(coreRadiusKm, 0)} km)`,
       suggestedCmf: `~${fmt(suggestedCmfPct, 0)}%`,
       suggestedCmfNote:

@@ -4,6 +4,7 @@ import { attachTooltips, tipIcon } from "./tooltip.js";
 import { createSolPresetEnvelope } from "./solPreset.js";
 import { createRealmspacePresetEnvelope } from "./realmspacePreset.js";
 import { createArrakisPresetEnvelope } from "./arrakisPreset.js";
+import { createTutorial } from "./tutorial.js";
 import { escapeHtml } from "./uiHelpers.js";
 
 const { exportEnvelope, validateEnvelope, importWorld, createBackup, listBackups, restoreBackup } =
@@ -179,6 +180,37 @@ function clearAllSavedDataSafe() {
   }
 }
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Import/Export page lets you save your entire world as a JSON file " +
+      "and restore it later. Use it to back up your work, share worlds, or " +
+      "start from a preset.",
+  },
+  {
+    title: "Exporting",
+    body:
+      "Click Export JSON to download your world, or Copy to Clipboard to " +
+      "paste it elsewhere. The file includes your star, system, all planets, " +
+      "moons, calendar, and settings.",
+  },
+  {
+    title: "Importing",
+    body:
+      "Drop a JSON file or click Import to load a saved world. The tool " +
+      "validates the file and shows a summary before applying. An automatic " +
+      "backup is created before any import.",
+  },
+  {
+    title: "Presets",
+    body:
+      "Load built-in worlds like Sol (our Solar System), Realmspace " +
+      "(D&D Spelljammer), or Arrakis (Dune) for instant starting points " +
+      "or inspiration.",
+  },
+];
+
 export function initImportExportPage(root) {
   let pendingImport = null; // { world, meta }
 
@@ -187,7 +219,7 @@ export function initImportExportPage(root) {
       <div class="panel">
         <div class="panel__header">
           <h1 class="panel__title"><span class="ws-icon icon--import-export" aria-hidden="true"></span><span>Import/Export</span></h1>
-          <div class="badge">Interactive tool</div>
+          <button id="ioTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
         </div>
         <div class="panel__body">
           <div class="hint">Export your full world as JSON, or validate and import saved worlds. Imports replace current data after confirmation and automatic backup.</div>
@@ -299,6 +331,12 @@ export function initImportExportPage(root) {
   const btnCancelImport = root.querySelector("#btn-cancel-import");
 
   attachTooltips(root);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.io.tutorial",
+    container: root,
+    triggerBtn: root.querySelector("#ioTutorials"),
+  });
   btnDownload?.setAttribute("data-tip", TIP_LABEL["Download JSON"] || "");
   btnCopy?.setAttribute("data-tip", TIP_LABEL["Copy to clipboard"] || "");
   btnRefresh?.setAttribute("data-tip", TIP_LABEL["Refresh view"] || "");

@@ -49,6 +49,7 @@ import {
 } from "./celestialTextureWorkerClient.js";
 import { composeCelestialDescriptor } from "./celestialComposer.js";
 import { clamp } from "../engine/utils.js";
+import { createTutorial } from "./tutorial.js";
 
 function hashUnit(str) {
   // deterministic 0..1 hash
@@ -237,6 +238,42 @@ const TIP_LABEL = {
   "Cluster Speed": "Auto-spin speed multiplier.",
 };
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Visualiser shows your system in interactive 3D. Left-drag to pan, " +
+      "right-drag to rotate, scroll to zoom. Click a body to focus on it; " +
+      "double-click to zoom in.",
+  },
+  {
+    title: "Navigation",
+    body:
+      "Press Escape to release focus on a body. Press ? to see the full " +
+      "control reference. The view transitions smoothly between local cluster " +
+      "and system scales as you zoom.",
+  },
+  {
+    title: "Display Options",
+    body:
+      "Toggle orbits, habitable zone, frost line, debris disks, Lagrange " +
+      "points, and labels using the Controls panel. Switch between logarithmic " +
+      "and linear distance scaling.",
+  },
+  {
+    title: "Animation",
+    body:
+      "Play or pause orbital animation and adjust the speed multiplier. " +
+      "Bodies move along their actual orbits with correct relative periods.",
+  },
+  {
+    title: "Export",
+    body:
+      "Save a PNG snapshot of the current view, or record a GIF animation. " +
+      "Use the fullscreen button for a larger viewport.",
+  },
+];
+
 export function initVisualiserPage(root, options = {}) {
   root.innerHTML = `
     <div class="page">
@@ -244,6 +281,7 @@ export function initVisualiserPage(root, options = {}) {
         <div class="panel">
           <div class="panel__header">
             <h1 class="panel__title"><span class="ws-icon icon--visualiser" aria-hidden="true"></span><span id="viz-title">System Visualiser</span></h1>
+            <button id="vizTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
             <div class="viz-canvas-actions">
               <button id="btn-controls" type="button" class="small">${tipIcon(TIP_LABEL["Controls"] || "")} Controls &#x25BE;</button>
               <button id="btn-reset-view" type="button" class="small" disabled>${tipIcon(TIP_LABEL["Reset view"] || "")} Reset view</button>
@@ -416,6 +454,12 @@ export function initVisualiserPage(root, options = {}) {
     </div>
   `;
   attachTooltips(root);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.viz.tutorial",
+    container: root,
+    triggerBtn: root.querySelector("#vizTutorials"),
+  });
 
   const canvas = root.querySelector("#viz");
   const overlayCanvas = root.querySelector("#viz-overlay");

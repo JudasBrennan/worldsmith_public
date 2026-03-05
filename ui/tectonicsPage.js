@@ -7,6 +7,7 @@ import {
 import { calcPlanetExact } from "../engine/planet.js";
 import { fmt } from "../engine/utils.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { createTutorial } from "./tutorial.js";
 import { escapeHtml } from "./uiHelpers.js";
 import {
   getSelectedPlanet,
@@ -879,6 +880,42 @@ function drawRiftProfile(canvas, riftData) {
   ctx.fillText("Width (km)", PAD.left + plotW / 2, h - 4);
 }
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Tectonics page models crustal features from plate dynamics. " +
+      "Select a mountain range type, set convergence parameters, and " +
+      "review the resulting elevation profile.",
+  },
+  {
+    title: "Mountain Types",
+    body:
+      "Choose from Andean (subduction), Laramide (flat-slab), Ural (ancient " +
+      "collision), or Himalayan (active collision). Each type produces a " +
+      "distinct cross-section and peak height.",
+  },
+  {
+    title: "Ocean and Margins",
+    body:
+      "Model continental margins with shelf width, slope angle, and abyssal " +
+      "depth. Ocean depth curves depend on plate age and spreading rate.",
+  },
+  {
+    title: "Volcanoes",
+    body:
+      "Configure shield volcanoes, hotspot chains, and rift valleys. Elastic " +
+      "lithosphere thickness and tidal heating affect maximum volcano height.",
+  },
+  {
+    title: "Plate Canvas",
+    body:
+      "Generate Voronoi plate boundaries with classification as convergent, " +
+      "divergent, or transform. Use this to sketch a tectonic map for your " +
+      "world.",
+  },
+];
+
 // ── Page controller ──────────────────────────────────────
 
 export function initTectonicsPage(containerEl) {
@@ -1196,7 +1233,7 @@ export function initTectonicsPage(containerEl) {
         <div class="panel">
           <div class="panel__header">
             <h1 class="panel__title">Tectonics</h1>
-            <div class="badge">Interactive tool</div>
+            <button id="tecTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
           </div>
           <div class="panel__body">
             <div class="hint">Model mountain ranges, ocean depth, continental margins, shield volcanoes, and rift valleys.</div>
@@ -1482,6 +1519,26 @@ export function initTectonicsPage(containerEl) {
   }
 
   render();
+
+  // Tutorial (hosted on document.body because render() resets containerEl.innerHTML)
+  const tutHost = document.createElement("div");
+  document.body.appendChild(tutHost);
+  const tut = createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.tec.tutorial",
+    container: tutHost,
+  });
+  containerEl.addEventListener("click", (e) => {
+    if (e.target.closest("#tecTutorials")) tut?.toggle();
+  });
+  const tutObs = new MutationObserver(() => {
+    if (!containerEl.isConnected) {
+      tut?.destroy();
+      tutHost.remove();
+      tutObs.disconnect();
+    }
+  });
+  tutObs.observe(containerEl.parentNode || document.body, { childList: true });
 
   // ── Event delegation ─────────────────────────────────
 

@@ -605,6 +605,7 @@ export function calcClimateZones({
   tidallyLockedToStar = false,
   compositionClass = "Earth-like",
   liquidWaterPossible = true,
+  climateState = "Stable",
   insolationEarth: _insolationEarth = 1,
   gravityG = 1,
   altitudeM = 0,
@@ -630,6 +631,7 @@ export function calcClimateZones({
     tidallyLockedToStar: locked,
     compositionClass,
     liquidWaterPossible: liqWater,
+    climateState,
     gravityG: g,
     altitudeM: round(altKm * 1000, 0),
   };
@@ -709,7 +711,21 @@ export function calcClimateZones({
   // Merge adjacent identical zones (same code + same variant)
   const merged = mergeZones(zones);
 
-  const advisory = !liqWater ? "No liquid water \u2014 all zones are arid variants." : null;
+  const advisoryParts = [];
+  if (!liqWater) advisoryParts.push("No liquid water \u2014 all zones are arid variants.");
+  if (climateState === "Snowball")
+    advisoryParts.push(
+      "Snowball state \u2014 ice-albedo feedback likely drives global glaciation.",
+    );
+  else if (climateState === "Moist greenhouse")
+    advisoryParts.push(
+      "Moist greenhouse \u2014 stratospheric water vapour enables hydrogen escape to space.",
+    );
+  else if (climateState === "Runaway greenhouse")
+    advisoryParts.push(
+      "Runaway greenhouse \u2014 absorbed flux exceeds the radiation limit; surface water boils off.",
+    );
+  const advisory = advisoryParts.length > 0 ? advisoryParts.join(" ") : null;
   return result(inputs, merged, advisory);
 }
 

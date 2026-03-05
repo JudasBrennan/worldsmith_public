@@ -11,6 +11,7 @@ import {
   normalizeNameList,
 } from "../engine/usableCalendar.js";
 import { bindNumberAndSlider } from "./bind.js";
+import { createTutorial } from "./tutorial.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
   getSelectedMoon,
@@ -164,11 +165,17 @@ const TIPS = {
   "Planet orbital period": "Derived from the selected planet and star. Read-only.",
   "Moon orbital period": "Primary moon synodic period (new moon to new moon). Read-only.",
   "Planet rotation": "Length of one planetary day. Derived from the selected planet and read-only.",
+  "Decimal places":
+    "When enabled, rounds derived orbital data (planet period, moon period, rotation)" +
+    " to the selected number of decimal places before feeding into the calendar model." +
+    " This affects month lengths and leap cycles." +
+    " 6 = full engine precision; 0 = whole numbers only." +
+    " When disabled, raw engine values pass through unmodified.",
   "Months per year":
     "How many months the calendar splits the year into. Defaults to lunar-cycle-based value.",
-  "Solar weeks": "Week count used when Basis is Solar.",
-  "Lunar weeks": "Week count used when Basis is Lunar.",
-  "Lunisolar weeks": "Week count used when Basis is Lunisolar.",
+  "Days per month":
+    "How many days each month contains. Defaults to the orbital-derived value for the active basis.",
+  "Days per week": "How many days each week contains. Defaults to one quarter of days per month.",
   Basis: "Select which model drives month/week partitioning.",
   Year: "Calendar year shown in Month View.",
   Month: "Month shown in Month View.",
@@ -238,6 +245,7 @@ const TIPS = {
   "Add leap rule": "Add this leap-rule row to the active leap rules list.",
   "Previous month": "Move to the previous month (crosses year boundary when needed).",
   "Next month": "Move to the next month (crosses year boundary when needed).",
+  Tutorials: "Step-by-step guide to setting up your calendar.",
   "Open detailed view": "Open the full detailed calendar view with moon markers.",
   "Close detailed view": "Close the detailed calendar overlay.",
   "Month summary": "Current month, year, and month length.",
@@ -361,6 +369,65 @@ const TIPS = {
   "Jump absolute day": "Jump Month View to the date represented by this absolute day.",
   "Jump date": "Jump Month View to the specified year, month, and day.",
 };
+
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Calendar page turns your planet and moon data into a working calendar. " +
+      "Use the settings drawer on the left to configure structure, identity, rules, " +
+      "and output. The month view on the right updates live as you make changes.",
+  },
+  {
+    title: "Choose a Source Planet and Moon",
+    body:
+      "Open the Structure tab in the drawer. Select a source planet to set the " +
+      "year length, then pick a primary moon to drive lunar cycles. You can add " +
+      "up to three extra moons for multi-moon phase displays.",
+  },
+  {
+    title: "Calendar Basis",
+    body:
+      "Choose Solar, Lunar, or Lunisolar basis in the Structure tab. Solar ties " +
+      "months to the orbital year. Lunar ties them to moon cycles. Lunisolar " +
+      "combines both, adjusting months to stay in sync with seasons.",
+  },
+  {
+    title: "Month, Day, and Week Structure",
+    body:
+      "In the Structure tab, adjust months per year, days per month, and days per " +
+      "week. By default these are derived from orbital data. Override any slider " +
+      "for a custom calendar. The structure readout shows the resulting year length.",
+  },
+  {
+    title: "Naming Days, Months, and Eras",
+    body:
+      "Switch to the Identity tab to name your weekdays and months (one per line). " +
+      "Set a year display mode: plain numeric, named eras, or pre/post-calendar " +
+      "eras like BCE/CE. Add era rules to mark ages of your world's history.",
+  },
+  {
+    title: "Leap Rules",
+    body:
+      "In the Rules tab, open the Leap Years section. Add rules that insert or " +
+      "remove days on cycle years. Use the Suggest button to auto-generate rules " +
+      "that minimize calendar drift from the true orbital year.",
+  },
+  {
+    title: "Holidays and Festivals",
+    body:
+      "Still in the Rules tab, add holidays by date, weekday, or moon phase. " +
+      "Holidays can recur weekly, monthly, or yearly. Festivals are multi-day " +
+      "events. Use categories and colour tags to organise them on the grid.",
+  },
+  {
+    title: "Exporting Your Calendar",
+    body:
+      "Open the Output tab in the drawer. Export a single month as PDF, download " +
+      "an ICS file for real calendar apps, or use JSON import/export to save and " +
+      "share your full calendar configuration.",
+  },
+];
 
 const N = (v, f = 0) => {
   const n = Number(v);
@@ -791,9 +858,8 @@ function defaultState(world) {
       primaryMoonId,
       extraMoonIds: ["", "", ""],
       monthsPerYear: null,
-      solarWeeksPerMonth: 4,
-      lunarWeeksPerMonth: 4,
-      lunisolarWeeksPerMonth: 4,
+      daysPerMonth: null,
+      daysPerWeek: null,
     },
     ui: {
       calendarName: "Calendar",
@@ -839,6 +905,8 @@ function defaultState(world) {
       jumpAbsoluteDay: 0,
       jumpYear: 1,
       jumpMonthIndex: 0,
+      derivedRoundEnabled: false,
+      derivedDecimalPlaces: 6,
       jumpDayOfMonth: 1,
       collapsedSections: {
         designer: true,
@@ -849,6 +917,9 @@ function defaultState(world) {
         leap: true,
         cycles: true,
       },
+      drawerOpen: true,
+      drawerSection: "structure",
+      rulesTab: "holidays",
     },
   };
 }
@@ -868,9 +939,8 @@ function normalizeSingleProfile(world, rawProfile) {
         3,
       ),
       monthsPerYear: ri.monthsPerYear == null ? null : clampI(ri.monthsPerYear, 1, 240),
-      solarWeeksPerMonth: clampI(ri.solarWeeksPerMonth ?? 4, 1, 20),
-      lunarWeeksPerMonth: clampI(ri.lunarWeeksPerMonth ?? 4, 1, 20),
-      lunisolarWeeksPerMonth: clampI(ri.lunisolarWeeksPerMonth ?? 4, 1, 20),
+      daysPerMonth: ri.daysPerMonth == null ? null : clampI(ri.daysPerMonth, 1, 500),
+      daysPerWeek: ri.daysPerWeek == null ? null : clampI(ri.daysPerWeek, 1, 30),
     },
     ui: {
       ...d.ui,
@@ -931,6 +1001,8 @@ function normalizeSingleProfile(world, rawProfile) {
       jumpAbsoluteDay: Math.max(0, I(ru.jumpAbsoluteDay ?? 0, 0)),
       jumpYear: Math.max(1, I(ru.jumpYear ?? 1, 1)),
       jumpMonthIndex: Math.max(0, I(ru.jumpMonthIndex ?? 0, 0)),
+      derivedRoundEnabled: !!(ru.derivedRoundEnabled ?? d.ui.derivedRoundEnabled),
+      derivedDecimalPlaces: clampI(ru.derivedDecimalPlaces ?? d.ui.derivedDecimalPlaces, 0, 6),
       jumpDayOfMonth: Math.max(1, I(ru.jumpDayOfMonth ?? 1, 1)),
       collapsedSections: {
         designer:
@@ -962,6 +1034,13 @@ function normalizeSingleProfile(world, rawProfile) {
             ? !!ru.collapsedSections.cycles
             : true,
       },
+      drawerOpen: !!(ru.drawerOpen ?? d.ui.drawerOpen),
+      drawerSection: ["structure", "identity", "rules", "output"].includes(ru.drawerSection)
+        ? ru.drawerSection
+        : d.ui.drawerSection,
+      rulesTab: ["holidays", "festivals", "leap", "cycles"].includes(ru.rulesTab)
+        ? ru.rulesTab
+        : d.ui.rulesTab,
     },
   };
   while (profile.inputs.extraMoonIds.length < 3) profile.inputs.extraMoonIds.push("");
@@ -2863,47 +2942,74 @@ function buildContext(world, state) {
     if (moonDefs.length >= 4) break;
   }
 
-  const primaryMoonSynodicDays = Math.max(0.1, N(moonDefs[0]?.synodicDays, 29.5306));
+  const primaryMoonSynodicDaysRaw = Math.max(0.1, N(moonDefs[0]?.synodicDays, 29.5306));
+
+  // Optionally round derived values before feeding into the calendar model
+  let planetOrbitalPeriodDaysClamped = planetOrbitalPeriodDays;
+  let primaryMoonSynodicDays = primaryMoonSynodicDaysRaw;
+  let planetRotationPeriodHoursClamped = planetRotationPeriodHours;
+  if (state.ui.derivedRoundEnabled) {
+    const dp = clampI(state.ui.derivedDecimalPlaces ?? 6, 0, 6);
+    const dpFactor = 10 ** dp;
+    planetOrbitalPeriodDaysClamped = Math.round(planetOrbitalPeriodDays * dpFactor) / dpFactor;
+    primaryMoonSynodicDays = Math.round(primaryMoonSynodicDaysRaw * dpFactor) / dpFactor;
+    planetRotationPeriodHoursClamped = Math.round(planetRotationPeriodHours * dpFactor) / dpFactor;
+  }
+
   const derivedMonthsPerYear = Math.max(
     1,
-    Math.round(planetOrbitalPeriodDays / primaryMoonSynodicDays),
+    Math.round(planetOrbitalPeriodDaysClamped / primaryMoonSynodicDays),
   );
   if (state.inputs.monthsPerYear == null || !Number.isFinite(Number(state.inputs.monthsPerYear))) {
     state.inputs.monthsPerYear = derivedMonthsPerYear;
   }
 
+  // Convert sidereal rotation → solar day for calendar purposes.
+  // A calendar day is noon-to-noon (solar day), not star-to-star (sidereal day).
+  // For prograde rotation: solarDay = 1 / (1/sidereal - 1/orbital)
+  const orbitalHours = planetOrbitalPeriodDaysClamped * 24;
+  const siderealHours = planetRotationPeriodHoursClamped;
+  const recipDiff = 1 / siderealHours - 1 / orbitalHours;
+  const solarDayHours = recipDiff > 1e-9 ? 1 / recipDiff : siderealHours;
+
   const calendarModel = calcCalendarModel({
-    planetOrbitalPeriodDays,
+    planetOrbitalPeriodDays: planetOrbitalPeriodDaysClamped,
     moonOrbitalPeriodDays: primaryMoonSynodicDays,
-    planetRotationPeriodHours,
-    solarWeeksPerMonth: state.inputs.solarWeeksPerMonth,
-    lunarWeeksPerMonth: state.inputs.lunarWeeksPerMonth,
-    lunisolarWeeksPerMonth: state.inputs.lunisolarWeeksPerMonth,
+    planetRotationPeriodHours: solarDayHours,
+    weeksPerMonth: 4,
   });
   const base = getCalendarBasisMetrics(calendarModel, state.ui.basis);
   const overrideMonths = clampI(state.inputs.monthsPerYear, 1, 240);
-  let metrics;
-  if (overrideMonths !== base.monthsPerYear) {
-    // Recalculate month/week geometry for the overridden month count
-    const yearLen =
-      base.basis === "solar"
-        ? calendarModel.solar.commonYearLength
-        : base.basis === "lunar"
-          ? calendarModel.lunar.yearLength
-          : calendarModel.lunisolar.commonYearLength;
-    const dpm = Math.max(1, Math.floor(yearLen / overrideMonths));
-    const intercal = yearLen - dpm * overrideMonths;
-    const dpw = Math.max(1, Math.floor(dpm / base.weeksPerMonth));
-    metrics = {
-      ...base,
-      monthsPerYear: overrideMonths,
-      daysPerMonth: dpm,
-      intercalaryDays: intercal,
-      daysPerWeek: dpw,
-    };
-  } else {
-    metrics = { ...base, monthsPerYear: overrideMonths };
-  }
+
+  // Year length for the active basis
+  const yearLen =
+    base.basis === "solar"
+      ? calendarModel.solar.commonYearLength
+      : base.basis === "lunar"
+        ? calendarModel.lunar.yearLength
+        : calendarModel.lunisolar.commonYearLength;
+
+  // Cascading overrides: months → days/month → days/week
+  const autoDpm = Math.max(1, Math.floor(yearLen / overrideMonths));
+  const effectiveDpm =
+    state.inputs.daysPerMonth != null ? clampI(state.inputs.daysPerMonth, 1, 500) : autoDpm;
+
+  const maxDpw = Math.min(30, effectiveDpm);
+  const autoDpw = Math.max(1, Math.floor(effectiveDpm / 4));
+  const effectiveDpw =
+    state.inputs.daysPerWeek != null ? clampI(state.inputs.daysPerWeek, 1, maxDpw) : autoDpw;
+
+  const weeksPerMonth = Math.max(1, Math.floor(effectiveDpm / effectiveDpw));
+  const yearlyIntercalary = yearLen - overrideMonths * effectiveDpm;
+
+  const metrics = {
+    ...base,
+    monthsPerYear: overrideMonths,
+    daysPerMonth: effectiveDpm,
+    daysPerWeek: effectiveDpw,
+    weeksPerMonth,
+    intercalaryDays: yearlyIntercalary,
+  };
   state.ui.startDayOfYear = mod(I(state.ui.startDayOfYear, 0), metrics.daysPerWeek);
   state.ui.weekStartsOn = mod(I(state.ui.weekStartsOn, 0), metrics.daysPerWeek);
   state.ui.monthIndex = clampI(state.ui.monthIndex, 0, metrics.monthsPerYear - 1);
@@ -2951,11 +3057,14 @@ function buildContext(world, state) {
     planetMoons,
     sourcePlanetId,
     moonDefs,
-    planetOrbitalPeriodDays,
-    planetRotationPeriodHours,
+    planetOrbitalPeriodDays: planetOrbitalPeriodDaysClamped,
+    planetRotationPeriodHours: planetRotationPeriodHoursClamped,
+    solarDayHours,
     primaryMoonSynodicDays,
     derivedMonthsPerYear,
     metrics,
+    yearLen,
+    yearlyIntercalary,
     dayNames,
     monthNames,
     holidays,
@@ -3142,8 +3251,8 @@ function festivalSummary(festival, ctx) {
 
 function recommendLeapRuleFromOrbit(ctx) {
   const orbitalDays = Math.max(0.000001, N(ctx?.planetOrbitalPeriodDays, 365.2422));
-  const rotationHours = Math.max(0.000001, N(ctx?.planetRotationPeriodHours, 24));
-  const localYearActual = orbitalDays / (rotationHours / 24);
+  const solarHours = Math.max(0.000001, N(ctx?.solarDayHours, 24));
+  const localYearActual = orbitalDays / (solarHours / 24);
   const monthsPerYear = Math.max(1, I(ctx?.metrics?.monthsPerYear, 12));
   const baseYearLength = getMonthLengthsForYear({
     metrics: ctx?.metrics,
@@ -3399,30 +3508,58 @@ export function initCalendarPage(mountEl) {
   const wrap = document.createElement("div");
   wrap.className = "page";
   wrap.innerHTML = `
-    <div class="panel"><div class="panel__header"><h1 class="panel__title"><span class="ws-icon icon--calendar" aria-hidden="true"></span><span>Calendar</span></h1><div class="badge">Interactive tool</div></div><div class="panel__body"><div class="hint">Build a usable calendar from selected planet/moons, then inspect compact and detailed views.</div></div></div>
+    <div class="panel"><div class="panel__header"><h1 class="panel__title"><span class="ws-icon icon--calendar" aria-hidden="true"></span><span>Calendar</span></h1><button id="calTutorials" type="button" class="ws-tutorial-trigger" data-tip="${esc(TIPS.Tutorials || "")}">Tutorials</button></div><div class="panel__body"><div class="hint">Build a usable calendar from selected planet/moons, then inspect compact and detailed views.</div></div></div>
     <div class="calendar-workspace">
-      <div class="calendar-controls-stack">
+      <div class="calendar-toolbar">
+        <div class="calendar-toolbar__left">
+          <select id="calProfileSelect" class="calendar-toolbar__profile" data-tip="${esc(TIPS["Calendar profile"] || "")}"></select>
+          <button id="calProfileNew" type="button" class="small" data-tip="${esc(TIPS["New profile"] || "")}">New</button>
+          <button id="calProfileDuplicate" type="button" class="small" data-tip="${esc(TIPS["Duplicate profile"] || "")}">Dup</button>
+          <button id="calProfileDelete" class="small danger" type="button" data-tip="${esc(TIPS["Delete profile"] || "")}">Del</button>
+        </div>
+        <div class="calendar-toolbar__nav">
+          <button id="calPrevMonth" type="button" class="calendar-toolbar__btn" data-tip="${esc(TIPS["Previous month"] || "")}">\u2190</button>
+          <select id="calMonth" class="calendar-toolbar__select" data-tip="${esc(TIPS.Month || "")}"></select>
+          <input id="calYear" type="number" min="1" step="1" class="calendar-toolbar__year" data-tip="${esc(TIPS.Year || "")}" />
+          <button id="calNextMonth" type="button" class="calendar-toolbar__btn" data-tip="${esc(TIPS["Next month"] || "")}">\u2192</button>
+        </div>
+        <div class="calendar-toolbar__right">
+          <button id="calDrawerToggle" type="button" class="calendar-toolbar__btn" data-tip="${esc(TIPS["Toggle settings"] || "")}" aria-label="Toggle settings">\u276E</button>
+          <button id="calOpenDetail" type="button" class="calendar-toolbar__btn" data-tip="${esc(TIPS["Open detailed view"] || "")}">Detailed Calendar</button>
+        </div>
+      </div>
+      <div class="calendar-drawer" id="calDrawer">
+        <div class="calendar-drawer__tabs">
+          <button type="button" class="calendar-drawer__tab is-active" data-drawer-tab="structure">Structure</button>
+          <button type="button" class="calendar-drawer__tab" data-drawer-tab="identity">Identity</button>
+          <button type="button" class="calendar-drawer__tab" data-drawer-tab="rules">Rules</button>
+          <button type="button" class="calendar-drawer__tab" data-drawer-tab="output">Output</button>
+        </div>
+        <div class="calendar-drawer__body">
+        <section data-drawer-section="structure" class="calendar-drawer__section">
         <div class="panel"><div class="panel__header"><h2>Inputs</h2></div><div class="panel__body">
-          <div class="form-row"><div><div class="label">Calendar profile ${tipIcon(TIPS["Calendar profile"] || "")}</div></div><select id="calProfileSelect"></select></div>
-          <div class="button-row"><button id="calProfileNew" type="button" data-tip="${esc(TIPS["New profile"] || "")}">New</button><button id="calProfileDuplicate" type="button" data-tip="${esc(TIPS["Duplicate profile"] || "")}">Duplicate</button><button id="calProfileDelete" class="small danger" type="button" data-tip="${esc(TIPS["Delete profile"] || "")}">Delete</button></div>
           <div class="form-row"><div><div class="label">Source planet ${tipIcon(TIPS["Source planet"] || "")}</div></div><select id="calSourcePlanet"></select></div>
           <div class="form-row"><div><div class="label">Primary moon ${tipIcon(TIPS["Primary moon"] || "")}</div></div><select id="calPrimaryMoon"></select></div>
           <div class="form-row"><div><div class="label">Extra moon 1 ${tipIcon(TIPS["Extra moon"] || "")}</div></div><select id="calExtraMoon1"></select></div>
           <div class="form-row"><div><div class="label">Extra moon 2 ${tipIcon(TIPS["Extra moon"] || "")}</div></div><select id="calExtraMoon2"></select></div>
           <div class="form-row"><div><div class="label">Extra moon 3 ${tipIcon(TIPS["Extra moon"] || "")}</div></div><select id="calExtraMoon3"></select></div>
-          <div class="label">Derived Data</div>
-          <div class="derived-readout" id="calDerivedData"></div>
+          <div class="form-row"><div><div class="label">Basis ${tipIcon(TIPS.Basis || "")}</div></div><select id="calBasis"><option value="solar">Solar</option><option value="lunar">Lunar</option><option value="lunisolar">Lunisolar</option></select></div>
+          <details class="calendar-derived-details" open>
+            <summary>Orbital data</summary>
+            <div class="derived-readout" id="calDerivedData"></div>
+            <div class="form-row"><div><div class="label">Round derived data ${tipIcon(TIPS["Decimal places"] || "")}</div></div><div class="calendar-holiday-attrs__list"><label class="calendar-holiday-attr"><input id="calDerivedRoundEnabled" type="checkbox" />Enable</label></div></div>
+            ${sliderField("calDerivedDecimalPlaces", "Decimal places", "", "", 0, 6, 1, "")}
+          </details>
           ${sliderField("calMonthsPerYear", "Months per year", "", "Linked to lunar cycles by default.", 1, 60, 1, TIPS["Months per year"])}
-          ${sliderField("calSolarWeeks", "Solar weeks", "per month", "", 1, 20, 1, TIPS["Solar weeks"])}
-          ${sliderField("calLunarWeeks", "Lunar weeks", "per month", "", 1, 20, 1, TIPS["Lunar weeks"])}
-          ${sliderField("calLunisolarWeeks", "Lunisolar weeks", "per month", "", 1, 20, 1, TIPS["Lunisolar weeks"])}
-          <div class="button-row"><button class="primary" id="calApplyInputs" type="button" data-tip="${esc(TIPS["Apply inputs"] || "")}">Apply</button><button id="calUseSelected" type="button" data-tip="${esc(TIPS["Use selected objects"] || "")}">Use selected objects</button></div>
+          ${sliderField("calDaysPerMonth", "Days per month", "", "Linked to orbital data by default.", 1, 120, 1, TIPS["Days per month"])}
+          ${sliderField("calDaysPerWeek", "Days per week", "", "Linked to days per month by default.", 1, 30, 1, TIPS["Days per week"])}
+          <div class="derived-readout" id="calStructureInfo"></div>
+          <div class="button-row"><button id="calUseSelected" type="button" data-tip="${esc(TIPS["Use selected objects"] || "")}">Use selected objects</button></div>
         </div></div>
+        </section>
+        <section data-drawer-section="identity" class="calendar-drawer__section" hidden>
         <div class="panel"><div class="panel__header"><h2>Calendar Designer</h2><div class="calendar-section-info">${tipIcon(TIPS["Calendar Designer section"] || "")}</div></div><div class="panel__body">
           <div class="form-row"><div><div class="label">Calendar name ${tipIcon(TIPS["Calendar name"] || "")}</div></div><input id="calCalendarName" type="text" /></div>
-          <div class="form-row"><div><div class="label">Basis ${tipIcon(TIPS.Basis || "")}</div></div><select id="calBasis"><option value="solar">Solar</option><option value="lunar">Lunar</option><option value="lunisolar">Lunisolar</option></select></div>
-          <div class="form-row"><div><div class="label">Year ${tipIcon(TIPS.Year || "")}</div></div><input id="calYear" type="number" min="1" step="1" /></div>
-          <div class="form-row"><div><div class="label">Month ${tipIcon(TIPS.Month || "")}</div></div><select id="calMonth"></select></div>
           <div class="form-row"><div><div class="label">Start day of year ${tipIcon(TIPS["Start day of year"] || "")}</div></div><select id="calStartDay"></select></div>
           <div class="form-row"><div><div class="label">Week starts on ${tipIcon(TIPS["Week starts on"] || "")}</div></div><select id="calWeekStart"></select></div>
           <div class="form-row"><div><div class="label">Moon epoch offset <span class="unit">days</span> ${tipIcon(TIPS["Moon epoch offset"] || "")}</div></div><input id="calMoonEpoch" type="number" step="0.1" /></div>
@@ -3444,9 +3581,10 @@ export function initCalendarPage(mountEl) {
           <div class="button-row"><button id="calEraAdd" type="button" data-tip="${esc(TIPS["Add era"] || "")}">Add era</button></div>
           <div id="calEraList" class="calendar-item-list" data-tip="${esc(TIPS["Era list"] || "")}"></div>
 
-          <div class="button-row"><button class="primary" id="calApplyNames" type="button" data-tip="${esc(TIPS["Apply names"] || "")}">Apply names</button><button id="calResetNames" type="button" data-tip="${esc(TIPS["Reset names"] || "")}">Reset names</button></div>
+          <div class="button-row"><button id="calResetNames" type="button" data-tip="${esc(TIPS["Reset names"] || "")}">Reset names</button></div>
         </div></div>
-
+        </section>
+        <section data-drawer-section="output" class="calendar-drawer__section" hidden>
         <div class="panel"><div class="panel__header"><h2>Calendar Data</h2><div class="calendar-section-info">${tipIcon(TIPS["Calendar Data section"] || "")}</div></div><div class="panel__body">
           <div class="hint">Export or import calendar settings only (does not replace world generation data).</div>
           <div style="height:10px"></div>
@@ -3489,8 +3627,17 @@ export function initCalendarPage(mountEl) {
           </div>
           <div id="calOutputStatus" class="io-status" data-kind="info"></div>
         </div></div>
-
+        </section>
+        <section data-drawer-section="rules" class="calendar-drawer__section" hidden>
+        <div class="calendar-drawer__subtabs">
+          <button class="calendar-drawer__subtab is-active" data-rules-tab="holidays">Holidays</button>
+          <button class="calendar-drawer__subtab" data-rules-tab="festivals">Festivals</button>
+          <button class="calendar-drawer__subtab" data-rules-tab="leap">Leap Years</button>
+          <button class="calendar-drawer__subtab" data-rules-tab="cycles">Cycles</button>
+        </div>
+        <div data-rules-section="holidays">
         <div class="panel"><div class="panel__header"><h2>Special Days</h2><div class="calendar-section-info">${tipIcon(TIPS["Special Days section"] || "")}</div></div><div class="panel__body">
+          <div id="calHolidayList" class="calendar-item-list" data-tip="${esc(TIPS.Holidays || "")}"></div>
           <div class="label">Holidays ${tipIcon(TIPS.Holidays || "")}</div>
           <div class="calendar-holiday-form">
             <div class="form-row"><div><div class="label">Holiday name ${tipIcon(TIPS["Holiday name"] || "")}</div></div><input id="calHolidayName" type="text" /></div>
@@ -3534,10 +3681,12 @@ export function initCalendarPage(mountEl) {
             <div class="form-row"><div><div class="label">Skip days ${tipIcon(TIPS["Holiday exception days"] || "")}</div><div class="hint">Day numbers in month.</div></div><input id="calHolidayExceptDays" type="text" placeholder="13" /></div>
             <div class="button-row"><button class="primary" id="calHolidaySave" type="button" data-tip="${esc(TIPS["Add holiday"] || "")}">Add holiday</button><button id="calHolidayCancel" type="button" style="display:none" data-tip="${esc(TIPS["Cancel holiday edit"] || "")}">Cancel edit</button></div>
           </div>
-          <div id="calHolidayList" class="calendar-item-list" data-tip="${esc(TIPS.Holidays || "")}"></div>
         </div></div>
+        </div>
 
+        <div data-rules-section="festivals" hidden>
         <div class="panel"><div class="panel__header"><h2>Festival Days</h2><div class="calendar-section-info">${tipIcon(TIPS["Festival Days section"] || "")}</div></div><div class="panel__body">
+          <div id="calFestivalList" class="calendar-item-list" data-tip="${esc(TIPS["Festival list"] || "")}"></div>
           <div class="label">Festival / intercalary days ${tipIcon(TIPS["Festival days"] || "")}</div>
           <div class="calendar-holiday-form">
             <div class="form-row"><div><div class="label">Festival name ${tipIcon(TIPS["Festival name"] || "")}</div></div><input id="calFestivalName" type="text" /></div>
@@ -3549,10 +3698,14 @@ export function initCalendarPage(mountEl) {
             <div class="form-row calendar-holiday-attrs"><div><div class="label">Behaviour ${tipIcon(TIPS["Festival outside week"] || "")}</div></div><div class="calendar-holiday-attrs__list"><label class="calendar-holiday-attr"><input id="calFestivalOutsideWeek" type="checkbox" />Outside weekday flow</label></div></div>
             <div class="button-row"><button class="primary" id="calFestivalSave" type="button" data-tip="${esc(TIPS["Add festival"] || "")}">Add festival</button><button id="calFestivalCancel" type="button" style="display:none" data-tip="${esc(TIPS["Cancel festival edit"] || "")}">Cancel edit</button></div>
           </div>
-          <div id="calFestivalList" class="calendar-item-list" data-tip="${esc(TIPS["Festival list"] || "")}"></div>
         </div></div>
+        </div>
 
+        <div data-rules-section="leap" hidden>
         <div class="panel"><div class="panel__header"><h2>Leap Years</h2><div class="calendar-section-info">${tipIcon(TIPS["Leap Years section"] || "")}</div></div><div class="panel__body">
+          <div class="button-row"><button id="calLeapSuggest" class="primary" type="button" data-tip="${esc(TIPS["Suggest leap rule"] || "")}">Suggest leap rule</button></div>
+          <div id="calLeapStatus" class="io-status" data-kind="info"></div>
+          <div id="calLeapList" class="calendar-item-list" data-tip="${esc(TIPS["Leap list"] || "")}"></div>
           <div class="label">Leap rules ${tipIcon(TIPS["Leap rules"] || "")}</div>
           <div class="calendar-holiday-form">
             <div class="form-row"><div><div class="label">Rule name ${tipIcon(TIPS["Leap rule name"] || "")}</div></div><input id="calLeapName" type="text" placeholder="Rule name" /></div>
@@ -3560,13 +3713,14 @@ export function initCalendarPage(mountEl) {
             <div class="form-row"><div><div class="label">Start year ${tipIcon(TIPS["Leap start year"] || "")}</div></div><input id="calLeapOffset" type="number" min="1" step="1" placeholder="1" /></div>
             <div class="form-row"><div><div class="label">Target month ${tipIcon(TIPS["Leap month"] || "")}</div></div><select id="calLeapMonth"></select></div>
             <div class="form-row"><div><div class="label">Day delta <span class="unit">days</span> ${tipIcon(TIPS["Leap day delta"] || "")}</div></div><input id="calLeapDelta" type="number" min="-30" max="30" step="1" placeholder="+/- days" /></div>
-            <div class="button-row"><button id="calLeapAdd" type="button" data-tip="${esc(TIPS["Add leap rule"] || "")}">Add rule</button><button id="calLeapSuggest" type="button" data-tip="${esc(TIPS["Suggest leap rule"] || "")}">Suggest leap rule</button></div>
+            <div class="button-row"><button id="calLeapAdd" type="button" data-tip="${esc(TIPS["Add leap rule"] || "")}">Add rule</button></div>
           </div>
-          <div id="calLeapStatus" class="io-status" data-kind="info"></div>
-          <div id="calLeapList" class="calendar-item-list" data-tip="${esc(TIPS["Leap list"] || "")}"></div>
         </div></div>
+        </div>
 
+        <div data-rules-section="cycles" hidden>
         <div class="panel"><div class="panel__header"><h2>Work/Rest Cycles</h2><div class="calendar-section-info">${tipIcon(TIPS["Work/Rest Cycles section"] || "")}</div></div><div class="panel__body">
+          <div id="calCycleList" class="calendar-item-list" data-tip="${esc(TIPS["Cycle list"] || "")}"></div>
           <div class="label">Cycle rules ${tipIcon(TIPS["Cycle list"] || "")}</div>
           <div class="calendar-holiday-form">
             <div class="form-row"><div><div class="label">Rule name ${tipIcon(TIPS["Cycle rule name"] || "")}</div></div><input id="calCycleName" type="text" placeholder="Work cycle" /></div>
@@ -3585,20 +3739,25 @@ export function initCalendarPage(mountEl) {
             <div class="form-row"><div><div class="label">Marker short ${tipIcon(TIPS["Cycle marker short"] || "")}</div></div><input id="calCycleMarkerShort" type="text" maxlength="3" /></div>
             <div class="button-row"><button class="primary" id="calCycleSave" type="button" data-tip="${esc(TIPS["Add cycle rule"] || "")}">Add cycle rule</button><button id="calCycleCancel" type="button" style="display:none" data-tip="${esc(TIPS["Cancel cycle edit"] || "")}">Cancel edit</button></div>
           </div>
-          <div id="calCycleList" class="calendar-item-list" data-tip="${esc(TIPS["Cycle list"] || "")}"></div>
         </div></div>
+        </div>
+        </section>
+        </div>
       </div>
+      <div class="calendar-drawer-backdrop is-hidden" id="calDrawerBackdrop"></div>
 
-      <div class="panel calendar-month-panel"><div class="panel__header"><h2>Month View</h2><div class="button-row calendar-nav" style="margin:0"><button id="calPrevMonth" type="button" data-tip="${esc(TIPS["Previous month"] || "")}">Previous</button><button id="calNextMonth" type="button" data-tip="${esc(TIPS["Next month"] || "")}">Next</button><button id="calOpenDetail" type="button" data-tip="${esc(TIPS["Open detailed view"] || "")}">Detailed view</button></div></div><div class="panel__body"><div class="calendar-month-title" id="calMonthTitle" data-tip="${esc(TIPS["Month summary"] || "")}"></div><div class="calendar-chip-row" id="calChipRow" data-tip="${esc(TIPS["Moon summary chips"] || "")}"></div><div class="calendar-season-band" id="calSeasonBand" data-tip="${esc(TIPS["Season bands"] || "")}" hidden></div><div class="calendar-holiday-filter-bar" id="calHolidayFilters" data-tip="${esc(TIPS["Holiday filters"] || "")}">${holidayFilterControlsHtml()}</div><div class="calendar-mini-grid-wrap" data-tip="${esc(TIPS["Simple calendar"] || "")}"><table class="calendar-mini-grid"><thead><tr id="calMiniHead"></tr></thead><tbody id="calMiniBody"></tbody></table></div><div class="calendar-selected-day" id="calSelectedDay" data-tip="${esc(TIPS["Selected day"] || "")}"></div><div class="calendar-date-tools" data-tip="${esc(TIPS["Date converter"] || "")}"><div class="calendar-date-tools__title">Date Converter ${tipIcon(TIPS["Date converter"] || "")}</div><div class="calendar-date-tools__row"><label>Absolute day ${tipIcon(TIPS["Absolute day"] || "")}</label><input id="calJumpAbs" type="number" min="0" step="1" /><button id="calJumpAbsBtn" type="button" data-tip="${esc(TIPS["Jump absolute day"] || "")}">Jump</button></div><div class="calendar-date-tools__row"><label>Year</label><input id="calJumpYear" type="number" min="1" step="1" /><label>Month</label><select id="calJumpMonth"></select><label>Day</label><input id="calJumpDay" type="number" min="1" step="1" /><button id="calJumpDateBtn" type="button" data-tip="${esc(TIPS["Jump date"] || "")}">Jump</button></div></div><div class="calendar-compact-summary"><div class="calendar-moon-legend" id="calMoonLegend" data-tip="${esc(TIPS["Moon key"] || "")}"></div><div class="calendar-compact-grid" id="calCompactGrid" data-tip="${esc(TIPS["Compact stats"] || "")}"></div><div class="calendar-compact-events" id="calCompactEvents" data-tip="${esc(TIPS["Month events"] || "")}"></div></div></div></div>
+      <div class="panel calendar-month-panel"><div class="panel__header"><h2>Month View</h2></div><div class="panel__body"><div class="calendar-month-title" id="calMonthTitle" data-tip="${esc(TIPS["Month summary"] || "")}"></div><div class="calendar-chip-row" id="calChipRow" data-tip="${esc(TIPS["Moon summary chips"] || "")}"></div><div class="calendar-season-band" id="calSeasonBand" data-tip="${esc(TIPS["Season bands"] || "")}" hidden></div><div class="calendar-holiday-filter-bar" id="calHolidayFilters" data-tip="${esc(TIPS["Holiday filters"] || "")}">${holidayFilterControlsHtml()}</div><div class="calendar-mini-grid-wrap" data-tip="${esc(TIPS["Simple calendar"] || "")}"><table class="calendar-mini-grid"><thead><tr id="calMiniHead"></tr></thead><tbody id="calMiniBody"></tbody></table></div><div class="calendar-selected-day" id="calSelectedDay" data-tip="${esc(TIPS["Selected day"] || "")}"></div><div class="calendar-date-tools" data-tip="${esc(TIPS["Date converter"] || "")}"><div class="calendar-date-tools__title">Date Converter ${tipIcon(TIPS["Date converter"] || "")}</div><div class="calendar-date-tools__row"><label>Absolute day ${tipIcon(TIPS["Absolute day"] || "")}</label><input id="calJumpAbs" type="number" min="0" step="1" /><button id="calJumpAbsBtn" type="button" data-tip="${esc(TIPS["Jump absolute day"] || "")}">Jump</button></div><div class="calendar-date-tools__row"><label>Year</label><input id="calJumpYear" type="number" min="1" step="1" /><label>Month</label><select id="calJumpMonth"></select><label>Day</label><input id="calJumpDay" type="number" min="1" step="1" /><button id="calJumpDateBtn" type="button" data-tip="${esc(TIPS["Jump date"] || "")}">Jump</button></div></div><div class="calendar-compact-summary"><div class="calendar-moon-legend" id="calMoonLegend" data-tip="${esc(TIPS["Moon key"] || "")}"></div><div class="calendar-compact-grid" id="calCompactGrid" data-tip="${esc(TIPS["Compact stats"] || "")}"></div><div class="calendar-compact-events" id="calCompactEvents" data-tip="${esc(TIPS["Month events"] || "")}"></div></div></div></div>
     </div>
 
     <div class="calendar-detail-overlay is-hidden" id="calDetailOverlay"><div class="panel calendar-detail-dialog"><div class="panel__header"><h2>Detailed Calendar</h2><div class="button-row" style="margin:0"><button id="calDetailPrev" type="button" data-tip="${esc(TIPS["Previous month"] || "")}">Previous</button><button id="calDetailNext" type="button" data-tip="${esc(TIPS["Next month"] || "")}">Next</button><button id="calCloseDetail" type="button" data-tip="${esc(TIPS["Close detailed view"] || "")}">Close</button></div></div><div class="panel__body"><div class="calendar-month-title" id="calDetailMonthTitle" data-tip="${esc(TIPS["Month summary"] || "")}"></div><div class="calendar-chip-row" id="calDetailChipRow" data-tip="${esc(TIPS["Moon summary chips"] || "")}"></div><div class="calendar-season-band" id="calDetailSeasonBand" data-tip="${esc(TIPS["Season bands"] || "")}" hidden></div><div class="calendar-moon-legend" id="calDetailMoonLegend" data-tip="${esc(TIPS["Moon key"] || "")}"></div><div class="calendar-selected-day" id="calDetailSelectedDay" data-tip="${esc(TIPS["Selected day"] || "")}"></div><div class="calendar-grid-wrap calendar-grid-wrap--detail" data-tip="${esc(TIPS["Detailed calendar"] || "")}"><table class="calendar-grid-table"><thead><tr id="calDetailHead"></tr></thead><tbody id="calDetailBody"></tbody></table></div></div></div></div>
+
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
 
   const $ = (sel) => wrap.querySelector(sel);
   const els = {
+    drawerToggle: $("#calDrawerToggle"),
     profileSelect: $("#calProfileSelect"),
     profileNew: $("#calProfileNew"),
     profileDuplicate: $("#calProfileDuplicate"),
@@ -3609,11 +3768,12 @@ export function initCalendarPage(mountEl) {
     extraMoon2: $("#calExtraMoon2"),
     extraMoon3: $("#calExtraMoon3"),
     derivedData: $("#calDerivedData"),
+    derivedRoundEnabled: $("#calDerivedRoundEnabled"),
+    derivedDecimalPlaces: $("#calDerivedDecimalPlaces"),
     monthsPerYear: $("#calMonthsPerYear"),
-    solarWeeks: $("#calSolarWeeks"),
-    lunarWeeks: $("#calLunarWeeks"),
-    lunisolarWeeks: $("#calLunisolarWeeks"),
-    applyInputs: $("#calApplyInputs"),
+    daysPerMonth: $("#calDaysPerMonth"),
+    daysPerWeek: $("#calDaysPerWeek"),
+    structureInfo: $("#calStructureInfo"),
     useSelected: $("#calUseSelected"),
     calendarName: $("#calCalendarName"),
     basis: $("#calBasis"),
@@ -3658,7 +3818,6 @@ export function initCalendarPage(mountEl) {
     icsMonth: $("#calIcsMonth"),
     icsYear: $("#calIcsYear"),
     outputStatus: $("#calOutputStatus"),
-    applyNames: $("#calApplyNames"),
     resetNames: $("#calResetNames"),
     holidayName: $("#calHolidayName"),
     holidayCategory: $("#calHolidayCategory"),
@@ -3823,16 +3982,16 @@ export function initCalendarPage(mountEl) {
   }
 
   const binders = [
+    bindPair(wrap, "calDerivedDecimalPlaces", 0, 6, 1),
     bindPair(wrap, "calMonthsPerYear", 1, 60, 1),
-    bindPair(wrap, "calSolarWeeks", 1, 20, 1),
-    bindPair(wrap, "calLunarWeeks", 1, 20, 1),
-    bindPair(wrap, "calLunisolarWeeks", 1, 20, 1),
+    bindPair(wrap, "calDaysPerMonth", 1, 120, 1),
+    bindPair(wrap, "calDaysPerWeek", 1, 30, 1),
   ];
   const collapsiblePanels = {};
 
   for (const def of CALENDAR_COLLAPSIBLE_PANELS) {
     const titleEl = [
-      ...wrap.querySelectorAll(".calendar-controls-stack .panel > .panel__header > h2"),
+      ...wrap.querySelectorAll(".calendar-drawer__section .panel > .panel__header > h2"),
     ].find((h2) => h2.textContent.trim() === def.title);
     const header = titleEl?.parentElement || null;
     const panel = header?.closest(".panel") || null;
@@ -3938,6 +4097,36 @@ export function initCalendarPage(mountEl) {
         ? "Expand"
         : "Collapse";
     }
+  }
+
+  const drawerEl = $("#calDrawer");
+  const workspaceEl = wrap.querySelector(".calendar-workspace");
+
+  function applyDrawerState() {
+    const open = !!state.ui.drawerOpen;
+    if (workspaceEl) workspaceEl.classList.toggle("drawer-open", open);
+    if (drawerEl) drawerEl.classList.toggle("is-hidden", !open);
+    els.drawerToggle?.classList.toggle("is-active", open);
+    if (els.drawerToggle) els.drawerToggle.textContent = open ? "\u276E" : "\u276F";
+    const tabs = wrap.querySelectorAll("[data-drawer-tab]");
+    for (const tab of tabs) {
+      tab.classList.toggle("is-active", tab.dataset.drawerTab === state.ui.drawerSection);
+    }
+    const sections = wrap.querySelectorAll("[data-drawer-section]");
+    for (const section of sections) {
+      section.hidden = section.dataset.drawerSection !== state.ui.drawerSection;
+    }
+    const subtabs = wrap.querySelectorAll("[data-rules-tab]");
+    for (const st of subtabs) {
+      st.classList.toggle("is-active", st.dataset.rulesTab === state.ui.rulesTab);
+    }
+    const ruleSections = wrap.querySelectorAll("[data-rules-section]");
+    for (const rs of ruleSections) {
+      rs.hidden = rs.dataset.rulesSection !== state.ui.rulesTab;
+    }
+    const backdrop = wrap.querySelector("#calDrawerBackdrop");
+    const narrow = typeof window !== "undefined" && window.innerWidth <= 1200;
+    if (backdrop) backdrop.classList.toggle("is-visible", open && narrow);
   }
 
   function setJsonStatus(msg, kind = "info") {
@@ -4473,16 +4662,60 @@ export function initCalendarPage(mountEl) {
     els.extraMoon2.value = state.inputs.extraMoonIds[1] || "";
     els.extraMoon3.value = state.inputs.extraMoonIds[2] || "";
 
+    const roundOn = !!state.ui.derivedRoundEnabled;
+    const ddp = clampI(state.ui.derivedDecimalPlaces ?? 6, 0, 6);
+    const orbDp = roundOn ? ddp : 6;
+    const rotDp = roundOn ? Math.min(ddp, 3) : 3;
     els.derivedData.textContent =
-      `Planet orbital period: ${N(ctx.planetOrbitalPeriodDays).toFixed(6)} days\n` +
-      `Moon orbital period: ${N(ctx.primaryMoonSynodicDays).toFixed(6)} days\n` +
-      `Planet rotation: ${N(ctx.planetRotationPeriodHours).toFixed(3)} hours`;
+      `Planet orbital period: ${N(ctx.planetOrbitalPeriodDays).toFixed(orbDp)} days\n` +
+      `Moon orbital period: ${N(ctx.primaryMoonSynodicDays).toFixed(orbDp)} days\n` +
+      `Planet rotation: ${N(ctx.planetRotationPeriodHours).toFixed(rotDp)} hours (sidereal)\n` +
+      `Solar day: ${N(ctx.solarDayHours).toFixed(rotDp)} hours`;
 
+    els.derivedRoundEnabled.checked = roundOn;
+    els.derivedDecimalPlaces.value = String(ddp);
+    els.derivedDecimalPlaces.disabled = !roundOn;
+    const dpSlider = els.derivedDecimalPlaces
+      .closest(".form-row")
+      ?.querySelector('input[type="range"]');
+    if (dpSlider) dpSlider.disabled = !roundOn;
     els.monthsPerYear.value = String(ctx.metrics.monthsPerYear);
-    els.solarWeeks.value = String(clampI(state.inputs.solarWeeksPerMonth, 1, 20));
-    els.lunarWeeks.value = String(clampI(state.inputs.lunarWeeksPerMonth, 1, 20));
-    els.lunisolarWeeks.value = String(clampI(state.inputs.lunisolarWeeksPerMonth, 1, 20));
+    els.daysPerMonth.value = String(ctx.metrics.daysPerMonth);
+    els.daysPerWeek.value = String(ctx.metrics.daysPerWeek);
+    const dpwCeiling = Math.min(30, ctx.metrics.daysPerMonth);
+    const dpwSlider = wrap.querySelector("#calDaysPerWeek_slider");
+    const dpwMaxLabel = wrap.querySelector("#calDaysPerWeek_max");
+    if (dpwSlider) dpwSlider.max = String(dpwCeiling);
+    if (dpwMaxLabel) dpwMaxLabel.textContent = String(dpwCeiling);
     syncSliders();
+
+    // Structure readout — use getMonthLengthsForYear to account for leap rules
+    const wpm = Math.floor(ctx.metrics.daysPerMonth / ctx.metrics.daysPerWeek);
+    const weekRemainder = ctx.metrics.daysPerMonth - wpm * ctx.metrics.daysPerWeek;
+    const actualMonthLengths = getMonthLengthsForYear({
+      metrics: ctx.metrics,
+      year: state.ui.year,
+      leapRules: state.ui.leapRules || [],
+    });
+    const actualBaseYear = actualMonthLengths.reduce((a, b) => a + b, 0);
+    const lastMonthLen = actualMonthLengths[actualMonthLengths.length - 1];
+    const drift = actualBaseYear - ctx.yearLen;
+    let readout =
+      `Weeks per month: ${wpm}` + (weekRemainder ? ` (+${weekRemainder} remainder)` : "");
+    readout += `\nCalendar year: ${actualBaseYear} days`;
+    if (drift) readout += ` (${drift > 0 ? "+" : ""}${drift} vs orbital ${ctx.yearLen})`;
+    if (lastMonthLen !== ctx.metrics.daysPerMonth) readout += `\nLast month: ${lastMonthLen} days`;
+    const clampedRules = (state.ui.leapRules || []).filter(
+      (r) => I(r?.monthIndex, 0) >= ctx.metrics.monthsPerYear,
+    ).length;
+    if (clampedRules > 0) {
+      readout += `\n${clampedRules} leap rule(s) clamped to last month`;
+    }
+    els.structureInfo.textContent = readout;
+    els.structureInfo.classList.toggle(
+      "drift-warning",
+      ctx.yearLen > 0 && Math.abs(drift / ctx.yearLen) > 0.1,
+    );
 
     if (document.activeElement !== els.calendarName) {
       els.calendarName.value = String(state.ui.calendarName || "Calendar");
@@ -4850,6 +5083,7 @@ export function initCalendarPage(mountEl) {
     updateFestivalEnables();
     updateCycleEnables();
     applyCollapsedPanels();
+    applyDrawerState();
     persistState(state);
   }
 
@@ -4924,6 +5158,40 @@ export function initCalendarPage(mountEl) {
   loadCurrentJsonToTextarea();
   setOutputStatus("Ready.", "info");
   applyCollapsedPanels();
+  applyDrawerState();
+
+  els.drawerToggle.addEventListener("click", () => {
+    state.ui.drawerOpen = !state.ui.drawerOpen;
+    applyDrawerState();
+    persistState(state);
+  });
+  wrap.querySelector(".calendar-drawer__tabs")?.addEventListener("click", (e) => {
+    const tab = e.target.closest("[data-drawer-tab]");
+    if (!tab) return;
+    state.ui.drawerSection = tab.dataset.drawerTab;
+    applyDrawerState();
+    persistState(state);
+  });
+  wrap.querySelector(".calendar-drawer__subtabs")?.addEventListener("click", (e) => {
+    const st = e.target.closest("[data-rules-tab]");
+    if (!st) return;
+    state.ui.rulesTab = st.dataset.rulesTab;
+    applyDrawerState();
+    persistState(state);
+  });
+  wrap.querySelector("#calDrawerBackdrop")?.addEventListener("click", () => {
+    state.ui.drawerOpen = false;
+    applyDrawerState();
+    persistState(state);
+  });
+
+  // Tutorial panel
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.cal.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#calTutorials"),
+  });
 
   for (const { key } of CALENDAR_COLLAPSIBLE_PANELS) {
     const refs = collapsiblePanels[key];
@@ -4986,7 +5254,8 @@ export function initCalendarPage(mountEl) {
     render();
   });
 
-  els.applyInputs.addEventListener("click", () => {
+  // Live-update: read inputs and re-render without resetting view position
+  function applyInputsLive() {
     state.inputs.sourcePlanetId = els.sourcePlanet.value || "";
     state.inputs.primaryMoonId = els.primaryMoon.value || "";
     state.inputs.extraMoonIds = [
@@ -4994,13 +5263,39 @@ export function initCalendarPage(mountEl) {
       els.extraMoon2.value || "",
       els.extraMoon3.value || "",
     ];
+    state.ui.derivedRoundEnabled = !!els.derivedRoundEnabled.checked;
+    state.ui.derivedDecimalPlaces = clampI(els.derivedDecimalPlaces.value, 0, 6);
     state.inputs.monthsPerYear = clampI(els.monthsPerYear.value, 1, 240);
-    state.inputs.solarWeeksPerMonth = clampI(els.solarWeeks.value, 1, 20);
-    state.inputs.lunarWeeksPerMonth = clampI(els.lunarWeeks.value, 1, 20);
-    state.inputs.lunisolarWeeksPerMonth = clampI(els.lunisolarWeeks.value, 1, 20);
-    state.ui.monthIndex = 0;
-    state.ui.selectedDay = 1;
+    state.inputs.daysPerMonth = clampI(els.daysPerMonth.value, 1, 500);
+    const liveDpm = state.inputs.daysPerMonth;
+    state.inputs.daysPerWeek = clampI(els.daysPerWeek.value, 1, Math.min(30, liveDpm));
     render();
+  }
+
+  // Source object selects reset calendar view position (new orbital data)
+  [els.sourcePlanet, els.primaryMoon, els.extraMoon1, els.extraMoon2, els.extraMoon3].forEach(
+    (el) =>
+      el.addEventListener("change", () => {
+        state.ui.monthIndex = 0;
+        state.ui.selectedDay = 1;
+        applyInputsLive();
+      }),
+  );
+
+  // Number/slider inputs live-update without resetting view
+  [els.monthsPerYear, els.daysPerMonth, els.daysPerWeek, els.derivedDecimalPlaces].forEach((el) =>
+    el.addEventListener("input", applyInputsLive),
+  );
+
+  // Rounding toggle: enable/disable slider + live-update
+  els.derivedRoundEnabled.addEventListener("change", () => {
+    const on = els.derivedRoundEnabled.checked;
+    els.derivedDecimalPlaces.disabled = !on;
+    const dpSlider = els.derivedDecimalPlaces
+      .closest(".form-row")
+      ?.querySelector('input[type="range"]');
+    if (dpSlider) dpSlider.disabled = !on;
+    applyInputsLive();
   });
 
   els.useSelected.addEventListener("click", () => {
@@ -5009,6 +5304,8 @@ export function initCalendarPage(mountEl) {
     state.inputs.primaryMoonId = getSelectedMoon(w)?.id || "";
     state.inputs.extraMoonIds = ["", "", ""];
     state.inputs.monthsPerYear = null;
+    state.inputs.daysPerMonth = null;
+    state.inputs.daysPerWeek = null;
     render();
   });
 
@@ -5198,13 +5495,17 @@ export function initCalendarPage(mountEl) {
     render();
   });
 
-  els.applyNames.addEventListener("click", () => {
+  // Live-update: name textareas apply on every keystroke
+  function applyNamesLive() {
     updateYearDisplayState();
     state.ui.dayNames = splitNames(els.dayNames.value);
     state.ui.weekNames = splitNames(els.weekNames.value);
     state.ui.monthNames = splitNames(els.monthNames.value);
     render();
-  });
+  }
+  [els.dayNames, els.weekNames, els.monthNames].forEach((el) =>
+    el.addEventListener("input", applyNamesLive),
+  );
   els.resetNames.addEventListener("click", () => {
     state.ui.calendarName = "Calendar";
     state.profileName = "Calendar";
@@ -5756,7 +6057,9 @@ export function initCalendarPage(mountEl) {
   });
 
   const onEsc = (event) => {
-    if (event.key === "Escape") closeDetail();
+    if (event.key === "Escape") {
+      closeDetail();
+    }
   };
   document.addEventListener("keydown", onEsc);
   const wrapObserver = new MutationObserver(() => {

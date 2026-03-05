@@ -15,9 +15,7 @@
 //   planetOrbitalPeriodDays   — planet orbital period (Earth days)
 //   moonOrbitalPeriodDays     — moon orbital period (Earth days)
 //   planetRotationPeriodHours — planet rotation period (hours)
-//   solarWeeksPerMonth        — desired weeks per solar month
-//   lunarWeeksPerMonth        — desired weeks per lunar month
-//   lunisolarWeeksPerMonth    — desired weeks per lunisolar month
+//   weeksPerMonth             — desired weeks per month (all bases)
 //
 // Outputs:
 //   inputs    — sanitised / clamped copies of every input
@@ -181,9 +179,7 @@ function computeLunisolarCalendar(localYearActual, localMonthActual, weeksPerMon
  * @param {number}  opts.planetOrbitalPeriodDays   - Planet orbital period in Earth days.
  * @param {number}  opts.moonOrbitalPeriodDays     - Moon orbital period in Earth days.
  * @param {number}  opts.planetRotationPeriodHours - Planet rotation period in hours.
- * @param {number}  [opts.solarWeeksPerMonth=4]     - Desired weeks per solar month.
- * @param {number}  [opts.lunarWeeksPerMonth=4]     - Desired weeks per lunar month.
- * @param {number}  [opts.lunisolarWeeksPerMonth=4] - Desired weeks per lunisolar month.
+ * @param {number}  [opts.weeksPerMonth=4]           - Desired weeks per month (all bases).
  * @returns {{ inputs: object, actual: object, solar: object, lunar: object, lunisolar: object }}
  *   Full calendar model with sanitised inputs, actual local-day durations,
  *   and three calendar variants each containing year/month/week structure
@@ -193,9 +189,7 @@ export function calcCalendarModel({
   planetOrbitalPeriodDays,
   moonOrbitalPeriodDays,
   planetRotationPeriodHours,
-  solarWeeksPerMonth = 4,
-  lunarWeeksPerMonth = 4,
-  lunisolarWeeksPerMonth = 4,
+  weeksPerMonth = 4,
 }) {
   const orbitalPlanet = positive(planetOrbitalPeriodDays, 365.2422);
   const orbitalMoon = positive(moonOrbitalPeriodDays, 29.5306);
@@ -205,22 +199,17 @@ export function calcCalendarModel({
   const localMonthActual = orbitalMoon / localDayScale;
   const localYearActual = orbitalPlanet / localDayScale;
 
-  const solar = computeSolarCalendar(localYearActual, localMonthActual, solarWeeksPerMonth);
-  const lunar = computeLunarCalendar(localYearActual, localMonthActual, lunarWeeksPerMonth);
-  const lunisolar = computeLunisolarCalendar(
-    localYearActual,
-    localMonthActual,
-    lunisolarWeeksPerMonth,
-  );
+  const wpm = clamp(toFinite(weeksPerMonth, 4), 1, 53);
+  const solar = computeSolarCalendar(localYearActual, localMonthActual, wpm);
+  const lunar = computeLunarCalendar(localYearActual, localMonthActual, wpm);
+  const lunisolar = computeLunisolarCalendar(localYearActual, localMonthActual, wpm);
 
   return {
     inputs: {
       planetOrbitalPeriodDays: orbitalPlanet,
       moonOrbitalPeriodDays: orbitalMoon,
       planetRotationPeriodHours: rotationHours,
-      solarWeeksPerMonth: clamp(toFinite(solarWeeksPerMonth, 4), 1, 53),
-      lunarWeeksPerMonth: clamp(toFinite(lunarWeeksPerMonth, 4), 1, 53),
-      lunisolarWeeksPerMonth: clamp(toFinite(lunisolarWeeksPerMonth, 4), 1, 53),
+      weeksPerMonth: wpm,
     },
     actual: {
       localMonthDays: localMonthActual,

@@ -11,7 +11,19 @@
 //   Wisdom 1980 — chaotic zone width
 //   Rhines 1975 — atmospheric band scaling
 
-import { clamp, toFinite, round, fmt } from "./utils.js";
+import {
+  clamp,
+  toFinite,
+  round,
+  fmt,
+  eccentricityFactor,
+  spinOrbitResonance,
+  MOON_VOLATILE_TABLE,
+  jeansParameter,
+  vaporPressurePa,
+  escapeTimescaleSeconds,
+} from "./utils.js";
+import { findNearestResonance } from "./debrisDisk.js";
 
 /* ── Constants ───────────────────────────────────────────────────── */
 
@@ -31,6 +43,31 @@ const HEATING_EFFICIENCY = 0.15; // energy-limited mass-loss efficiency ε
 const EARTH_GRAVITY_MS2 = 9.80665; // standard gravity (m/s²)
 const ICE_GIANT_MASS_MJUP = 0.15; // ice-giant / gas-giant boundary (~48 M⊕)
 const S_PER_GYR = 3.156e16; // seconds per gigayear
+const MU_0 = 4 * Math.PI * 1e-7; // T·m/A — vacuum permeability
+const P_SW_1AU = 2.0e-9; // Pa — solar wind dynamic pressure at 1 AU
+
+/* ── Jeans escape constants ──────────────────────────────────────── */
+
+const R_GAS = 8.3145; // J/(mol·K) — universal gas constant
+const MW_H2 = 0.002; // kg/mol
+const MW_HE = 0.004;
+const MW_CH4 = 0.016;
+const MW_NH3 = 0.017;
+const MW_H2O = 0.018;
+const MW_CO = 0.028;
+
+const JEANS_RETAINED = 6; // λ ≥ 6: firmly retained over Gyr
+const JEANS_MARGINAL = 3; // 3 ≤ λ < 6: marginal (slow escape)
+
+// Non-thermal escape multipliers (Gunell et al. 2018)
+const NT_H2_FACTOR = 3.0; // charge exchange, polar wind
+const NT_HE_FACTOR = 5.0; // ion pickup
+const NT_TEMP_FLOOR_K = 100; // non-thermal negligible below this
+
+// Gas-giant exobase model (Yelle 2004, Murray-Clay et al. 2009)
+const GG_EXOBASE_BASE_K = 200; // UV + gravity-wave heating floor (Strobel & Atreya 1983)
+const GG_EXOBASE_XUV_COEFF = 3.5; // XUV heating efficiency for extended H₂/He envelopes
+const GG_EXOBASE_MAX_K = 10000; // hydrodynamic blow-off cap (Lyman-α + H₃⁺ thermostat)
 
 /* ── Mass ↔ Radius (Chen & Kipping 2017) ────────────────────────── */
 
@@ -82,7 +119,7 @@ const SUDARSKY = [
     cls: "I",
     maxTeq: 150,
     cloud: "Ammonia",
-    bondAlbedo: 0.57,
+    bondAlbedo: 0.34,
     hex: "#C4A46C",
     label: "Class I — Ammonia clouds",
   },
@@ -296,46 +333,363 @@ function getAtmosphere(massMjup, teqK, metallicity) {
 // Jupiter ~1.67, Saturn ~2.5, Neptune ~2.6, Uranus ~1.06
 function internalHeatRatio(massMjup) {
   const m = clamp(toFinite(massMjup, 1), 0.01, 100);
-  if (m < 0.05) return 1.06; // Uranus-like (little internal heat)
-  if (m < 0.1) return 1.5 + (m - 0.05) * 22; // ramp Uranus→Neptune
-  if (m < 0.2) return 2.6; // Neptune-like
-  if (m < 0.5) return 2.6 - (m - 0.2) * 3.0; // ramp Neptune→Saturn
-  if (m < 1.5) return 1.7; // Jupiter-like
-  // More massive → more residual heat from contraction
-  return 1.7 + Math.log10(m / 1.5) * 0.5;
+
+  // Sub-ice-giant: minimal Kelvin-Helmholtz contraction heat
+  if (m <= 0.04) return 1.05;
+
+  // Ice giant transition: sigmoid onset of contraction heating.
+  // Below ~0.05 Mjup, envelopes are too thin for efficient convective
+  // heat transport; above ~0.05 Mjup, deepening H₂O/NH₃ ionic layers
+  // enable vigorous convection and sustained contraction luminosity.
+  if (m <= 0.06) {
+    const x = (m - 0.05) / 0.001;
+    return 1.05 + 1.6 / (1 + Math.exp(-x));
+  }
+
+  // Super-Neptune regime: high contraction heat plateau
+  if (m <= 0.15) return 2.65;
+
+  // Ice giant → gas giant transition: declining ratio as absorbed
+  // stellar flux grows relative to intrinsic luminosity
+  if (m <= 0.3) {
+    const t = (m - 0.15) / 0.15;
+    return 2.65 - t * 0.88; // 2.65 → 1.77
+  }
+
+  // Gas giant regime: gradual decline through Saturn → Jupiter masses
+  if (m <= 2.0) {
+    const t = (m - 0.3) / 1.7;
+    return 1.77 - t * 0.267; // 1.77 → 1.503
+  }
+
+  // Super-Jupiter: increasing residual heat from ongoing contraction
+  return 1.503 + Math.log10(m / 2.0) * 0.5;
 }
 
-/* ── Magnetic field ──────────────────────────────────────────────── */
+/* ── Magnetic field (Christensen energy-flux dynamo) ──────────── */
 
-// Jupiter reference values
-const JUPITER_DIPOLE_AM2 = 1.55e20; // A·m²
+// Jupiter reference (Connerney+ 2018)
 const JUPITER_SURFACE_GAUSS = 4.28;
-const JUPITER_ROTATION_S = 9.925 * 3600;
+const JUPITER_DENSITY_GCM3 = 1.326;
 
-function calcMagnetic(massMjup, radiusKm, rotationS, orbitAu) {
-  // Christensen 2009 energy-flux scaling simplified:
-  // Dipole moment scales as (mass/Mj)^(1/3) × (radius/Rj)^(3) × (rotation/Pj)^(-1/3)
-  // This is a simplified parametric scaling, not the full Christensen model.
-  const mRatio = clamp(massMjup, 0.01, 100);
-  const rRatio = radiusKm / JUPITER_RADIUS_KM;
-  const pRatio = rotationS / JUPITER_ROTATION_S;
+// Compositional convection floor: prevents unrealistically weak fields
+// for planets with very low thermal flux (e.g. Uranus at 0.042 W/m²).
+// Physical basis: compositional convection from phase separation
+// (H/He demixing in gas giants, water/ammonia differentiation in
+// ice giants) sustains dynamo action even without measurable thermal
+// flux.  Jupiter's helium rain alone releases ~0.3–0.5 W/m².
+const Q_FLOOR_WM2 = 0.4;
 
-  const dipole = JUPITER_DIPOLE_AM2 * mRatio ** (1 / 3) * rRatio ** 3 * pRatio ** (-1 / 3);
-  const surfaceGauss = (JUPITER_SURFACE_GAUSS * mRatio ** (1 / 3)) / pRatio ** (1 / 3);
+// Dynamo shell outer boundary: fraction of planet radius where the
+// conducting region (metallic H or ionic fluid) ends.
+//
+// Gas giants: metallic hydrogen transition depth.
+//   Jupiter (1.0 Mjup): r_o/R ≈ 0.83 (French+ 2012, ApJS 202, 5)
+//   Saturn  (0.3 Mjup): r_o/R ≈ 0.40 (Stanley & Glatzmaier 2010)
+//   Log-interpolation in mass: r_o/R = 0.40 + 0.43 × log(M/0.3)/log(1/0.3)
+//
+// Ice giants: density-dependent ionic ocean shell.
+//   Less dense ice giants reach ionic dissociation pressure at a larger
+//   fractional radius → thicker conducting shell.  Exponent 0.82
+//   calibrated to Uranus (ρ=1.27) / Neptune (ρ=1.64) field ratio.
+//   Reference: r_o/R ≈ 0.70 at ρ_ref (Stanley & Bloxham 2004)
+const ICE_GIANT_REF_DENSITY = Math.sqrt(1.27 * 1.638); // 1.442 g/cm³
+function dynamoShellRatio(massMjup, isIceGiant, densityGcm3) {
+  if (isIceGiant) {
+    return clamp(0.7 * (ICE_GIANT_REF_DENSITY / densityGcm3) ** 0.82, 0.5, 0.85);
+  }
+  const logRatio = Math.log(clamp(massMjup, 0.15, 13) / 0.3) / Math.log(1.0 / 0.3);
+  return clamp(0.4 + 0.43 * logRatio, 0.3, 0.9);
+}
 
-  // Magnetopause standoff: R_mp/R_p = (B²/(μ₀·ρ_sw·v_sw²))^(1/6)
-  // Solar wind density scales as 1/r², velocity ~400 km/s constant
-  // At Jupiter (5.2 AU): R_mp ≈ 75 Rj
-  // Scale: R_mp ∝ B^(1/3) × r_orbit^(1/3)
-  const bRatio = surfaceGauss / JUPITER_SURFACE_GAUSS;
-  const rOrbitRatio = orbitAu / 5.2;
-  const magnetopauseRp = 75 * bRatio ** (1 / 3) * rOrbitRatio ** (1 / 3);
+// Christensen (2009, Nature 457, 167) energy-flux scaling (un-normalised).
+// B_rms ∝ ρ^(1/2) × q^(1/3) × (r_o/R)^n
+//
+// The theoretical dipole attenuation is (r_o/R)³. The additional 0.2
+// accounts for thin-shell dipolarity reduction (Heimpel+ 2005) and
+// stable-layer field filtering above the dynamo (Christensen & Wicht 2008).
+// Calibrated so Saturn (shell 0.40) reproduces observed 0.21 G.
+const SHELL_EXPONENT = 3.2;
+function rawGiantFieldStrength(densityGcm3, qEffWm2, shellRatio) {
+  return Math.sqrt(densityGcm3) * Math.cbrt(qEffWm2) * shellRatio ** SHELL_EXPONENT;
+}
+
+// ── Gas giant self-normalisation (Jupiter) ──
+const JUPITER_INTERNAL_FLUX_WM2 = 5.53; // engine-consistent (observed 5.4, Li+ 2018)
+const JUPITER_SHELL_RATIO = dynamoShellRatio(1.0, false, 0);
+const JUPITER_RAW_FIELD = rawGiantFieldStrength(
+  JUPITER_DENSITY_GCM3,
+  Math.max(JUPITER_INTERNAL_FLUX_WM2, Q_FLOOR_WM2),
+  JUPITER_SHELL_RATIO,
+);
+
+// ── Ice giant self-normalisation (Uranus/Neptune geometric mean) ──
+// Thin-shell multipolar dynamos operate in a different regime from
+// thick-shell dipolar dynamos; separate normalisation avoids
+// cross-regime extrapolation through a conductivity fudge factor.
+const ICE_GIANT_SURFACE_GAUSS = Math.sqrt(0.23 * 0.14); // 0.1795 G
+const ICE_GIANT_REF_SHELL = 0.7; // Stanley & Bloxham (2004)
+const ICE_GIANT_RAW_FIELD = rawGiantFieldStrength(
+  ICE_GIANT_REF_DENSITY,
+  Q_FLOOR_WM2,
+  ICE_GIANT_REF_SHELL,
+);
+
+// ── Magnetopause plasma inflation from tidally-heated moons ─────
+// Chapman-Ferraro gives the vacuum dipole standoff; moons with
+// significant tidal heating drive volcanism → outgassing → plasma
+// loading that inflates the magnetosphere (e.g. Io plasma torus).
+//
+// Power-law model: f = (1 + H_moon / H_REF)^γ
+// Calibrated to Jupiter (f≈2.4, Io-dominated) and Saturn (f≈1.6).
+const PLASMA_H_REF = 4e5; // W — reference heating scale
+const PLASMA_GAMMA = 0.047; // power-law inflation exponent
+const PLASMA_H_THRESHOLD = 1e8; // W — minimum heating for plasma loading
+
+// Moon self-heating constants (tidal heating ON moons FROM planet).
+// Same tidal formula but with M_planet as tide-raiser and moon k₂/Q
+// estimated from a cold-body model with tidal-thermal feedback.
+const MOON_RHO = 2500; // kg/m³ — rocky/icy average
+const MOON_MU_COLD = 65e9; // Pa — cold rock/ice rigidity
+const MOON_Q_COLD = 100; // cold dissipation factor
+const MOON_MU_MELT = 10e9; // Pa — partially molten rigidity
+const MOON_Q_MELT = 10; // molten dissipation factor
+const MELT_FLUX_THRESHOLD = 0.02; // W/m² — partial melting onset
+
+/**
+ * Tidal heating ON a single moon FROM the planet (Peale+ 1979).
+ * dE/dt = (21/2)(k₂/Q)(G M_planet² R_moon⁵ n / a⁶) × f(e)
+ * Includes tidal-thermal feedback: intense heating partially melts
+ * the interior, reducing rigidity and Q, amplifying dissipation
+ * (Io mechanism — Peale+ 1979, Moore 2003).
+ */
+function moonSelfTidalHeating(moonMassKg, semiMajorAxisM, ecc, planetMassKg) {
+  if (ecc <= 0 || semiMajorAxisM <= 0 || moonMassKg <= 0) return 0;
+
+  const rMoonM = Math.cbrt((3 * moonMassKg) / (4 * Math.PI * MOON_RHO));
+  const gMoon = (G * moonMassKg) / (rMoonM * rMoonM);
+  const k2Cold = 1.5 / (1 + (19 * MOON_MU_COLD) / (2 * MOON_RHO * gMoon * rMoonM));
+  const n = Math.sqrt((G * planetMassKg) / semiMajorAxisM ** 3);
+  const fe = eccentricityFactor(ecc);
+
+  const hCold =
+    (21 / 2) *
+    (k2Cold / MOON_Q_COLD) *
+    ((G * planetMassKg ** 2 * rMoonM ** 5 * n) / semiMajorAxisM ** 6) *
+    fe;
+
+  // Tidal-thermal feedback: intense heating → partial melting → amplification
+  const surfaceArea = 4 * Math.PI * rMoonM ** 2;
+  const fluxCold = hCold / surfaceArea;
+
+  if (fluxCold > 0.001) {
+    const meltFrac = 1 / (1 + (fluxCold / MELT_FLUX_THRESHOLD) ** -3);
+    if (meltFrac > 0.01) {
+      const effMu = Math.exp(
+        Math.log(MOON_MU_COLD) * (1 - meltFrac) + Math.log(MOON_MU_MELT) * meltFrac,
+      );
+      const effQ = MOON_Q_COLD * (1 - meltFrac) + MOON_Q_MELT * meltFrac;
+      const k2Eff = 1.5 / (1 + (19 * effMu) / (2 * MOON_RHO * gMoon * rMoonM));
+      return (
+        (21 / 2) *
+        (k2Eff / effQ) *
+        ((G * planetMassKg ** 2 * rMoonM ** 5 * n) / semiMajorAxisM ** 6) *
+        fe
+      );
+    }
+  }
+
+  return hCold;
+}
+
+/** Sum tidal self-heating across all moons in the system. */
+function totalMoonSelfHeating(moons, planetMassKg) {
+  if (!moons || moons.length === 0) return 0;
+  let total = 0;
+  for (const m of moons) {
+    const moonMassKg = (Number(m.massMoon) || 0) * KG_PER_MMOON;
+    const aM = (Number(m.semiMajorAxisKm) || 0) * 1000;
+    const ecc = Number(m.eccentricity) || 0;
+    if (moonMassKg <= 0 || aM <= 0) continue;
+    total += moonSelfTidalHeating(moonMassKg, aM, ecc, planetMassKg);
+  }
+  return total;
+}
+
+// ── Atmospheric sputtering plasma from moons ────────────────────
+// Moons with sublimation-driven volatile atmospheres (e.g. Triton N₂)
+// are sputtered by magnetospheric particles, creating plasma that
+// inflates the magnetosphere.  This is distinct from tidal-heating-
+// driven volcanism (Io SO₂), which is captured by moonSelfTidalHeating.
+//
+// Equivalent plasma power:  W_sput = min(P, P_SAT) × π R² / g × K_SPUT
+// where P = surface vapor pressure (Pa), P_SAT = pressure above which
+// magnetospheric ions are stopped before reaching the surface (sputtering
+// saturates), R = moon radius, g = surface gravity, and K_SPUT converts
+// the "sputtering source strength" to equivalent watts for the power-law
+// plasma inflation formula.
+//
+// Calibrated so Triton's N₂ sputtering inflates Neptune from 18 → 23 Rp.
+const K_SPUT = 6.5e-6; // calibrated sputtering efficiency
+const P_SPUT_SAT = 10; // Pa — sputtering pressure saturation (thick atmospheres shield surface)
+
+/**
+ * Estimate equivalent plasma power (W) from atmospheric sputtering on a moon.
+ *
+ * Runs a lightweight volatile analysis using the same utils.js functions
+ * as moon.js to identify sublimation-driven atmospheres.  SO₂ is excluded
+ * because volcanic outgassing is already captured by the tidal heating proxy.
+ *
+ * @param {object} inp - moon input object (massMoon, densityGcm3, albedo, ...)
+ * @param {number} starLumLsol - host star luminosity (L☉)
+ * @param {number} orbitAu - planet's orbital distance from star (AU)
+ * @param {number} ageGyr - system age (Gyr)
+ * @returns {number} equivalent plasma power in watts (0 if no volatile atmosphere)
+ */
+function moonSputteringPlasmaW(inp, starLumLsol, orbitAu, ageGyr) {
+  const moonMassKg = (Number(inp.massMoon) || 0) * KG_PER_MMOON;
+  if (moonMassKg <= 0) return 0;
+
+  const rhoKgM3 = (Number(inp.densityGcm3) || MOON_RHO / 1000) * 1000;
+  const rhoGcm3 = rhoKgM3 / 1000;
+  const albedo = clamp(Number(inp.albedo) || 0.3, 0, 0.95);
+
+  // Derive physical properties from mass + density
+  const rMoonM = Math.cbrt((3 * moonMassKg) / (4 * Math.PI * rhoKgM3));
+  const gMoon = (G * moonMassKg) / (rMoonM * rMoonM);
+  const vEscMs = Math.sqrt((2 * G * moonMassKg) / rMoonM);
+
+  // Equilibrium temperature (same as moon.js: T_eq = 279 × (1−a)^0.25 × √L / √d)
+  const tSurfK =
+    orbitAu > 0
+      ? (279 * Math.pow(1 - albedo, 0.25) * Math.sqrt(starLumLsol)) / Math.sqrt(orbitAu)
+      : 0;
+  if (tSurfK <= 0 || gMoon <= 0) return 0;
+
+  const ageSeconds = ageGyr * 3.156e16;
+
+  // Find the dominant retained sublimating species (excluding SO₂).
+  // Only sublimation-regime atmospheres count (T < T_tp): above the triple
+  // point the ice never condensed during formation, so no surface reservoir
+  // exists to sustain sputtering (e.g. Ganymede at 110 K has no N₂ ice).
+  let bestPressure = 0;
+  let bestMassKg = 0;
+  for (const vol of MOON_VOLATILE_TABLE) {
+    if (vol.species === "SO\u2082") continue; // volcanic — handled by tidal heating
+    if (rhoGcm3 >= vol.maxRho) continue; // not present
+    if (tSurfK < vol.subK) continue; // not sublimating
+    if (tSurfK >= vol.tTp) continue; // above triple point — no surface ice reservoir
+    const lambda = jeansParameter(vol.massAmu, vEscMs, tSurfK);
+    if (lambda <= 6) continue;
+    const pPa = vaporPressurePa(vol, tSurfK);
+    const tEsc = escapeTimescaleSeconds(pPa, gMoon, vol.massAmu, tSurfK, lambda);
+    if (tEsc <= ageSeconds) continue; // not geologically retained
+    if (pPa > bestPressure) {
+      bestPressure = pPa;
+      bestMassKg = vol.massAmu * 1.6605e-27;
+    }
+  }
+
+  if (bestPressure <= 0) return 0;
+
+  // Equivalent plasma power: W = min(P, P_SAT) × π R² / g × K_SPUT
+  // P_SAT caps the pressure because at high P the atmosphere is optically
+  // thick to sputtering ions — they're stopped before reaching the surface.
+  void bestMassKg; // available for future species-dependent yields
+  const pEff = Math.min(bestPressure, P_SPUT_SAT);
+  return (pEff * Math.PI * rMoonM * rMoonM * K_SPUT) / gMoon;
+}
+
+/** Sum sputtering plasma equivalent power across all moons (watts). */
+function totalMoonSputteringPlasmaW(moons, starLumLsol, orbitAu, ageGyr) {
+  if (!moons || moons.length === 0) return 0;
+  let total = 0;
+  for (const m of moons) total += moonSputteringPlasmaW(m, starLumLsol, orbitAu, ageGyr);
+  return total;
+}
+
+function calcMagnetic(
+  massMjup,
+  radiusKm,
+  densityGcm3,
+  internalFluxWm2,
+  moonTidalFluxWm2,
+  isIceGiant,
+  orbitAu,
+  moons,
+  starLumLsol,
+  ageGyr,
+) {
+  // 1. Total convective heat flux available to drive dynamo
+  const qTotal = internalFluxWm2 + moonTidalFluxWm2;
+  const qEff = Math.max(qTotal, Q_FLOOR_WM2);
+
+  // 2. Dynamo shell geometry (density-dependent for ice giants)
+  const shell = dynamoShellRatio(massMjup, isIceGiant, densityGcm3);
+
+  // 3. Self-normalised surface field (Christensen 2009)
+  //    Dual normalisation: gas giants → Jupiter, ice giants → Uranus/Neptune mean
+  const rawField = rawGiantFieldStrength(densityGcm3, qEff, shell);
+  const surfaceGauss = isIceGiant
+    ? ICE_GIANT_SURFACE_GAUSS * (rawField / ICE_GIANT_RAW_FIELD)
+    : JUPITER_SURFACE_GAUSS * (rawField / JUPITER_RAW_FIELD);
+
+  // 5. Field morphology (Stanley & Bloxham 2004, Christensen & Aubert 2006)
+  //    Gas giants: thick metallic-H shell → dipolar
+  //    Ice giants: thin ionic conducting shell → multipolar
+  const fieldMorphology = isIceGiant ? "multipolar" : "dipolar";
+
+  // 6. Dipole moment: B_eq = μ₀ m / (4π R³) → m = B R³ / (μ₀/4π)
+  //    μ₀/4π = 1e-7 T·m/A
+  const radiusM = radiusKm * 1000;
+  const surfaceTesla = surfaceGauss * 1e-4;
+  const dipoleMomentAm2 = (surfaceTesla * radiusM ** 3) / 1e-7;
+
+  // 7. Magnetopause standoff (Chapman-Ferraro + plasma inflation)
+  //    R_CF/R = [B²/(2μ₀ P_sw)]^(1/6)  — first-principles dipole pressure balance
+  //    P_sw = P_1AU / r²  — solar wind dynamic pressure at orbit distance
+  //    Plasma sources: (a) tidal heating → volcanism (Io SO₂)
+  //                    (b) atmospheric sputtering (Triton N₂)
+  //    f = (1 + H_total/H_REF)^γ when H_total > threshold
+  const bTesla = surfaceGauss * 1e-4;
+  const pSw = P_SW_1AU / (orbitAu * orbitAu);
+  const rCF = Math.pow((bTesla * bTesla) / (2 * MU_0 * pSw), 1 / 6);
+  const massKg = massMjup * JUPITER_MASS_KG;
+  const moonHeat = totalMoonSelfHeating(moons, massKg);
+  const sputterW = totalMoonSputteringPlasmaW(moons, starLumLsol, orbitAu, ageGyr);
+  const totalPlasma = moonHeat + sputterW;
+  // Threshold applies to volcanic plasma (tidal heating) only; sputtering
+  // is sublimation-driven and operates at lower power levels.
+  const hasPlasmaSource = sputterW > 0 || moonHeat >= PLASMA_H_THRESHOLD;
+  const plasmaFactor = hasPlasmaSource ? Math.pow(1 + totalPlasma / PLASMA_H_REF, PLASMA_GAMMA) : 1;
+  const magnetopauseRp = rCF * plasmaFactor;
+
+  // 8. Field label and Earth-normalised value
+  const surfaceFieldEarths = surfaceGauss / 0.31;
+  let fieldLabel;
+  if (surfaceFieldEarths > 50) fieldLabel = "Extremely strong";
+  else if (surfaceFieldEarths > 10) fieldLabel = "Very strong";
+  else if (surfaceFieldEarths > 2) fieldLabel = "Strong";
+  else if (surfaceFieldEarths > 0.3) fieldLabel = "Moderate";
+  else if (surfaceFieldEarths > 0.05) fieldLabel = "Weak";
+  else fieldLabel = "Very weak";
 
   return {
-    dipoleMomentAm2: dipole,
+    dynamoActive: true,
+    dynamoReason: isIceGiant
+      ? "Active dynamo (ionic ocean convection)"
+      : "Active dynamo (metallic hydrogen convection)",
+    fieldMorphology,
+    fieldLabel,
     surfaceFieldGauss: round(surfaceGauss, 3),
+    surfaceFieldEarths: round(surfaceFieldEarths, 2),
+    shellRatio: round(shell, 3),
+    conductivityRegime: isIceGiant ? "ionic" : "metallic-H",
+    effectiveFluxWm2: round(qEff, 3),
+    dipoleMomentAm2,
     magnetopauseRp: round(magnetopauseRp, 1),
     magnetopauseKm: round(magnetopauseRp * radiusKm, 0),
+    sputteringPlasmaW: round(sputterW, 0),
   };
 }
 
@@ -431,6 +785,178 @@ function calcMassLoss(massMjup, radiusKm, orbitAu, starMassMsol, starLuminosityL
   };
 }
 
+/* ── Per-species Jeans escape ─────────────────────────────────────── */
+
+const GG_GAS_SPECIES = [
+  { key: "h2", label: "H\u2082", mw: MW_H2 },
+  { key: "he", label: "He", mw: MW_HE },
+  { key: "ch4", label: "CH\u2084", mw: MW_CH4 },
+  { key: "nh3", label: "NH\u2083", mw: MW_NH3 },
+  { key: "h2o", label: "H\u2082O", mw: MW_H2O },
+  { key: "co", label: "CO", mw: MW_CO },
+];
+
+function ggJeansStatus(lambda) {
+  if (lambda >= JEANS_RETAINED) return "Retained";
+  if (lambda >= JEANS_MARGINAL) return "Marginal";
+  return "Lost";
+}
+
+function ggEffectiveStatus(lambda, mw, exobaseTempK) {
+  const thermal = ggJeansStatus(lambda);
+  if (exobaseTempK > NT_TEMP_FLOOR_K) {
+    let factor = 1;
+    if (mw <= MW_H2) factor = NT_H2_FACTOR;
+    else if (mw <= MW_HE) factor = NT_HE_FACTOR;
+    if (factor > 1) {
+      if (lambda >= factor * JEANS_RETAINED) return "Retained";
+      if (lambda >= factor * JEANS_MARGINAL) return "Marginal";
+      return "Lost";
+    }
+  }
+  return thermal;
+}
+
+/**
+ * Gas-giant exobase temperature.
+ * Extended H₂/He envelopes absorb XUV efficiently across a large column
+ * (no surface to limit absorption depth). The exobase sits at ~nanobar
+ * pressure where molecular diffusion dominates.
+ *
+ * @param {number} tEffK   Effective temperature (includes internal heat)
+ * @param {number} fXuvRatio  XUV flux relative to present-day Sun at 1 AU
+ * @returns {number} Exobase temperature in K
+ */
+function computeGasGiantExobaseTemp(tEffK, fXuvRatio) {
+  if (tEffK <= 0) return 0;
+  const base = Math.max(tEffK, GG_EXOBASE_BASE_K);
+  return Math.min(
+    base * (1 + GG_EXOBASE_XUV_COEFF * Math.sqrt(Math.max(0, fXuvRatio))),
+    GG_EXOBASE_MAX_K,
+  );
+}
+
+/**
+ * Per-species Jeans escape analysis for gas giant atmospheres.
+ * @param {number} escapeVelocityKms  Surface escape velocity (km/s)
+ * @param {number} exobaseTempK       Exobase temperature (K)
+ * @returns {object} Per-species escape status keyed by species key
+ */
+function computeGasGiantJeansEscape(escapeVelocityKms, exobaseTempK) {
+  const vEsc = escapeVelocityKms * 1000; // m/s
+  const vEsc2 = vEsc * vEsc;
+  const denom = 2 * R_GAS * Math.max(exobaseTempK, 1);
+  const species = {};
+  for (const g of GG_GAS_SPECIES) {
+    const lambda = (vEsc2 * g.mw) / denom;
+    const thermal = ggJeansStatus(lambda);
+    const status = ggEffectiveStatus(lambda, g.mw, exobaseTempK);
+    species[g.key] = {
+      lambda: round(lambda, 1),
+      thermalStatus: thermal,
+      status,
+      nonThermal: status !== thermal,
+      label: g.label,
+    };
+  }
+  return species;
+}
+
+/* ── Moon tidal heating ─────────────────────────────────────────── */
+
+const KG_PER_MMOON = 7.342e22; // kg per lunar mass (M☾)
+
+/**
+ * Fluid Love number k₂ for gas/ice giants.
+ * k₂ depends on central mass concentration: ice giants have proportionally
+ * massive rocky/icy cores (low k₂ ≈ 0.10), while gas giants have large H/He
+ * envelopes approaching the fluid limit (k₂ ≈ 0.38). Modelled as a sigmoid
+ * in log-mass space, calibrated to Solar System measurements.
+ *
+ * Jupiter k₂ ≈ 0.379 (Wahl+ 2016, Juno), Saturn k₂ ≈ 0.39 (Lainey+ 2017),
+ * Uranus k₂ ≈ 0.104, Neptune k₂ ≈ 0.127 (Gavrilov & Zharkov 1977).
+ *
+ * @param {number} massMjup  Mass in Jupiter masses
+ * @returns {number} Fluid Love number k₂
+ */
+function gasGiantK2(massMjup) {
+  const K2_FLOOR = 0.09; // sub-ice-giant, heavily core-dominated
+  const K2_CEIL = 0.385; // gas giant, fluid-envelope-dominated
+  const LOG_MID = -1.14; // midpoint ≈ 0.072 Mjup (core→envelope transition)
+  const STEEPNESS = 15; // transition sharpness in log-mass space
+  const logM = Math.log10(clamp(massMjup, 0.001, 100));
+  return K2_FLOOR + (K2_CEIL - K2_FLOOR) / (1 + Math.exp(-STEEPNESS * (logM - LOG_MID)));
+}
+
+/**
+ * Tidal quality factor Q for gas/ice giants.
+ * Piecewise mass-dependent fit calibrated to Solar System observations.
+ * Q is non-monotonic: Saturn's Q is anomalously low due to resonance
+ * locking (Fuller, Luan & Quataert 2016).
+ *
+ * Jupiter Q ≈ 3.5×10⁴ (Lainey+ 2009), Saturn Q ≈ 2500
+ * (Lainey+ 2012/2017, resonance locking), ice giants Q ≈ 1.5×10⁴
+ * (Tittemore & Wisdom 1990, Zhang & Hamilton 2008).
+ *
+ * @param {number} massMjup  Mass in Jupiter masses
+ * @returns {number} Tidal quality factor Q
+ */
+function gasGiantTidalQ(massMjup) {
+  if (massMjup >= 0.8) return 3.5e4; // Jupiter-like (Lainey+ 2009)
+  if (massMjup >= 0.5) {
+    // Log-space interpolation Saturn → Jupiter
+    const t = (massMjup - 0.5) / 0.3;
+    return 10 ** (Math.log10(2500) + t * (Math.log10(35000) - Math.log10(2500)));
+  }
+  if (massMjup >= 0.2) return 2500; // Saturn-like (resonance locking, Fuller+ 2016)
+  if (massMjup >= ICE_GIANT_MASS_MJUP) {
+    // Log-space interpolation ice giant → Saturn
+    const t = (massMjup - ICE_GIANT_MASS_MJUP) / (0.2 - ICE_GIANT_MASS_MJUP);
+    return 10 ** (Math.log10(15000) + t * (Math.log10(2500) - Math.log10(15000)));
+  }
+  return 1.5e4; // Ice giant
+}
+
+/**
+ * Tidal heating on a gas giant from a single moon (Peale, Cassen & Reynolds 1979).
+ * Same formula as planet.js:planetTidalHeatingFromMoon but using fluid k₂ and Q.
+ *
+ * dE/dt = (21/2) × (k₂/Q) × (G × M_moon² × R_planet⁵ × n / a⁶) × f(e)
+ */
+function ggTidalHeatingFromMoon(k2, Q, radiusM, moonMassKg, semiMajorAxisM, orbitalPeriodS, ecc) {
+  if (semiMajorAxisM <= 0 || orbitalPeriodS <= 0 || ecc <= 0) return 0;
+  const n = (2 * Math.PI) / orbitalPeriodS;
+  return (
+    (21 / 2) *
+    (k2 / Q) *
+    ((G * moonMassKg ** 2 * radiusM ** 5 * n) / semiMajorAxisM ** 6) *
+    eccentricityFactor(ecc)
+  );
+}
+
+/**
+ * Sum tidal heating on a gas giant from all assigned moons.
+ * @param {Array|null} moons  Array of moon input objects
+ * @param {number} k2         Fluid Love number
+ * @param {number} Q          Tidal quality factor
+ * @param {number} massKg     Gas giant mass in kg
+ * @param {number} radiusM    Gas giant radius in metres
+ * @returns {number} Total tidal heating power in Watts
+ */
+function totalGasGiantTidalHeating(moons, k2, Q, massKg, radiusM) {
+  if (!moons || moons.length === 0) return 0;
+  let total = 0;
+  for (const m of moons) {
+    const moonMassKg = (Number(m.massMoon) || 0) * KG_PER_MMOON;
+    const aM = (Number(m.semiMajorAxisKm) || 0) * 1000;
+    const ecc = Number(m.eccentricity) || 0;
+    if (moonMassKg <= 0 || aM <= 0) continue;
+    const orbitalPeriodS = 2 * Math.PI * Math.sqrt(aM ** 3 / (G * massKg));
+    total += ggTidalHeatingFromMoon(k2, Q, radiusM, moonMassKg, aM, orbitalPeriodS, ecc);
+  }
+  return total;
+}
+
 /* ── Interior / core ─────────────────────────────────────────────── */
 
 function calcInterior(massMjup) {
@@ -523,13 +1049,16 @@ function calcRingProperties(massMjup, teqK, rocheLimitRockKm, rocheLimitIceKm) {
 
 /* ── Tidal effects ───────────────────────────────────────────────── */
 
-function calcTidalEffects(massMjup, radiusKm, orbitAu, starMassMsol, starAgeGyr) {
+function calcTidalEffects(massMjup, radiusKm, orbitAu, ecc, starMassMsol, starAgeGyr) {
   const age = Math.max(0.1, starAgeGyr);
   const aRatio = orbitAu / 0.05;
   const rRatio = radiusKm / JUPITER_RADIUS_KM;
   // Locking timescale: ~1 Gyr for 1 Mjup at 0.05 AU around 1 Msol
   const lockingGyr = (aRatio ** 6 * massMjup) / (rRatio ** 5 * starMassMsol ** 2);
-  const circGyr = (aRatio ** 6.5 * massMjup) / (rRatio ** 5 * starMassMsol ** 2);
+  // Circularisation scales inversely with eccentricity dissipation factor
+  const eFactor = ecc > 0.001 ? eccentricityFactor(ecc) : 1;
+  const circGyr =
+    (aRatio ** 6.5 * massMjup) / (rRatio ** 5 * starMassMsol ** 2) / Math.max(1, eFactor);
   return {
     lockingTimescaleGyr: round(lockingGyr, 3),
     isTidallyLocked: lockingGyr < age,
@@ -560,6 +1089,9 @@ export function calcGasGiant({
   massMjup: rawMass,
   radiusRj: rawRadius,
   orbitAu,
+  eccentricity: rawEcc,
+  inclinationDeg: rawIncl,
+  axialTiltDeg: rawTilt,
   rotationPeriodHours,
   metallicity: rawMetallicity,
   starMassMsol,
@@ -567,10 +1099,15 @@ export function calcGasGiant({
   starAgeGyr,
   starRadiusRsol,
   stellarMetallicityFeH,
+  otherGiants,
+  moons,
 }) {
   /* ── Resolve mass ↔ radius ─────────────────────────────────────── */
 
   const orbit = clamp(toFinite(orbitAu, 5.2), 0.01, 1e6);
+  const eccentricity = clamp(toFinite(rawEcc, 0), 0, 0.99);
+  const inclinationDeg = clamp(toFinite(rawIncl, 0), 0, 180);
+  const axialTiltDeg = clamp(toFinite(rawTilt, 0), 0, 180);
   const rot = clamp(toFinite(rotationPeriodHours, 10), 1, 100); // 1–100 h spin period
   const sMass = clamp(toFinite(starMassMsol, 1), 0.075, 100); // H-burning min to ~100 M☉
   const sLum = Math.max(0.0001, toFinite(starLuminosityLsol, 1));
@@ -637,6 +1174,31 @@ export function calcGasGiant({
   const tEffK = (teqK ** 4 * ihRatio) ** 0.25;
   const internalFlux = Math.max(0, SIGMA * (tEffK ** 4 - teqK ** 4));
 
+  // Moon tidal heating on the gas giant (Peale et al. 1979, fluid k₂/Q)
+  const surfaceAreaM2 = 4 * Math.PI * radiusM ** 2;
+  const ggK2 = gasGiantK2(massMjup);
+  const ggQ = gasGiantTidalQ(massMjup);
+  const moonTidalHeatingW = totalGasGiantTidalHeating(moons, ggK2, ggQ, massKg, radiusM);
+  const moonTidalHeatingWm2 = surfaceAreaM2 > 0 ? moonTidalHeatingW / surfaceAreaM2 : 0;
+  const moonTidalFraction = internalFlux > 0 ? moonTidalHeatingWm2 / internalFlux : 0;
+
+  // Periapsis / apoapsis equilibrium and effective temps
+  const periapsisAu = orbit * (1 - eccentricity);
+  const apoapsisAu = orbit * (1 + eccentricity);
+  const teqPeriK =
+    periapsisAu > 0
+      ? (279 * (1 - bondAlbedo) ** 0.25 * Math.sqrt(sLum)) / Math.sqrt(periapsisAu)
+      : teqK;
+  const teqApoK =
+    apoapsisAu > 0
+      ? (279 * (1 - bondAlbedo) ** 0.25 * Math.sqrt(sLum)) / Math.sqrt(apoapsisAu)
+      : teqK;
+  const tEffPeriK = (teqPeriK ** 4 * ihRatio) ** 0.25;
+  const tEffApoK = (teqApoK ** 4 * ihRatio) ** 0.25;
+
+  // Insolation (stellar flux relative to Earth)
+  const insolationEarth = sLum / orbit ** 2;
+
   /* ── Classification ───────────────────────────────────────────── */
 
   const isIceGiant = massMjup < ICE_GIANT_MASS_MJUP;
@@ -665,8 +1227,18 @@ export function calcGasGiant({
 
   /* ── Magnetic field ────────────────────────────────────────────── */
 
-  const rotationS = rot * 3600;
-  const magnetic = calcMagnetic(massMjup, radiusKm, rotationS, orbit);
+  const magnetic = calcMagnetic(
+    massMjup,
+    radiusKm,
+    densityGcm3,
+    internalFlux,
+    moonTidalHeatingWm2,
+    isIceGiant,
+    orbit,
+    moons,
+    sLum,
+    sAge,
+  );
 
   /* ── Gravitational zones ───────────────────────────────────────── */
 
@@ -688,7 +1260,13 @@ export function calcGasGiant({
   const oblateness = calcOblateness(massMjup, radiusKm, rot, densityGcm3);
   const interior = calcInterior(massMjup);
   const massLoss = calcMassLoss(massMjup, radiusKm, orbit, sMass, sLum, sAge);
-  const tidal = calcTidalEffects(massMjup, radiusKm, orbit, sMass, sAge);
+
+  // Per-species Jeans escape
+  const fXuvRatio = massLoss.xuvFluxErgCm2S / F_XUV_SUN_1AU;
+  const ggExobaseTempK = computeGasGiantExobaseTemp(tEffK, fXuvRatio);
+  const ggJeansSpecies = computeGasGiantJeansEscape(escapeVelocityKms, ggExobaseTempK);
+
+  const tidal = calcTidalEffects(massMjup, radiusKm, orbit, eccentricity, sMass, sAge);
   const ringProps = calcRingProperties(massMjup, teqK, rocheLimitRockKm, rocheLimitIceKm);
   const ageRadius = calcAgeRadiusCorrection(massMjup, radiusRj, sAge, teqK);
 
@@ -700,7 +1278,34 @@ export function calcGasGiant({
   /* ── Orbital ───────────────────────────────────────────────────── */
 
   const orbitalPeriodYears = Math.sqrt(orbit ** 3 / sMass);
-  const orbitalVelocityKms = (2 * Math.PI * orbit * AU_KM) / (orbitalPeriodYears * 365.25 * 86400);
+  const orbitalPeriodDays = orbitalPeriodYears * 365.25;
+  const orbitalVelocityKms = (2 * Math.PI * orbit * AU_KM) / (orbitalPeriodDays * 86400);
+
+  // Orbital direction from inclination
+  const orbitalDirection =
+    inclinationDeg > 90 ? "Retrograde" : inclinationDeg < 90 ? "Prograde" : "Undefined";
+
+  // Local days per year
+  const localDaysPerYear = (orbitalPeriodDays * 24) / rot;
+
+  // Spin-orbit resonance (Goldreich & Peale 1966)
+  const tidallyEvolved = tidal.isTidallyLocked;
+  const resonance = tidallyEvolved ? spinOrbitResonance(eccentricity) : null;
+  const resonanceRotationHours = resonance ? (orbitalPeriodDays * 24) / resonance.p : null;
+
+  // Giant-to-giant mean-motion resonance
+  const nearestResonance = findNearestResonance(
+    orbit,
+    Array.isArray(otherGiants) ? otherGiants : [],
+  );
+
+  // Build Jeans escape display string
+  let jeansDisplayStr = `Atmospheric escape (T_exo ${fmt(round(ggExobaseTempK, 0), 0)} K, XUV ${fmt(round(fXuvRatio, 2), 2)}\u00d7 Earth):`;
+  for (const g of GG_GAS_SPECIES) {
+    const sp = ggJeansSpecies[g.key];
+    const ntTag = sp.nonThermal ? " (non-thermal)" : "";
+    jeansDisplayStr += `\n  ${sp.label}: \u03bb=${fmt(sp.lambda, 1)} \u2014 ${sp.status}${ntTag}`;
+  }
 
   /* ── Assemble output ───────────────────────────────────────────── */
 
@@ -709,6 +1314,9 @@ export function calcGasGiant({
       massMjup,
       radiusRj,
       orbitAu: orbit,
+      eccentricity,
+      inclinationDeg,
+      axialTiltDeg,
       rotationPeriodHours: rot,
       metallicitySolar: atmosphere.metallicitySolar,
       stellarMetallicityFeH: round(stellarFeH, 2),
@@ -746,9 +1354,19 @@ export function calcGasGiant({
     thermal: {
       equilibriumTempK: round(teqK, 1),
       effectiveTempK: round(tEffK, 1),
+      teqPeriK: round(teqPeriK, 1),
+      teqApoK: round(teqApoK, 1),
+      tEffPeriK: round(tEffPeriK, 1),
+      tEffApoK: round(tEffApoK, 1),
       internalHeatRatio: round(ihRatio, 2),
       internalFluxWm2: round(internalFlux, 3),
       bondAlbedo: round(sudFinal.bondAlbedo, 3),
+      insolationEarth: round(insolationEarth, 4),
+      moonTidalHeatingW: round(moonTidalHeatingW, 0),
+      moonTidalHeatingWm2: round(moonTidalHeatingWm2, 6),
+      moonTidalFraction: round(moonTidalFraction, 4),
+      k2: round(ggK2, 3),
+      tidalQ: Math.round(ggQ),
     },
 
     atmosphere,
@@ -769,12 +1387,28 @@ export function calcGasGiant({
     oblateness,
     interior,
     massLoss,
-    tidal,
+    jeansEscape: {
+      exobaseTempK: round(ggExobaseTempK, 0),
+      xuvFluxRatio: round(fXuvRatio, 4),
+      species: ggJeansSpecies,
+    },
+    tidal: {
+      ...tidal,
+      spinOrbitResonance: resonance ? resonance.ratio : null,
+      resonanceRotationHours: resonanceRotationHours ? round(resonanceRotationHours, 2) : null,
+    },
     ringProperties: ringProps,
 
     orbital: {
+      periapsisAu: round(periapsisAu, 4),
+      apoapsisAu: round(apoapsisAu, 4),
       orbitalPeriodYears: round(orbitalPeriodYears, 4),
+      orbitalPeriodDays: round(orbitalPeriodDays, 2),
       orbitalVelocityKms: round(orbitalVelocityKms, 2),
+      orbitalDirection,
+      localDaysPerYear: round(localDaysPerYear, 2),
+      insolationEarth: round(insolationEarth, 4),
+      nearestResonance,
     },
 
     appearance: {
@@ -793,12 +1427,38 @@ export function calcGasGiant({
       classification: sudFinal.label,
       hillSphere: `${fmt(hillSphereAu, 3)} AU (${fmt(hillSphereKm, 0)} km)`,
       rocheLimit: `${fmt(rocheLimitIceKm, 0)} km (ice) / ${fmt(rocheLimitRockKm, 0)} km (rock)`,
-      magneticField: `${fmt(magnetic.surfaceFieldGauss, 2)} G`,
+      magneticField: `${fmt(magnetic.surfaceFieldGauss, 2)} G (${magnetic.fieldLabel})`,
+      magneticMorphology:
+        magnetic.fieldMorphology.charAt(0).toUpperCase() + magnetic.fieldMorphology.slice(1),
       magnetosphere: `${fmt(magnetic.magnetopauseRp, 0)} Rp (${fmt(magnetic.magnetopauseKm, 0)} km)`,
+      moonTidalHeating:
+        moonTidalHeatingW > 0
+          ? `${moonTidalHeatingW.toExponential(2)} W (${fmt(moonTidalFraction * 100, 2)}% of internal heat)`
+          : "No moons assigned",
+      sputteringPlasma:
+        magnetic.sputteringPlasmaW > 0
+          ? `${magnetic.sputteringPlasmaW.toExponential(2)} W equiv. (atmospheric sputtering)`
+          : "None",
       bands: `${dynamics.bandCount} bands, ${dynamics.windDirection} winds`,
       windSpeed: `${fmt(dynamics.equatorialWindMs, 0)} m/s`,
-      orbitalPeriod: `${fmt(orbitalPeriodYears, 2)} yr`,
+      orbitalPeriod: `${fmt(orbitalPeriodYears, 2)} yr (${fmt(orbitalPeriodDays, 1)} days)`,
       orbitalVelocity: `${fmt(orbitalVelocityKms, 1)} km/s`,
+      insolation: `${fmt(insolationEarth, 3)}× Earth`,
+      peri: eccentricity > 0.005 ? `${fmt(periapsisAu, 4)} AU` : null,
+      apo: eccentricity > 0.005 ? `${fmt(apoapsisAu, 4)} AU` : null,
+      tempPeri:
+        eccentricity > 0.005
+          ? `T_eq ${fmt(Math.round(teqPeriK), 0)} K, T_eff ${fmt(Math.round(tEffPeriK), 0)} K`
+          : null,
+      tempApo:
+        eccentricity > 0.005
+          ? `T_eq ${fmt(Math.round(teqApoK), 0)} K, T_eff ${fmt(Math.round(tEffApoK), 0)} K`
+          : null,
+      orbitalDirection,
+      localDaysPerYear: `${fmt(localDaysPerYear, 2)} local days`,
+      resonance: nearestResonance
+        ? `${nearestResonance.label} (${fmt(nearestResonance.resonanceAu, 3)} AU, ${fmt(nearestResonance.deltaPct * 100, 1)}% off)`
+        : "No nearby resonance",
       chaoticZone: `±${fmt(chaoticZoneHalfAu, 3)} AU`,
       metallicity: `${fmt(atmosphere.metallicitySolar, 1)}× solar`,
       oblateness: `f = ${fmt(oblateness.flattening, 4)} (J₂ = ${fmt(oblateness.j2, 5)})`,
@@ -808,11 +1468,12 @@ export function calcGasGiant({
       massLossRate: `${massLoss.massLossRateKgS.toExponential(2)} kg/s`,
       evaporationTimescale: `${massLoss.evaporationTimescaleGyr >= 1e10 ? "≫ Hubble time" : fmt(massLoss.evaporationTimescaleGyr, 2) + " Gyr"}`,
       rocheLobeRadius: `${fmt(massLoss.rocheLobeRadiusKm, 0)} km${massLoss.rocheLobeOverflow ? " (OVERFLOW)" : ""}`,
+      jeansEscape: jeansDisplayStr,
       suggestedRadius: `${fmt(ageRadius.suggestedRadiusRj, 3)} Rj at ${fmt(sAge, 1)} Gyr`,
       radiusAgeNote: ageRadius.radiusAgeNote,
       ringType: `${ringProps.ringType} — ${ringProps.ringComposition}`,
       ringDetails: `τ ≈ ${fmt(ringProps.opticalDepth, 2)} (${ringProps.opticalDepthClass}), ${ringProps.estimatedMassKg.toExponential(2)} kg`,
-      tidalLocking: `τ_lock = ${tidal.lockingTimescaleGyr >= 1e6 ? "≫ age" : fmt(tidal.lockingTimescaleGyr, 2) + " Gyr"}${tidal.isTidallyLocked ? " — Locked" : ""}`,
+      tidalLocking: `τ_lock = ${tidal.lockingTimescaleGyr >= 1e6 ? "≫ age" : fmt(tidal.lockingTimescaleGyr, 2) + " Gyr"}${tidal.isTidallyLocked ? (resonance && resonance.ratio !== "1:1" ? ` — Spin-orbit resonance (${resonance.ratio})` : " — Synchronous (1:1)") : ""}`,
       circularisation: `τ_circ = ${tidal.circularisationTimescaleGyr >= 1e6 ? "≫ age" : fmt(tidal.circularisationTimescaleGyr, 2) + " Gyr"}${tidal.isCircularised ? " — Circularised" : ""}`,
     },
   };

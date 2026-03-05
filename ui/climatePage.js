@@ -12,6 +12,7 @@ import {
   selectPlanet,
   updateWorld,
 } from "./store.js";
+import { createTutorial } from "./tutorial.js";
 
 // ── Tooltips ────────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ function getClimateContext(world) {
     tidallyLockedToStar: !!model.derived.tidallyLockedToStar,
     compositionClass: model.derived.compositionClass || "Earth-like",
     liquidWaterPossible: !!model.derived.liquidWaterPossible,
+    climateState: model.derived.climateState || "Stable",
     insolationEarth: model.derived.insolationEarth || 1,
     gravityG: model.derived.gravityG || 1,
   };
@@ -245,6 +247,37 @@ function drawLatitudeBands(canvas, zones) {
     ctx.fillText(`${lat}\u00b0`, x, h - 4);
   }
 }
+
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "Climate Zones derives K\u00F6ppen classification bands from your planet\u2019s " +
+      "temperature, axial tilt, and atmospheric circulation. Select a planet " +
+      "to see its latitude-by-latitude climate.",
+  },
+  {
+    title: "Latitude Bands",
+    body:
+      "Each band is colour-coded by K\u00F6ppen class: A (tropical), B (arid), " +
+      "C (temperate), D (continental), and E (polar). Band widths depend on " +
+      "circulation cells and axial tilt.",
+  },
+  {
+    title: "Zone Details",
+    body:
+      "Expand any zone card to see temperature range, environment description, " +
+      "and aridity index. Use this to decide where forests, deserts, and ice " +
+      "caps appear on your world.",
+  },
+  {
+    title: "Altitude",
+    body:
+      "The altitude slider adjusts the reference height for temperature " +
+      "lapse-rate calculations. Higher altitudes shift zone boundaries, " +
+      "turning temperate regions into alpine or polar climates.",
+  },
+];
 
 // ── Page init ───────────────────────────────────────────────
 
@@ -408,6 +441,7 @@ export function initClimatePage(containerEl) {
         <div class="panel">
           <div class="panel__header">
             <h1 class="panel__title">Climate Zones ${tipIcon(TIP_LABEL["Climate Zones"])}</h1>
+            <button id="climTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
           </div>
           <div class="panel__body">
 
@@ -471,4 +505,24 @@ export function initClimatePage(containerEl) {
   }
 
   render();
+
+  // Tutorial (hosted on document.body because render() resets containerEl.innerHTML)
+  const tutHost = document.createElement("div");
+  document.body.appendChild(tutHost);
+  const tut = createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.climate.tutorial",
+    container: tutHost,
+  });
+  containerEl.addEventListener("click", (e) => {
+    if (e.target.closest("#climTutorials")) tut?.toggle();
+  });
+  const tutObs = new MutationObserver(() => {
+    if (!containerEl.isConnected) {
+      tut?.destroy();
+      tutHost.remove();
+      tutObs.disconnect();
+    }
+  });
+  tutObs.observe(containerEl.parentNode || document.body, { childList: true });
 }

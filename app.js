@@ -14,6 +14,8 @@ import { initSciencePage } from "./ui/sciencePage.js";
 import { initTectonicsPage } from "./ui/tectonicsPage.js";
 import { initClimatePage } from "./ui/climatePage.js";
 import { initPopulationPage } from "./ui/populationPage.js";
+import { initLessonsPage } from "./ui/lessonsPage.js";
+import { initScienceVisualiserPage } from "./ui/scienceVisualiserPage.js";
 import * as store from "./ui/store.js";
 import { createSolPresetEnvelope } from "./ui/solPreset.js";
 import { showSplashOverlay } from "./ui/splashOverlay.js";
@@ -130,6 +132,8 @@ const PAGE_MAP = {
   tectonics: initTectonicsPage,
   climate: initClimatePage,
   population: initPopulationPage,
+  lessons: initLessonsPage,
+  "science-viz": initScienceVisualiserPage,
 };
 
 function route() {

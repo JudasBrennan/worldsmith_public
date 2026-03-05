@@ -8,6 +8,7 @@ import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { getClusterObjectVisual, normalizeClusterObjectKey } from "./clusterObjectVisuals.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { createTutorial } from "./tutorial.js";
 import { escapeHtml } from "./uiHelpers.js";
 import {
   getClusterAdjustments,
@@ -236,6 +237,44 @@ function formatSystemLabel(system) {
     .join(" + ");
 }
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Local Cluster page generates a procedural neighbourhood of nearby " +
+      "star systems. Your home star sits at the centre, surrounded by " +
+      "randomly placed neighbours.",
+  },
+  {
+    title: "Seed and Radius",
+    body:
+      "Change the random seed to regenerate the cluster layout. Adjust the " +
+      "neighbourhood radius to control the volume of space sampled and the " +
+      "number of systems generated.",
+  },
+  {
+    title: "Editing Systems",
+    body:
+      "Click any system to rename it, adjust its position, or edit its " +
+      "metallicity. Each neighbour has a spectral class and giant-planet " +
+      "probability derived from its galactic position.",
+  },
+  {
+    title: "Galactic Context",
+    body:
+      "The Galactic Habitable Zone indicator shows whether your star\u2019s " +
+      "position favours Earth-like planet formation. Metallicity gradients " +
+      "and stellar density vary with galactic radius.",
+  },
+  {
+    title: "Stellar Census",
+    body:
+      "The output panel breaks down the neighbourhood by spectral class, " +
+      "counting O, B, A, F, G, K, M stars, white dwarfs, and brown dwarfs. " +
+      "Binary and triple system rates are estimated.",
+  },
+];
+
 export function initLocalClusterPage(mountEl) {
   const initial = getClusterInputs();
   const state = normalizeLocalClusterInputs(initial);
@@ -249,7 +288,7 @@ export function initLocalClusterPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--local-cluster" aria-hidden="true"></span><span>Local Cluster</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="clusterTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Set your galactic neighbourhood inputs and generate seeded nearby star-system coordinates from the WorldSmith Galaxy sheet logic.</div>
@@ -397,6 +436,12 @@ export function initLocalClusterPage(mountEl) {
 
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.cluster.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#clusterTutorials"),
+  });
 
   const galacticRadiusEl = wrap.querySelector("#clusterGalacticRadius");
   const locationEl = wrap.querySelector("#clusterLocation");

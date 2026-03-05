@@ -27,6 +27,7 @@ import {
   listSystemDebrisDisks,
   setOrbitMode,
 } from "./store.js";
+import { createTutorial } from "./tutorial.js";
 
 const TIP_LABEL = {
   "Orbit Placement Mode":
@@ -91,6 +92,44 @@ function orbitSlotToleranceAu(slotAu) {
   return Math.max(0.05, slotAu * 0.02);
 }
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The System page arranges planets and moons into orbital slots around " +
+      "your star. Use the system poster at the top for a visual overview, and " +
+      "the panels below to configure placement.",
+  },
+  {
+    title: "Orbit Spacing",
+    body:
+      "In Guided mode, Spacing Factor and Orbit 1 control logarithmic orbit " +
+      "slot placement. Adjust them to space out your planets realistically. " +
+      "The slot list shows generated positions in AU.",
+  },
+  {
+    title: "Assigning Bodies",
+    body:
+      "Drag planets from the Unassigned list into orbit slots. Green slots " +
+      "are in the habitable zone; grey slots lie beyond the frost line. Each " +
+      "slot holds one body.",
+  },
+  {
+    title: "Moons and Locking",
+    body:
+      "Drag moons onto planets to assign them. Lock bodies with the lock " +
+      "icon to prevent accidental reassignment. Edit buttons jump to the " +
+      "Planet or Moon detail page.",
+  },
+  {
+    title: "System Poster",
+    body:
+      "The poster visualises your full system. Toggle labels, moons, " +
+      "habitable zone, frost line, debris disks, and guides. Switch between " +
+      "logarithmic and linear scale. Export as PNG.",
+  },
+];
+
 export function initSystemPage(mountEl) {
   const defaults = {
     spacingFactor: 0.33,
@@ -114,7 +153,7 @@ export function initSystemPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--system" aria-hidden="true"></span><span>Planetary System</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="sysTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Tune Spacing Factor and Orbit 1 to generate slot spacing, then assign inner planets to available orbit slots.</div>
@@ -192,7 +231,6 @@ export function initSystemPage(mountEl) {
             <div class="hint">Gas giants are managed on the <a href="#/planet">Planets</a> tab. Debris disks are managed on the <a href="#/outer">Other Objects</a> tab.</div>
 
             <div class="button-row">
-              <button class="primary" id="btn-apply">Apply</button>
               <button id="btn-sol">Sol-ish Preset</button>
               <button id="btn-reset">Reset to Defaults</button>
             </div>
@@ -248,6 +286,12 @@ export function initSystemPage(mountEl) {
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.system.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#sysTutorials"),
+  });
 
   const massDisplay = wrap.querySelector("#massDisplay");
 
@@ -896,7 +940,8 @@ export function initSystemPage(mountEl) {
     render();
   }
 
-  wrap.querySelector("#btn-apply").addEventListener("click", applyFromInputs);
+  // Live-update: apply on every input change
+  [spacingEl, orbit1El].forEach((el) => el.addEventListener("input", applyFromInputs));
 
   wrap.querySelector("#btn-sol").addEventListener("click", () => {
     state.spacingFactor = 0.35;
@@ -1228,12 +1273,6 @@ export function initSystemPage(mountEl) {
   if (posterWrap) {
     new ResizeObserver(() => render()).observe(posterWrap);
   }
-
-  wrap.querySelectorAll('input[type="number"]').forEach((el) => {
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") applyFromInputs();
-    });
-  });
 }
 
 function numWithSlider(id, label, unit, hint, min, max, step) {

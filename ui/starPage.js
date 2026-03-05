@@ -5,6 +5,7 @@ import { bindNumberAndSlider } from "./bind.js";
 import { createCelestialVisualPreviewController } from "./celestialVisualPreview.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { loadWorld, updateWorld } from "./store.js";
+import { createTutorial } from "./tutorial.js";
 
 const TIP_LABEL = {
   Name: "Display name used in exports, the visualiser, and linked pages.",
@@ -16,7 +17,7 @@ const TIP_LABEL = {
   "Maximum Age":
     "How long your star will remain on the main sequence, in billions of earth years.\n\nComputed as (M / L) \u00d7 10 Gyr \u2014 nuclear fuel supply divided by luminous burn rate.",
   Radius:
-    "Stellar radius in solar radii.\n\nFor M \u2264 1 Msol: Eker et al. (2018, MNRAS 479, 5491) quadratic mass\u2013radius relation from eclipsing binaries.\nFor M > 1 Msol: power-law scaling (Demircan & Kahraman 1991).\n\nSun = 1 Rsol = 695,700 km",
+    "Stellar radius in solar radii.\n\nFor M \u2264 0.5 Msol: Schweitzer et al. (2019) linear relation from M-dwarf eclipsing binaries.\nFor 0.5\u20131.5 Msol: Eker et al. (2018, MNRAS 479, 5491) quadratic mass\u2013radius relation.\nFor M > 1.5 Msol: Stefan-Boltzmann derivation from Eker MLR + MTR.\n\nSun = 1 Rsol = 695,700 km",
   Luminosity:
     "Stellar luminosity in solar luminosities.\n\nZAMS mode: Eker et al. (2018, MNRAS 479, 5491) six-piece empirical relation from 509 eclipsing binaries. Replaces the classical L = M\u2074 approximation, which overestimated K-dwarf luminosities by 30\u201385%.\n\nEvolved mode: Hurley, Pols & Tout (2000) analytical stellar evolution. Radius and temperature are accurate to ~1\u20132%, but luminosity carries ~10% mean error inherent to the Tout (1996) polynomial ZAMS baseline and Hurley evolution-rate fits. This is the practical accuracy ceiling of analytical single-star evolution; sub-2% luminosity would require tabulated MESA/MIST isochrone grids.\n\nSun = 1 Lsol = 3.846E26 watts",
   "Radius Override":
@@ -66,6 +67,44 @@ const TIP_LABEL = {
     "Total expected CME rate per day. For FGK stars, this follows the solar-cycle envelope and is split into associated and background channels.\n\nReference: Yashiro et al. (2006, JGR 111, A12S05).",
 };
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Star page defines your system\u2019s central star. Inputs on the left set " +
+      "mass, age, and composition; outputs on the right show derived properties " +
+      "like luminosity, habitable zone, and spectral class.",
+  },
+  {
+    title: "Mass and Age",
+    body:
+      "Mass is the most important input \u2014 it determines nearly everything about " +
+      "your star. Age affects luminosity and activity levels. Use the Sol-ish " +
+      "Preset for a Sun-like starting point.",
+  },
+  {
+    title: "Stellar Evolution",
+    body:
+      "Toggle Stellar Evolution to model how your star changes over time. When " +
+      "enabled, luminosity and temperature shift based on the star\u2019s age and " +
+      "mass, following analytical evolution tracks.",
+  },
+  {
+    title: "Physics Mode",
+    body:
+      "Simple mode derives all properties from mass alone. Switch to Advanced " +
+      "to override any two of Radius, Luminosity, or Temperature \u2014 the third " +
+      "is computed via the Stefan-Boltzmann law.",
+  },
+  {
+    title: "Outputs and Life",
+    body:
+      "Review the outputs panel for habitable zone boundaries, flare activity, " +
+      "spectral class, and the life assessment badge. These feed into planet " +
+      "and moon calculations on other pages.",
+  },
+];
+
 export function initStarPage(mountEl) {
   const defaults = { name: "Star", massMsol: 0.8653, ageGyr: 6.254 }; // workbook defaults
   const world = loadWorld();
@@ -110,7 +149,7 @@ export function initStarPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--star" aria-hidden="true"></span><span>Star</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="starTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Set the star name, mass, and age here. These values drive linked system, planet, and moon calculations.</div>
@@ -239,13 +278,12 @@ export function initStarPage(mountEl) {
           <div class="hint" id="resolutionStatus" style="margin-top:4px;font-style:italic"></div>
 
           <div class="button-row">
-            <button class="primary" id="btn-apply">Apply</button>
             <button id="btn-sol">Sol-ish Preset</button>
             <button id="btn-reset">Reset to Defaults</button>
           </div>
 
           <div class="hint" style="margin-top:10px">
-            Autosaves locally as you apply changes.
+            Autosaves locally as you make changes.
           </div>
         </div>
       </div>
@@ -265,6 +303,12 @@ export function initStarPage(mountEl) {
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.star.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#starTutorials"),
+  });
 
   const nameEl = wrap.querySelector("#starName");
   const massEl = wrap.querySelector("#mass");
@@ -618,7 +662,10 @@ export function initStarPage(mountEl) {
     metallicityEl.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  let hydrating = false;
   function applyFromInputs() {
+    if (hydrating) return;
+    hydrating = true;
     state.name = sanitiseName(nameEl.value);
     nameEl.value = state.name;
     const m = clamp(massEl.value, 0.075, 100);
@@ -675,6 +722,7 @@ export function initStarPage(mountEl) {
       },
     });
     render();
+    hydrating = false;
   }
 
   // Initial population
@@ -698,7 +746,16 @@ export function initStarPage(mountEl) {
   syncBoundInputs();
   render();
 
-  wrap.querySelector("#btn-apply").addEventListener("click", applyFromInputs);
+  // Live-update: apply on every input change
+  [
+    nameEl,
+    massEl,
+    ageEl,
+    metallicityEl,
+    radiusOverrideEl,
+    luminosityOverrideEl,
+    tempOverrideEl,
+  ].forEach((el) => el.addEventListener("input", applyFromInputs));
 
   wrap.querySelector("#radiusClear").addEventListener("click", () => {
     radiusOverrideEl.value = "";
@@ -716,21 +773,21 @@ export function initStarPage(mountEl) {
   physicsModeRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.physicsMode = r.value;
-      render();
+      applyFromInputs();
     });
   });
 
   evolutionModeRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.evolutionMode = r.value;
-      render();
+      applyFromInputs();
     });
   });
 
   physicsDerivRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.advancedDerivationMode = getDerivMode();
-      render();
+      applyFromInputs();
     });
   });
 
@@ -817,20 +874,5 @@ export function initStarPage(mountEl) {
       },
     });
     render();
-  });
-
-  // UX: Enter key applies
-  [
-    nameEl,
-    massEl,
-    ageEl,
-    metallicityEl,
-    radiusOverrideEl,
-    luminosityOverrideEl,
-    tempOverrideEl,
-  ].forEach((el) => {
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") applyFromInputs();
-    });
   });
 }

@@ -1126,9 +1126,8 @@ const SOL_PRESET_WORLD = {
           primaryMoonId: "m_luna",
           extraMoonIds: ["", "", ""],
           monthsPerYear: 12,
-          solarWeeksPerMonth: 4,
-          lunarWeeksPerMonth: 4,
-          lunisolarWeeksPerMonth: 4,
+          daysPerMonth: null,
+          daysPerWeek: null,
         },
         ui: {
           calendarName: "Gregorian (UK)",

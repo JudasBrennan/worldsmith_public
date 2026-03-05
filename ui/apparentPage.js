@@ -22,6 +22,7 @@ import {
   listSystemGasGiants,
   loadWorld,
 } from "./store.js";
+import { createTutorial } from "./tutorial.js";
 
 const TIP_LABEL = {
   "Home world": "Reference world used for apparent brightness and apparent size outputs.",
@@ -218,6 +219,37 @@ function numWithSlider(id, label, unit, min, max, step, tip) {
   `;
 }
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Apparent Size page calculates how celestial objects look from your " +
+      "home world \u2014 angular diameter, apparent magnitude, and visibility " +
+      "based on real optics.",
+  },
+  {
+    title: "Sky Canvas",
+    body:
+      "The canvas at the top compares angular sizes at true proportions. " +
+      "Tiny objects use logarithmic scaling so they remain visible. Sol " +
+      "reference sizes are shown for comparison.",
+  },
+  {
+    title: "Object Tables",
+    body:
+      "Tables list apparent magnitude, angular diameter, phase angle, and " +
+      "illuminated fraction for every planet, gas giant, and moon in your " +
+      "system.",
+  },
+  {
+    title: "Phase Functions",
+    body:
+      "Four body types use different scattering models: rocky airless, rocky " +
+      "with atmosphere, gas giant, and tiny body. Phase angles above 160\u00B0 " +
+      "are flagged as too extreme to observe.",
+  },
+];
+
 export function initApparentPage(mountEl) {
   const world = loadWorld();
   const selectedPlanet = getSelectedPlanet(world);
@@ -235,7 +267,7 @@ export function initApparentPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--apparent" aria-hidden="true"></span><span>Apparent Size & Brightness</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="apparentTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Estimate star, planetary-object, and moon apparent brightness/size from a selected home world.</div>
@@ -376,6 +408,12 @@ export function initApparentPage(mountEl) {
   mountEl.innerHTML = "";
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.apparent.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#apparentTutorials"),
+  });
 
   const homeSelectEl = wrap.querySelector("#apparentHomePlanet");
   const moonPhaseEl = wrap.querySelector("#apparentMoonPhase");

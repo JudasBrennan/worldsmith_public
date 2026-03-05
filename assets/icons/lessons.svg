@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Open book -->
+  <path d="M2 4c0-1 .8-2 2-2h5c1.5 0 3 .8 3 2v15c-1-.5-2.5-1-3-1H4c-1.1 0-2-.9-2-2V4z" stroke="#6f93d8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 4c0-1-.8-2-2-2h-5c-1.5 0-3 .8-3 2v15c1-.5 2.5-1 3-1h4c1.1 0 2-.9 2-2V4z" stroke="#6f93d8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Page lines left -->
+  <path d="M5 7h4" stroke="#9fd1ff" stroke-width="1" stroke-linecap="round" opacity="0.7"/>
+  <path d="M5 10h4" stroke="#9fd1ff" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+  <path d="M5 13h3" stroke="#9fd1ff" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <!-- Page lines right -->
+  <path d="M15 7h4" stroke="#9fd1ff" stroke-width="1" stroke-linecap="round" opacity="0.7"/>
+  <path d="M15 10h4" stroke="#9fd1ff" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+  <path d="M15 13h3" stroke="#9fd1ff" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <!-- Spine highlight -->
+  <path d="M12 2v17" stroke="#8de0c8" stroke-width="1.1" stroke-linecap="round" opacity="0.6"/>
+</svg>

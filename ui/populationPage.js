@@ -12,6 +12,7 @@ import {
   selectPlanet,
   updateWorld,
 } from "./store.js";
+import { createTutorial } from "./tutorial.js";
 
 // ── Tooltips ────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ function getPopulationContext(world) {
     tidallyLockedToStar: !!model.derived.tidallyLockedToStar,
     compositionClass: model.derived.compositionClass || "Earth-like",
     liquidWaterPossible: !!model.derived.liquidWaterPossible,
+    climateState: model.derived.climateState || "Stable",
     gravityG: model.derived.gravityG || 1,
   });
 
@@ -377,6 +379,44 @@ function drawLandUseCascade(canvas, model) {
   });
 }
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Population page models growth, carrying capacity, and settlement " +
+      "distribution for a civilisation on your planet. It uses logistic " +
+      "growth and Zipf rank-size distributions.",
+  },
+  {
+    title: "Technology Era",
+    body:
+      "Select an era from hunter-gatherer to sci-fi. Each era sets baseline " +
+      "parameters for carrying capacity and growth rate. Higher technology " +
+      "supports larger populations per unit of land.",
+  },
+  {
+    title: "Growth Parameters",
+    body:
+      "Adjust growth rate, initial population, and elapsed time. The S-curve " +
+      "shows logistic growth approaching carrying capacity. Saturation " +
+      "percentage indicates how full the world is.",
+  },
+  {
+    title: "Land Use",
+    body:
+      "Configure ocean coverage, habitability, and productivity percentages. " +
+      "The cascade shows how surface area narrows from total area to " +
+      "productive farmland. Crop and livestock splits affect caloric output.",
+  },
+  {
+    title: "Distribution",
+    body:
+      "Population is distributed across continents and regions using " +
+      "Zipf\u2019s law. The rank-size chart shows how cities are distributed, " +
+      "from the largest capital to smaller settlements.",
+  },
+];
+
 // ── Page init ───────────────────────────────────────────────
 
 export function initPopulationPage(containerEl) {
@@ -445,6 +485,7 @@ export function initPopulationPage(containerEl) {
         <div class="panel">
           <div class="panel__header">
             <h1 class="panel__title">Population ${tipIcon(TIP_LABEL["Population"])}</h1>
+            <button id="popTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
           </div>
           <div class="panel__body">
 
@@ -774,4 +815,24 @@ export function initPopulationPage(containerEl) {
   }
 
   render();
+
+  // Tutorial (hosted on document.body because render() resets containerEl.innerHTML)
+  const tutHost = document.createElement("div");
+  document.body.appendChild(tutHost);
+  const tut = createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.pop.tutorial",
+    container: tutHost,
+  });
+  containerEl.addEventListener("click", (e) => {
+    if (e.target.closest("#popTutorials")) tut?.toggle();
+  });
+  const tutObs = new MutationObserver(() => {
+    if (!containerEl.isConnected) {
+      tut?.destroy();
+      tutHost.remove();
+      tutObs.disconnect();
+    }
+  });
+  tutObs.observe(containerEl.parentNode || document.body, { childList: true });
 }

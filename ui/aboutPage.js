@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.16.1</b> is a browser-based tool by <b>Judas Brennan</b> for generating
+          <b>WorldSmith Web 1.18.2</b> is a browser-based tool by <b>Judas Brennan</b> for generating
           <b>Sol-like planetary systems</b> and <b>Earth-like worlds</b> for tabletop roleplaying games.
         </p>
 
@@ -50,6 +50,8 @@ export function initAboutPage(mountEl) {
           <li><b>Calendar</b>: build a world-linked calendar from orbital periods, then define holidays, festivals, leap rules, and work/rest cycles.</li>
           <li><b>Visualiser</b>: left-drag to pan, right-drag to rotate, scroll to zoom. Click a body to center it; double-click to zoom in. Press <b>Esc</b> to release focus. Press <b>?</b> for full controls including touch gestures. Zoom out past the outermost object to transition into the local cluster view.</li>
           <li><b>Local Cluster</b>: generate nearby systems around your home star, manually add or remove stars and companions, and edit local system names.</li>
+          <li><b>Lessons</b>: 20-lesson progressive curriculum covering every scientific concept in the model. Six units from Stars to the Wider Universe, with a Basic/Advanced toggle and embedded mini-calculators.</li>
+          <li><b>Science Visualiser</b>: interactive dependency graph of all 58 scientific concepts in the engine. Search, filter by section, or trace upstream/downstream connections from any node.</li>
           <li><b>Science &amp; Maths</b>: reference page documenting every equation used across the engine, with LaTeX rendering and interactive calculators.</li>
         </ol>
 
@@ -65,9 +67,49 @@ export function initAboutPage(mountEl) {
           <li>Turn on <b>Atmospheric escape filter</b> on the Planet page to automatically remove gases the body is too small or warm to retain. The model includes non-thermal losses for H&#x2082; and He.</li>
           <li>Use the <b>Radioisotope Abundance</b> slider (or Per-Isotope mode) to model worlds with more or less internal heat than Earth, affecting volcanism, lithosphere thickness, and dynamo lifetime.</li>
           <li>Your work is stored locally in your browser (localStorage). Use <b>Export</b> regularly to back up your world. Clearing site data will reset the tool.</li>
+          <li>Click the <b>Tutorials</b> button in any page header for a step-by-step guide to that page&rsquo;s workflow. Your position is remembered across sessions.</li>
         </ul>
 
         <div class="page-title" style="margin-top:18px">Changelog</div>
+        <p><b>Version 1.18.2</b> (unreleased, from 1.18.1)</p>
+        <ul>
+          <li><b>Schweitzer M-dwarf Radius</b> &mdash; Replaced the Eker quadratic below 0.5 M&#9737; with the Schweitzer et al. (2019) linear relation (R&nbsp;=&nbsp;0.0282&nbsp;+&nbsp;0.935&thinsp;M), with a smooth blend over 0.5&ndash;0.7 M&#9737;. Improves low-mass radius accuracy against benchmark stars.</li>
+        </ul>
+
+        <p><b>Version 1.18.1</b> (from 1.18.0)</p>
+        <ul>
+          <li><b>Improved Mass-Radius Relation</b> &mdash; Extended the Eker (2018) quadratic MRR to its full calibration range of 1.5 M&#9737; (was 1.0). Above 1.5 M&#9737; the old Demircan &amp; Kahraman power law is replaced by a Stefan-Boltzmann derivation from Eker MLR + MTR, cutting RMSE against benchmark stars from ~28% to ~18%.</li>
+          <li><b>Mass-Temperature Relation</b> &mdash; New <code>massToTeff()</code> function implementing the Eker (2018) MTR for high-mass stars (M &gt; 1.5 M&#9737;).</li>
+          <li><b>Science &amp; Maths</b> &mdash; Updated MRR formula display with the new piecewise equation, and added the MTR formula entry.</li>
+        </ul>
+
+        <p><b>Version 1.18.0</b> (from 1.17.1)</p>
+        <ul>
+          <li><b>Calendar UX Redesign</b> &mdash; Rebuilt the Calendar page with a toolbar + closable drawer layout. The calendar grid now fills the full width when the drawer is closed. Four drawer tabs (Structure, Identity, Rules, Output) replace the previous eight collapsible panels.</li>
+          <li><b>Tutorials on Every Page</b> &mdash; All 13 interactive pages now have a &ldquo;Tutorials&rdquo; button in their header. Each tutorial walks you through the page&rsquo;s workflow in 4&ndash;8 steps with a persistent toast panel that remembers your position.</li>
+          <li><b>Live-Update Inputs</b> &mdash; Star, Moon, System, and Calendar pages now update outputs instantly as you type or drag sliders, removing the Apply button from these pages.</li>
+          <li><b>Calendar Structure Controls</b> &mdash; Replaced the three &ldquo;weeks per month&rdquo; sliders with direct &ldquo;Days per month&rdquo; and &ldquo;Days per week&rdquo; inputs with a structure readout showing weekly breakdown and drift warnings.</li>
+          <li><b>Bug Fixes</b> &mdash; Fixed infinite loop on Moon and Star pages when dragging sliders, fixed Science page crash from malformed data table call, fixed calendar rounding toggle responsiveness.</li>
+        </ul>
+
+        <p><b>Version 1.17.1</b> (from 1.17.0)</p>
+        <ul>
+          <li><b>Science Visualiser</b> &mdash; New interactive dependency graph page mapping 58 scientific concepts across 12 sections with 112 typed edges. Three view modes (full graph, section filter, trace mode), search, and detail panels with formulas and engine references.</li>
+          <li><b>Climate State Classification</b> &mdash; Planets are now classified as Stable, Snowball, Moist greenhouse, or Runaway greenhouse based on surface temperature and absorbed stellar flux. New KPI card on the planet page, climate advisory warnings, and a science visualiser node with five edges.</li>
+          <li><b>Climate State NASA Validation</b> &mdash; 19 tests validating absorbed flux and climate state against Solar System data (Mercury, Venus, Earth, Mars, Ceres) in dry and wet configurations.</li>
+          <li><b>Calendar Rounding Override</b> &mdash; New &ldquo;Round derived data&rdquo; toggle on the Calendar page with a 0&ndash;6 decimal places slider. When enabled, rounds orbital periods before they enter the calendar model, affecting month lengths and leap cycles. Persists per profile.</li>
+        </ul>
+
+        <p><b>Version 1.17.0</b> (from 1.16.1)</p>
+        <ul>
+          <li><b>Lessons Page</b> &mdash; 20-lesson progressive curriculum covering every scientific concept in the model, organised into six units with a Basic/Advanced toggle and embedded mini-calculators.</li>
+          <li><b>Gas Giant Orbital Parameters</b> &mdash; Eccentricity, inclination, and axial tilt inputs for gas giants, unlocking periapsis/apoapsis temperatures, insolation, spin-orbit resonance, and giant-to-giant mean-motion resonance.</li>
+          <li><b>Gas Giant Physics</b> &mdash; Christensen energy-flux dynamo model, Chapman-Ferraro magnetopause with moon plasma inflation, per-species Jeans escape analysis, moon tidal heating, and atmospheric sputtering magnetopause inflation.</li>
+          <li><b>Rocky Planet Enhancements</b> &mdash; Periapsis/apoapsis temperatures, volatile sublimation flags for dwarf planets, and suggested gas giant resonance for all rocky planets.</li>
+          <li><b>Moon Volatile Inventory</b> &mdash; Moons now display surface ices and thin volatile atmospheres for seven species, with Jeans escape and geological retention checks.</li>
+          <li><b>Unified KPI Layout</b> &mdash; Rocky planet, gas giant, and moon pages now share a consistent KPI card order for shared concepts (Appearance, Composition, Radius, Density, Gravity, Escape Velocity, Magnetic Field, Temperature, Orbital Period). Derived detail sections split into labelled sub-headings for readability.</li>
+        </ul>
+
         <p><b>Version 1.16.1</b> (from 1.16.0)</p>
         <ul>
           <li><b>Internal Heat UI</b> &mdash; Added the missing Internal Heat input section to the planet page with Simple (single slider) and Per-Isotope (U-238, U-235, Th-232, K-40) modes.</li>

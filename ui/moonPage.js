@@ -23,6 +23,7 @@ import {
   assignMoonToPlanet,
 } from "./store.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { createTutorial } from "./tutorial.js";
 
 const TIP_LABEL = {
   "Star Mass": "Host star mass in solar masses.\n\nSun = 1 Msol.",
@@ -110,6 +111,7 @@ const TIP_LABEL = {
   "Orbital Fate":
     "Linear extrapolation of the current recession rate to estimate when the moon reaches the Roche limit (tidal disruption) or escapes the Hill sphere.\n\nThis is a rough estimate \u2014 real orbital evolution is non-linear and depends on changing tidal parameters over geological time.",
   Limits: "Derived orbital limits and lock times for the selected moon.",
+  "Tidal locking": "Lock times and current lock state for the moon\u2013planet\u2013star system.",
   "Equilibrium Temp":
     "Temperature from stellar radiation alone, assuming no atmosphere (airless body)." +
     "\n\nUses the Stefan-Boltzmann equilibrium: T = (L(1\u2212a) / 16\u03C0\u03C3d\u00B2)\u00BC, " +
@@ -131,6 +133,44 @@ const TIP_LABEL = {
     "magnetopause. Upper estimate \u2014 actual doses may be lower due to ring " +
     "absorption and loss processes.",
 };
+
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Moons page creates and configures natural satellites. Select a moon " +
+      "from the dropdown, or create a new one. Assign it to a parent planet " +
+      "or gas giant using the parent selector.",
+  },
+  {
+    title: "Orbit Setup",
+    body:
+      "Set semi-major axis, eccentricity, and inclination. The semi-major axis " +
+      "is automatically clamped to the parent\u2019s moon zone \u2014 between the Roche " +
+      "limit and Hill sphere.",
+  },
+  {
+    title: "Physical Properties",
+    body:
+      "Adjust mass, density, albedo, and composition. Use the composition " +
+      "override dropdown for special scenarios like subsurface oceans or " +
+      "partially molten interiors.",
+  },
+  {
+    title: "Tidal System",
+    body:
+      "Outputs show tidal forces, heating, and locking timescales. Check " +
+      "whether the moon is tidally locked to its planet, and whether the " +
+      "planet is locked to its star or moon.",
+  },
+  {
+    title: "Recipes",
+    body:
+      "Click Recipes on the appearance preview to apply presets like Luna, " +
+      "Europa, Io, or Titan. Each recipe configures orbit and physical inputs " +
+      "for a realistic moon archetype.",
+  },
+];
 
 export function initMoonPage(mountEl) {
   const world = loadWorld();
@@ -156,7 +196,7 @@ export function initMoonPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--moons" aria-hidden="true"></span><span>Moons</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="moonTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Create moons for selected planets and tune orbit/physical inputs. Use outputs to check periods, lock state, and tides.</div>
@@ -242,7 +282,6 @@ export function initMoonPage(mountEl) {
           ${numWithSlider("initRot", "Initial Rotation Period", "hours", "", 2, 1000, 0.1, "Initial Rotation Period")}
 
           <div class="button-row">
-            <button class="primary" id="btn-apply">Apply</button>
             <button id="btn-default">Reset to Defaults</button>
           </div>
 
@@ -257,16 +296,19 @@ export function initMoonPage(mountEl) {
         <div class="panel__body">
           <div class="kpi-grid" id="kpis"></div>
 
-          <div style="margin-top:14px">
-            <div class="label">Derived limits ${tipIcon(TIP_LABEL["Limits"] || "")}</div>
-            <div class="derived-readout" id="limits"></div>
-          </div>
+          <div id="limits" style="margin-top:14px"></div>
         </div>
       </div>
     </div>
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.moon.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#moonTutorials"),
+  });
 
   const previewCleanupObserver = new MutationObserver(() => {
     if (wrap.isConnected) return;
@@ -446,7 +488,7 @@ export function initMoonPage(mountEl) {
         densityGcm3: ggModel.physical.densityGcm3,
         radiusEarth: ggModel.physical.radiusEarth,
         gravityG: ggModel.physical.gravityG,
-        surfaceFieldEarths: ggModel.magnetic.surfaceFieldGauss / 0.31,
+        surfaceFieldEarths: ggModel.magnetic.surfaceFieldEarths,
         magnetopauseRp: ggModel.magnetic.magnetopauseRp,
         radioisotopeAbundance: 1,
       },
@@ -501,6 +543,7 @@ export function initMoonPage(mountEl) {
         meta: moonProfile.terrain.type.replace("-", " "),
       },
       // MAJOR MOON PHYSICAL CHARACTERISTICS
+      { label: "Composition", value: model.display.compositionClass, meta: "" },
       { label: "Radius", value: model.display.radius, meta: "derived" },
       { label: "Gravity", value: model.display.gravity, meta: "" },
       { label: "Escape Velocity", value: model.display.esc, meta: "" },
@@ -509,11 +552,6 @@ export function initMoonPage(mountEl) {
       { label: "Surface Temp", value: model.display.surfaceTemp, meta: "" },
 
       // MAJOR MOON ORBITAL CHARACTERISTICS
-      { label: "Moon Zone (Inner)", value: model.display.zoneInner, meta: "" },
-      { label: "Moon Zone (Outer)", value: model.display.zoneOuter, meta: "" },
-      { label: "Periapsis", value: model.display.peri, meta: "" },
-      { label: "Apoapsis", value: model.display.apo, meta: "" },
-      { label: "Orbital Direction", value: model.orbit.orbitalDirection, meta: "" },
       { label: "Orbital Period (sidereal)", value: model.display.sidereal, meta: "" },
       { label: "Orbital Period (synodic)", value: model.display.synodic, meta: "" },
       { label: "Rotation Period", value: model.display.rot, meta: "" },
@@ -523,7 +561,8 @@ export function initMoonPage(mountEl) {
       { label: "Total Tidal Force", value: model.display.tides, meta: "" },
       { label: "Moon Contribution", value: model.display.moonPct, meta: "" },
       { label: "Star Contribution", value: model.display.starPct, meta: "" },
-      { label: "Composition", value: model.display.compositionClass, meta: "" },
+      { label: "Surface Ices", value: model.display.surfaceIces, meta: "" },
+      { label: "Volatile Atmosphere", value: model.display.volatileAtmosphere, meta: "" },
       {
         label: "Tidal Heating",
         value: model.display.tidalHeating,
@@ -533,9 +572,6 @@ export function initMoonPage(mountEl) {
       { label: "Radiogenic Heating", value: model.display.radiogenicHeating, meta: "" },
       { label: "Orbital Recession", value: model.display.recession, meta: "" },
       { label: "Orbital Fate", value: model.display.orbitalFate, meta: "" },
-      { label: "Moon locked to Planet?", value: model.display.moonLocked, meta: "" },
-      { label: "Planet locked to Moon?", value: model.display.planetLockedMoon, meta: "" },
-      { label: "Planet locked to Star?", value: model.display.planetLockedStar, meta: "" },
       {
         label: "Magnetospheric Radiation",
         value: model.display.magnetosphericRad,
@@ -612,16 +648,22 @@ export function initMoonPage(mountEl) {
       });
     }
 
-    limitsEl.textContent =
-      `Moon Zone (Inner): ${model.display.zoneInner}
-` +
-      `Moon Zone (Outer): ${model.display.zoneOuter}
-` +
-      `Lock time (Moon→Planet): ${model.display.tMoonLock}
-` +
-      `Lock time (Planet→Moon): ${model.display.tPlanetMoon}
-` +
-      `Lock time (Planet→Star): ${model.display.tPlanetStar}`;
+    limitsEl.innerHTML = `
+      <div class="label">Orbital limits ${tipIcon(TIP_LABEL["Limits"] || "")}</div>
+      <div class="derived-readout">Moon Zone (Inner): ${model.display.zoneInner}
+Moon Zone (Outer): ${model.display.zoneOuter}
+Periapsis: ${model.display.peri}
+Apoapsis: ${model.display.apo}
+Orbital direction: ${model.orbit.orbitalDirection}</div>
+      <div style="margin-top:14px">
+        <div class="label">Tidal locking ${tipIcon(TIP_LABEL["Tidal locking"] || "")}</div>
+        <div class="derived-readout">Moon locked to Planet: ${model.display.moonLocked}
+Planet locked to Moon: ${model.display.planetLockedMoon}
+Planet locked to Star: ${model.display.planetLockedStar}
+Lock time (Moon\u2192Planet): ${model.display.tMoonLock}
+Lock time (Planet\u2192Moon): ${model.display.tPlanetMoon}
+Lock time (Planet\u2192Star): ${model.display.tPlanetStar}</div>
+      </div>`;
   }
 
   function loadIntoInputs() {
@@ -644,7 +686,10 @@ export function initMoonPage(mountEl) {
     });
   }
 
+  let hydrating = false;
   function applyFromInputs() {
+    if (hydrating) return;
+    hydrating = true;
     const w = loadWorld();
     const moonId = w.moons.selectedId;
 
@@ -704,9 +749,14 @@ export function initMoonPage(mountEl) {
 
     loadIntoInputs();
     render();
+    hydrating = false;
   }
 
-  wrap.querySelector("#btn-apply").addEventListener("click", applyFromInputs);
+  // Live-update: apply on every input change
+  [nameEl, aEl, eEl, incEl, mEl, densityEl, albedoEl, initRotEl].forEach((el) =>
+    el.addEventListener("input", applyFromInputs),
+  );
+  moonPlanetSelectEl.addEventListener("change", applyFromInputs);
 
   moonSelectEl.addEventListener("change", () => {
     selectMoon(moonSelectEl.value);

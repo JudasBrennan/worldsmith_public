@@ -2,6 +2,597 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## 1.18.2 — Unreleased
+
+### Schweitzer M-dwarf Radius
+
+**Schweitzer et al. (2019) linear MRR for low-mass stars** (engine/star.js)
+
+Replaced the Eker (2018) quadratic below 0.5 Msol with the Schweitzer
+et al. (2019, A&A 625, A68) linear relation `R = 0.0282 + 0.935 M`,
+calibrated from 55 eclipsing M-dwarf binaries (0.09–0.6 Msol). A smooth
+linear blend over 0.5–0.7 Msol ensures continuity with the Eker
+quadratic.
+
+- Added Schweitzer linear branch for M ≤ 0.5 Msol.
+- Added blend zone (0.5–0.7 Msol) interpolating Schweitzer → Eker.
+- Low-mass benchmark RMSE improves (Proxima Cen, Barnard's Star).
+- Updated Science & Maths page, Lesson 1, and Star page tooltip.
+
+---
+
+## 1.18.1 — 2026-03-05
+
+### Improved Mass-Radius Relation
+
+**Eker (2018) MRR breakpoint correction** (engine/star.js)
+
+Extended the Eker et al. (2018) quadratic mass-radius relation from its
+previous 1.0 Msol breakpoint to the paper's full calibration range of
+1.5 Msol (Table 5). Above 1.5 Msol the Demircan & Kahraman (1991) power
+law is replaced by a Stefan-Boltzmann derivation using the Eker
+mass-luminosity and mass-temperature relations, with a normalisation
+factor for exact continuity at the boundary.
+
+- Added `massToTeff()` — Eker (2018) mass-temperature relation for
+  M > 1.5 Msol.
+- Changed `massToRadius()` breakpoint from 1.0 to 1.5 Msol.
+- Replaced `M^0.57` (Demircan & Kahraman 1991) with
+  `R = √L × (5776/T)² × norm` (Stefan-Boltzmann from Eker MLR + MTR).
+- RMSE against 17 benchmark stars drops from ~28% to ~18%.
+- Updated Science & Maths page formulas, Lesson 1 text, and Star page
+  tooltip.
+
+---
+
+## 1.18.0 — 2026-03-04
+
+### Calendar Page UX Redesign
+
+**Toolbar + drawer layout** (ui/calendarPage.js, styles.css)
+
+Restructured the calendar page from a fixed two-column layout into a
+toolbar + closable drawer pattern. The calendar grid is now the primary
+view, filling the full width when the drawer is closed.
+
+- Persistent toolbar holds profile management, calendar name, basis
+  selector, and month/year navigation.
+- Drawer contains four tabs: **Structure**, **Identity**, **Rules**,
+  and **Output**, consolidating the previous 8 collapsible panels.
+- Rules tab uses sub-tabs (Holidays, Festivals, Leap Years, Cycles)
+  with a list-first pattern — item lists appear above forms, with
+  forms revealed on Add/Edit.
+- Drawer pushes the calendar right on wide screens (>980px) and
+  overlays with a backdrop on narrow screens.
+- Derived orbital data wrapped in a collapsible `<details>` element.
+
+**Sidereal → solar day conversion** (ui/calendarPage.js)
+
+The planet model stores sidereal rotation period (star-to-star), but
+a calendar day is a solar day (noon-to-noon). Added conversion before
+passing rotation to the calendar engine:
+`solarDay = 1 / (1/sidereal − 1/orbital)`. For Earth this corrects
+23.934 h (sidereal) → 24.0 h (solar), producing the correct 365-day
+common year instead of the previous erroneous 366.
+
+**Structure readout accuracy** (ui/calendarPage.js)
+
+The "Last month" readout previously used a naive formula
+(`daysPerMonth + yearlyIntercalary`) that ignored active leap rules.
+Replaced with a call to `getMonthLengthsForYear()` so the displayed
+month length accounts for leap-rule adjustments (e.g. the Sol preset's
+Gregorian month-shape rules that redistribute intercalary days).
+
+**Tests** (tests/calendarPage.ui.test.js, tests/calendarPage.data.ui.test.js)
+
+- Added test: Sol preset Earth sidereal rotation produces 365-day
+  common year.
+- Updated derived-data readout regex to match new format showing
+  sidereal rotation and solar day.
+
+### Tutorials on Every Page
+
+**Shared tutorial module** (ui/tutorial.js, styles.css)
+
+Added a reusable tutorial toast panel system. Each interactive page now
+has a "Tutorials" button in its header that opens a step-by-step guide
+anchored to the bottom-right of the viewport. Position and open state
+persist across sessions via localStorage.
+
+- Created `ui/tutorial.js` — shared `createTutorial()` factory handling
+  panel DOM, state persistence, navigation, and Escape-key dismissal.
+- Renamed CSS from `.cal-tutorial` to `.ws-tutorial` (generic). Added
+  `.ws-tutorial-trigger` class for the header button.
+- Refactored the Calendar page to use the shared module (~80 lines of
+  inline tutorial code removed).
+
+**Page tutorials added** (13 pages total)
+
+| Page              | Steps | Key topics                                        |
+| ----------------- | ----- | ------------------------------------------------- |
+| Star              | 5     | Mass/age, evolution, physics mode, outputs        |
+| Planetary System  | 5     | Orbit spacing, drag-and-drop, system poster       |
+| Planets           | 8     | Rocky/gas giant, atmosphere, tectonics, recipes   |
+| Moons             | 5     | Orbit, tidal system, composition, recipes         |
+| Other Objects     | 4     | Debris disks, suggest feature, derived properties |
+| System Visualiser | 5     | Navigation, display options, animation, export    |
+| Local Cluster     | 5     | Seed, editing systems, galactic context, census   |
+| Import/Export     | 4     | Export, import, presets                           |
+| Apparent Size     | 4     | Sky canvas, object tables, phase functions        |
+| Calendar          | 8     | Structure, identity, rules, output (existing)     |
+| Tectonics         | 5     | Mountain types, ocean, volcanoes, plate canvas    |
+| Climate Zones     | 4     | Latitude bands, zone details, altitude            |
+| Population        | 5     | Tech era, growth, land use, distribution          |
+
+Pages that re-render via `innerHTML` (Tectonics, Climate, Population)
+host the tutorial panel on `document.body` with event delegation and
+MutationObserver cleanup.
+
+**Style guide updated** (STYLE_GUIDE.md)
+
+Documented both integration patterns (standard and re-rendering pages)
+with code examples, updated component inventory and HTML layout template.
+
+### Live-Update Inputs
+
+**Removed Apply buttons from Star, Moon, System, and Calendar pages**
+(ui/starPage.js, ui/moonPage.js, ui/systemPage.js, ui/calendarPage.js)
+
+All input fields now live-update immediately on keystroke or slider drag,
+matching the existing behaviour on Planet, Climate, Population, Tectonics,
+Apparent, and Outer Objects pages. The Local Cluster page retains its
+Apply button because regenerating the cluster discards manual star-system
+edits.
+
+Star page radio groups (physics mode, evolution mode, derivation mode)
+also trigger immediate recalculation. Enter-key shortcuts removed (no
+longer needed).
+
+Calendar page splits live-update into two concerns: source-object selects
+reset the calendar view position (month index, selected day), while
+numeric sliders and the rounding toggle re-render without resetting the
+view.
+
+**Tests** (tests/calendarPage.data.ui.test.js)
+
+- Updated rounding tests to dispatch `input`/`change` events instead of
+  clicking the removed Apply button.
+
+### Bug Fixes
+
+- Fixed `dataTable()` call in Science page moon volatile retention section
+  that passed a single array-of-arrays instead of separate `headers` and
+  `rows` arguments, crashing the page on load (ui/sciencePage.js:913).
+- Fixed calendar rounding toggle not immediately enabling the decimal
+  places slider — added `change` listener that toggles disabled state
+  without requiring Apply (ui/calendarPage.js).
+
+### Calendar Structure Controls
+
+Replaced the three "weeks per month" sliders (Solar/Lunar/Lunisolar) with
+two direct inputs: **Days per month** and **Days per week**. Both default
+to physics-derived values (null = auto) and cascade: changing months/year
+recalculates days/month if auto, which recalculates days/week if auto.
+
+A new **structure readout** below the inputs shows weeks per month,
+monthly intercalary days, calendar year length, and drift vs orbital year
+(with a warning when drift exceeds 10%).
+
+Engine simplified from three `solarWeeksPerMonth` / `lunarWeeksPerMonth` /
+`lunisolarWeeksPerMonth` parameters to a single `weeksPerMonth`
+(engine/calendar.js). Preset calendars updated (Sol, Arrakis, Realmspace).
+
+### CSS
+
+- Adjusted `.physics-duo-toggle` radio hit target (`left: 0` → `1px`).
+- Increased `.physics-trio-toggle` radio hit target height (30px → 50px).
+- Added `#moonsList .planet-card` spacing rule (5px vertical margin).
+
+## 1.17.1 — 2026-03-04
+
+### Science Visualiser
+
+**New page** (ui/scienceVisualiserPage.js, ui/scienceGraphData.js)
+
+Interactive dependency graph mapping every scientific concept in the engine.
+58 nodes across 12 thematic sections (Local Cluster, Stellar Physics, System
+Layout, Interior & Composition, Atmosphere & Surface, Climate, Tectonics,
+Moons & Tides, Gas Giants, Debris Disks, Population, Observing) connected
+by 112 typed edges (runtime, documented, curated). Each node carries a
+plain-language summary, formula, engine references, and documentation links.
+
+Three view modes — full graph, section-filtered, and trace mode — let users
+explore the model at different scales. Trace mode highlights all concepts
+within a configurable hop depth of the selected node. A search bar filters by
+name, tag, or description. Clicking a node opens a detail panel with its
+formula, upstream/downstream connections, and links to engine source and
+lessons.
+
+**Tests** (tests/scienceGraphData.test.js, tests/scienceVisualiser.ui.test.js)
+
+7 tests: graph data integrity checks (unique IDs, valid edge references,
+required fields) and UI rendering tests.
+
+### Climate State Classification
+
+**Snowball / greenhouse flags** (engine/planet.js, engine/climate.js,
+ui/planetPage.js, ui/climatePage.js, ui/populationPage.js,
+ui/scienceGraphData.js)
+
+Planets are now classified into one of four climate regimes based on surface
+temperature and absorbed stellar flux:
+
+| State              | Condition                        | Reference               |
+| ------------------ | -------------------------------- | ----------------------- |
+| Stable             | Normal regime (or dry world)     | —                       |
+| Snowball           | T < 240 K with surface water     | Budyko (1969)           |
+| Moist greenhouse   | T > 340 K with surface water     | Kasting (1988)          |
+| Runaway greenhouse | Absorbed flux > 282 W/m² + water | Goldblatt et al. (2013) |
+
+A new `classifyClimateState()` function checks thresholds in priority order
+(runaway → moist → snowball → stable). Dry worlds are always Stable since
+snowball and greenhouse feedbacks require water. The absorbed stellar flux
+diagnostic (`absorbedFluxWm2`) is computed as `S × 1361 × (1 − A) / 4` and
+exposed in both `derived` and `display`.
+
+The planet page gains a Climate State KPI card (with absorbed flux in the
+meta line). The climate advisory in `calcClimateZones()` now appends
+regime-specific warnings for extreme states. The science visualiser adds a
+`climate_state` node with five edges (from surface temperature, albedo,
+insolation, and water regime; to climate zones).
+
+**Tests** (tests/planet.test.js)
+
+7 tests: Earth-like → Stable, cold orbit → Snowball, strong greenhouse →
+Moist greenhouse, close-in orbit → Runaway greenhouse, dry cold → Stable,
+absorbed flux sanity check (≈ 238 W/m² for Earth), display string validation.
+
+### Climate State NASA Validation
+
+**19 new tests** (tests/climateState-nasa-validation.test.js)
+
+Validates absorbed stellar flux and climate-state classification against Solar
+System reference data from NASA Planetary Fact Sheets. Five inner bodies
+(Mercury, Venus, Earth, Mars, Ceres) tested in both dry and wet configurations.
+Venus gets a third "primordial" test (albedo 0.3, pre-cloud-deck) confirming
+runaway greenhouse. Absorbed flux values match analytical expectations within 1%.
+
+### Calendar Derived Data Rounding Override
+
+**Decimal places toggle** (ui/calendarPage.js)
+
+New "Round derived data" checkbox with a 0–6 decimal places slider on the
+Calendar Inputs panel. When enabled, rounds the three derived astronomical
+values (planet orbital period, moon synodic period, planet rotation) before
+they enter `calcCalendarModel()`. The rounded values propagate through month
+lengths, leap cycles, and week structure. When disabled (default), raw engine
+values pass through unmodified — preserving existing behaviour. The setting
+persists per calendar profile.
+
+**Tests** (tests/calendarPage.data.ui.test.js)
+
+2 tests: toggle-off preserves full precision; toggle-on with 0 dp produces
+whole numbers and with 2 dp produces two-decimal output.
+
+## 1.17.0 — 2026-03-04
+
+### New Features
+
+- **Lessons page** (ui/lessonsPage.js, ui/lessons/) — Added a 20-lesson
+  progressive curriculum covering every scientific concept in the model.
+  Organised into six units (Stars, Orbits & Systems, Terrestrial Worlds,
+  Giants & Moons, Surface & Climate, The Wider Universe). A global
+  Basic / Advanced toggle switches between plain-language explainers and
+  equation-level deep-dives with KaTeX rendering. Ten lessons include
+  embedded mini-calculators backed by real engine functions.
+
+- **Periapsis / apoapsis temperatures** (engine/planet.js, ui/planetPage.js) —
+  All rocky planets with eccentricity > 0.005 now show equilibrium
+  temperature at closest and farthest orbital approach alongside the
+  existing periapsis/apoapsis distance readouts.
+
+- **Volatile sublimation flags** (engine/planet.js, ui/planetPage.js) —
+  Dwarf planets (mass < 0.01 M⊕) display which surface ices (N₂, CO,
+  CH₄, H₂O, CO₂) can sublimate at periapsis vs apoapsis temperatures,
+  flagging transient or persistent atmospheres.
+
+- **Moon volatile inventory & atmospheric retention** (engine/moon.js,
+  engine/utils.js, ui/moonPage.js) — Moons now display surface ices and
+  thin volatile atmospheres. Seven species (N₂, CO, CH₄, CO₂, NH₃, SO₂,
+  H₂O) are checked via density-based presence, vacuum sublimation
+  threshold, Jeans escape parameter (λ > 6), and geological retention
+  (escape timescale > system age). Vapor pressure estimated via
+  Clausius–Clapeyron. Correctly predicts Triton's N₂ atmosphere, Io's
+  SO₂ envelope, Titan's N₂ retention, Titania's lack of atmosphere
+  (escape too fast), and Europa's stable water ice.
+
+- **Atmospheric sputtering magnetopause inflation** (engine/gasGiant.js) —
+  Moons with sublimation-driven volatile atmospheres (e.g. Triton's N₂)
+  now contribute plasma via magnetospheric ion sputtering, inflating the
+  magnetopause alongside volcanic outgassing. Includes triple-point
+  filtering (ice must exist) and pressure saturation (thick atmospheres
+  shield the surface). Fixes Neptune's magnetopause from 18 → 23 Rp
+  (observed: 23 Rp). All four Solar System giants now match within 3%:
+  Jupiter 75 Rp, Saturn 22 Rp, Uranus 18.5 Rp, Neptune 23 Rp.
+
+- **Suggested gas giant resonance** (engine/debrisDisk.js, engine/planet.js,
+  ui/planetPage.js) — All rocky planets now show the nearest mean-motion
+  resonance with a system gas giant (e.g. "Neptune 3:2 (39.4 AU, 0.3%
+  off)"). Checks ten resonance ratios (3:2, 2:1, 5:2, 3:1, 4:1 exterior;
+  1:2, 1:3, 1:4, 2:3, 2:5 interior) within an 8% tolerance.
+
+### Gas Giant Orbital Parameters
+
+**Eccentricity, inclination, and axial tilt inputs** (engine/gasGiant.js,
+ui/store.js, ui/planetPage.js)
+
+Gas giants now accept three new orbital/physical parameters that bring them to
+parity with rocky planets: eccentricity (0–0.99), orbital inclination
+(0–180°), and axial tilt (0–180°). All three are nullable — blank means "use
+default 0". Three new sliders appear under an "Orbit & Orientation" section
+below metallicity.
+
+**Derived outputs** (engine/gasGiant.js, ui/planetPage.js)
+
+The new inputs unlock several derived quantities:
+
+- Periapsis / apoapsis distances (only shown when e > 0.005)
+- Equilibrium and effective temperatures at orbital extremes
+- Insolation (stellar flux relative to Earth)
+- Orbital direction (prograde / retrograde from inclination)
+- Local days per year
+- Spin-orbit resonance state for tidally locked eccentric giants (Goldreich &
+  Peale 1966: 1:1, 3:2, 2:1, or 5:2 depending on eccentricity)
+- Giant-to-giant mean-motion resonance (reuses `findNearestResonance` from
+  `engine/debrisDisk.js`)
+
+Tidal circularisation timescale now scales with the Wisdom (2004) eccentricity
+dissipation factor — higher eccentricity drives faster circularisation.
+
+`spinOrbitResonance()` was extracted from `engine/planet.js` to
+`engine/utils.js` to avoid a circular dependency.
+
+**Tests** (tests/gasGiant.test.js)
+
+- Eccentric orbit produces correct periapsis/apoapsis distances
+- Periapsis equilibrium temperature exceeds apoapsis temperature
+- Circular orbit (e < 0.005) hides peri/apo display lines
+- Insolation at 5.2 AU ≈ 0.037× Earth
+- Inclination 0° → prograde, 150° → retrograde
+- Hot Jupiter at 0.03 AU with e = 0.15 → tidally locked in 3:2 spin-orbit
+- Circularisation timescale decreases with higher eccentricity
+- Giant-to-giant 5:2 resonance detected (Jupiter at 5.2 AU, test body at 8.25 AU)
+- No other giants → null resonance
+- Axial tilt echoed in inputs
+- Local days per year for Jupiter-like orbit ≈ 10,475
+
+**References**
+
+- Goldreich, P. & Peale, S. (1966), "Spin-orbit coupling in the solar system",
+  Astronomical Journal 71, 425
+- Wisdom, J. (2004), "Spin-orbit secondary resonance dynamics of Enceladus",
+  Astronomical Journal 128, 484
+
+### Gas Giant Thermal Model
+
+**Chromophore-adjusted Class I albedo and recalibrated internal heat ratio**
+(engine/gasGiant.js, ui/sciencePage.js)
+
+Two thermal model improvements that cascade into more accurate magnetic field
+strength, effective temperatures, and internal heat flux:
+
+- **Class I bond albedo** lowered from 0.57 to 0.34. The Sudarsky (2000) value
+  assumed pure NH₃ ice crystals; real ammonia cloud decks contain UV-photolysis
+  chromophores that darken the atmosphere. The adjusted value matches the observed
+  mean of Jupiter (0.343) and Saturn (0.342). Jupiter T_eq improves from 99 K to
+  110 K (NASA: 110 K); internal flux from 3.8 to 5.5 W/m² (observed: 5.4).
+
+- **`internalHeatRatio()` recalibrated** with a sigmoid transition in the ice
+  giant regime (centered at 0.05 Mjup) and corrected gas giant values. Key fixes:
+  Neptune ihRatio 1.59 → 2.62 (observed), Saturn 2.30 → 1.77 (observed), Jupiter
+  1.70 → 1.66 (observed). Uranus (1.06) was already correct.
+
+- **Compositional convection floor** raised from 0.2 to 0.4 W/m². Phase
+  separation (H/He demixing, water/ammonia differentiation) sustains at least
+  ~0.4 W/m² of compositional buoyancy flux even without measurable thermal output.
+
+### Gas Giant Magnetic Dynamo
+
+**Christensen energy-flux dynamo** (engine/gasGiant.js, ui/planetPage.js,
+ui/sciencePage.js)
+
+The simplified parametric scaling (B ∝ M^(1/3) × P^(-1/3)) is replaced by a
+Christensen (2009) energy-flux dynamo model self-normalised to Jupiter (4.28 G).
+The old model gave Saturn ~3 G — 14× the observed 0.21 G — because it ignored
+the mass-dependent conducting-shell geometry that drives real dynamo physics.
+
+The new model computes surface field strength from three physically motivated
+inputs, all already available in the engine:
+
+- **Dynamo shell geometry** — metallic hydrogen transition depth for gas giants
+  (log-interpolated: Jupiter r_o/R = 0.83, Saturn 0.40). Ice giants use a
+  density-dependent ionic ocean shell (r_o/R = 0.70 × (ρ_ref/ρ)^0.82) — less
+  dense ice giants reach ionic dissociation at larger fractional radius, producing
+  thicker conducting shells. Shell exponent 3.2 (vs theoretical 3) accounts for
+  thin-shell dipolarity reduction and stable-layer attenuation (Heimpel+ 2005,
+  Christensen & Wicht 2008).
+- **Internal heat flux** — thermal + moon tidal heating drive convective power.
+- **Compositional convection floor** (0.4 W/m²) — prevents unrealistically weak
+  fields for planets like Uranus with near-zero measured thermal flux, reflecting
+  phase-separation-driven convection (H/He demixing, water/ammonia
+  differentiation).
+
+**Dual normalisation** — gas giants normalise to Jupiter (4.28 G), ice giants
+normalise to the Uranus/Neptune geometric mean (0.18 G). Separate references
+avoid cross-regime extrapolation between thick-shell dipolar dynamos and
+thin-shell multipolar dynamos, eliminating the need for a conductivity fudge
+factor.
+
+Field morphology is now reported: gas giants → dipolar (thick metallic-H shell),
+ice giants → multipolar (thin ionic shell, Stanley & Bloxham 2004).
+
+**Calibration** (all four Solar System giants within ~2%):
+
+| Planet  | Observed (G) | Model (G) | Ratio  | Morphology |
+| ------- | ------------ | --------- | ------ | ---------- |
+| Jupiter | 4.28         | 4.28      | 1.00×  | Dipolar    |
+| Saturn  | 0.21         | ~0.21     | ~0.99× | Dipolar    |
+| Uranus  | 0.23         | ~0.24     | ~1.02× | Multipolar |
+| Neptune | 0.14         | ~0.14     | ~1.00× | Multipolar |
+
+New output fields: `dynamoActive`, `dynamoReason`, `fieldMorphology`,
+`fieldLabel`, `surfaceFieldEarths`, `shellRatio`, `conductivityRegime`,
+`effectiveFluxWm2`. All existing fields (`surfaceFieldGauss`,
+`dipoleMomentAm2`, `magnetopauseRp`, `magnetopauseKm`) preserved.
+
+**Tests** (tests/gasGiant.test.js, tests/gasGiant-nasa-validation.test.js)
+
+- Jupiter self-normalisation → within 2% of 4.28 G, dipolar, metallic-H
+- Saturn within 20% of 0.21 G, dipolar
+- Uranus within 20% of 0.23 G, multipolar, ionic
+- Neptune within 20% of 0.14 G, multipolar
+- Heavier planet → stronger field (monotonicity)
+- Output structure contains all 12 expected fields
+- Magnetopause scales with orbital distance
+- Display string includes field label and Gauss value
+- surfaceFieldEarths consistent with surfaceFieldGauss / 0.31
+- NASA validation: morphology, conductivity regime, dynamo active for all 4 giants
+
+**References**
+
+- Christensen, U. R. et al. (2009), "Energy flux determines magnetic field
+  strength of planets and stars", Nature 457, 167
+- Christensen, U. R. & Aubert, J. (2006), "Scaling properties of convection-
+  driven dynamos in rotating spherical shells", Geophys. J. Int. 166, 97
+- Stanley, S. & Bloxham, J. (2004), "Convective-region geometry as the cause
+  of Uranus' and Neptune's unusual magnetic fields", Nature 428, 151
+- French, M. et al. (2012), "Ab initio simulations for material properties along
+  the Jupiter adiabat", ApJS 202, 5
+
+### Gas Giant Magnetopause
+
+**Chapman-Ferraro + moon plasma inflation** (engine/gasGiant.js, ui/sciencePage.js)
+
+The magnetopause formula is replaced with a first-principles Chapman-Ferraro
+dipole pressure balance plus plasma inflation from tidally-heated moons:
+
+- **Chapman-Ferraro standoff**: `R_CF = [B²/(2μ₀ P_sw)]^(1/6)` where `P_sw`
+  is solar wind pressure at orbit distance. Gives the vacuum dipole prediction.
+- **Moon self-heating**: tidal heating ON each moon FROM the planet, using a
+  cold-body k₂/Q model with tidal-thermal feedback for intensely heated bodies
+  (Io mechanism — partial melting reduces rigidity and Q, amplifying
+  dissipation).
+- **Plasma inflation**: `f = (1 + H_moon/H_ref)^γ` where H_ref = 4×10⁵ W
+  and γ = 0.047, calibrated to Jupiter (f ≈ 2.4, Io plasma torus) and Saturn
+  (f ≈ 1.6). Below 10⁸ W total moon heating, no inflation is applied.
+
+The old formula (`75 × (B/B_J)^(1/3) × (r/5.2)^(1/3)`) baked Jupiter's
+anomalous Io-driven inflation into the calibration constant, producing 52–145%
+errors for non-Jupiter planets.
+
+| Planet  | Old          | New   | Observed | Improvement |
+| ------- | ------------ | ----- | -------- | ----------- |
+| Jupiter | 75 Rp (0%)   | 75 Rp | 75 Rp    | Same        |
+| Saturn  | 34 Rp (52%)  | 22 Rp | 22 Rp    | 52% → ~0%   |
+| Uranus  | 44 Rp (145%) | 19 Rp | 18 Rp    | 145% → ~3%  |
+| Neptune | 43 Rp (87%)  | 18 Rp | 23 Rp    | 87% → ~21%  |
+
+Neptune's remaining 21% error is due to its highly tilted (47°) and offset
+(0.55 R) magnetic dipole, which the centered-dipole model cannot capture.
+
+**References**
+
+- Chapman, S. & Ferraro, V. C. A. (1931), "A new theory of magnetic storms",
+  Terrestrial Magnetism 36, 77
+- Peale, S. J., Cassen, P. & Reynolds, R. T. (1979), "Melting of Io by tidal
+  dissipation", Science 203, 892
+
+### Gas Giant Per-Species Atmospheric Escape
+
+**Jeans escape analysis** (engine/gasGiant.js, ui/planetPage.js)
+
+Gas giants now show per-species Jeans escape analysis for all six tracked
+atmospheric species (H₂, He, CH₄, NH₃, H₂O, CO), complementing the existing
+bulk energy-limited (XUV) mass-loss model. Each species displays its Jeans
+parameter λ and retention status (Retained, Marginal, or Lost).
+
+A gas-giant-specific exobase temperature model accounts for extended H₂/He
+envelope XUV absorption — no surface pressure or CO₂ cooling like rocky
+planets. Uses an effective temperature floor of 200 K (UV + gravity-wave
+heating baseline) with XUV boost capped at 10,000 K (hydrodynamic blow-off
+regime). Non-thermal escape mechanisms raise retention thresholds for H₂ (×3,
+charge exchange/polar wind) and He (×5, ion pickup).
+
+Key behaviour: Jupiter-mass planets retain all species easily (λ ≫ 18), but
+mini-Neptunes (≤0.05 Mjup) at close orbits can lose H₂ and He through
+non-thermal processes even when thermally retained.
+
+**Tests** (tests/gasGiant.test.js)
+
+- Jupiter at 5.2 AU retains all heavy species
+- Mini-Neptune at 0.02 AU: non-thermal escape flips H₂/He from Retained to Lost
+- Sub-Neptune at 0.02 AU: H₂ thermally lost (λ < 3)
+- Higher mass → higher λ (stronger retention)
+- Closer orbit → hotter exobase
+- Display string contains species, λ values, and T_exo
+- Exobase temperature capped at 10,000 K
+
+**References**
+
+- Jeans, J. (1925), "The Dynamical Theory of Gases", Cambridge Univ. Press
+- Murray-Clay, R. A. et al. (2009), "Atmospheric escape from hot Jupiters",
+  ApJ 693, 23
+- Gunell, H. et al. (2018), "Why an intrinsic magnetic field does not protect
+  a planet against atmospheric escape", A&A 614, L3
+
+### Gas Giant Moon Tidal Heating
+
+**Tidal heating from orbiting moons** (engine/gasGiant.js, ui/planetPage.js)
+
+Gas giants now compute tidal heating deposited by their moons using the Peale,
+Cassen & Reynolds (1979) dissipation formula with gas-giant-specific fluid
+Love number k₂ and tidal quality factor Q.
+
+Gas giants are fluid bodies — the rigid-body k₂ formula (Munk & MacDonald 1960)
+does not apply. Instead, k₂ is calibrated to Solar System measurements: Jupiter
+k₂ ≈ 0.38 (Wahl+ 2016, Juno), Saturn k₂ ≈ 0.34 (Lainey+ 2017), ice giants
+k₂ ≈ 0.1–0.13. Tidal Q uses empirical piecewise fits: Jupiter Q ≈ 10⁵ (Lainey+
+2009), Saturn Q ≈ 3×10³ (resonance locking, Fuller+ 2016), ice giants Q ≈ 10⁴.
+
+Moon tidal heating is displayed as absolute power (W) and as a percentage of
+the giant's intrinsic internal heat flux. For Jupiter with Io, the reciprocal
+heating is ~4×10⁹ W (<10⁻⁶% of internal heat) — negligible, as expected. More
+significant contributions arise for lower-Q Saturn-mass hosts with eccentric
+close-in moons.
+
+New output fields: `thermal.moonTidalHeatingW`, `thermal.moonTidalFraction`,
+`thermal.k2`, `thermal.tidalQ`.
+
+**Tests** (tests/gasGiant.test.js)
+
+- No moons → zero tidal heating
+- Io-analog at Jupiter → ~10⁹ W (k₂/Q limits dissipation)
+- Higher eccentricity → more heating
+- Closer moon → more heating (a⁻⁶ dependence)
+- Saturn Q < Jupiter Q → same moon heats Saturn more
+- Ice giant k₂ lower than gas giant k₂
+- Display string contains W and % when moons present
+- Multiple moons sum → more than either alone
+
+**References**
+
+- Peale, S. J., Cassen, P. & Reynolds, R. T. (1979), "Melting of Io by tidal
+  dissipation", Science 203, 892
+- Wahl, S. M. et al. (2016), "Comparing Jupiter interior structure models to
+  Juno gravity measurements", Geophys. Res. Lett. 44, 4649
+- Lainey, V. et al. (2009), "Strong tidal dissipation in Io and Jupiter", Nature
+  459, 957
+- Lainey, V. et al. (2017), "New constraints on Saturn's interior from Cassini
+  astrometric data", Icarus 281, 286
+- Fuller, J., Luan, J. & Quataert, E. (2016), "Resonance locking as the source
+  of rapid tidal migration in the Jupiter and Saturn moon systems", MNRAS 458,
+  3867
+
 ## 1.16.1 — 2026-03-03
 
 ### Bug Fixes

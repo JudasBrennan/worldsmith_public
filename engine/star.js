@@ -1,8 +1,9 @@
 // Star calculator
 // Mass-luminosity from Eker et al. (2018, MNRAS 479, 5491) — six-piece
 // empirical relation calibrated from 509 eclipsing binary components.
-// Mass-radius from Eker (2018) quadratic (M ≤ 1 Msol) and Demircan &
-// Kahraman (1991) power law (M > 1 Msol).
+// Mass-radius: Schweitzer (2019) linear for M ≤ 0.5 Msol, blended to
+// Eker (2018) quadratic over 0.5–0.7, Eker quadratic for 0.7–1.5 Msol,
+// Eker MTR + Stefan-Boltzmann derivation for M > 1.5 Msol.
 // Habitable Zone uses temperature-dependent Seff polynomials from
 // Chromant's Desmos Star System Visualizer (Kopparapu-style correction).
 // Inputs:
@@ -59,28 +60,83 @@ export function massToLuminosity(massMsol) {
 }
 
 // ---------------------------------------------------------------------------
-// Mass-Radius Relation
+// Mass-Temperature Relation: Eker et al. (2018, MNRAS 479, 5491)
 // ---------------------------------------------------------------------------
-// M ≤ 1.0 Msol: Eker et al. (2018) quadratic (Table 5) from eclipsing
-// binaries:  R = 0.438 M² + 0.479 M + 0.075  (calibrated 0.179–1.5 Msol).
-// Normalised by dividing by R(1.0) = 0.992 so the Sun gives exactly 1.0 Rsol.
-// M > 1.0 Msol: R = M^0.57  (Demircan & Kahraman 1991 upper branch).
-// Both evaluate to 1.0 at M = 1.0, ensuring continuity at the boundary.
-const MRR_NORM = 1.0 / 0.992;
+// For M > 1.5 Msol: log Teff = −0.170 (log M)² + 0.888 log M + 3.671
+// Used with MLR and Stefan-Boltzmann to derive radius for high-mass stars.
 
 /**
- * Converts stellar mass to radius using a two-piece relation: Eker et al.
- * (2018) quadratic for M <= 1 Msol, Demircan & Kahraman (1991) power law
- * for M > 1 Msol. Both pieces evaluate to exactly 1.0 Rsol at 1.0 Msol,
- * ensuring continuity at the boundary. Mass is clamped to 0.075--100 Msol.
+ * Converts stellar mass to effective temperature using the Eker et al. (2018)
+ * mass-temperature relation (MTR). Intended for M > 1.5 Msol where the MRR
+ * quadratic is not calibrated.
+ *
+ * @param {number} massMsol - Stellar mass in solar masses (Msol)
+ * @returns {number} Effective temperature in Kelvin (K)
+ */
+export function massToTeff(massMsol) {
+  const logM = Math.log10(massMsol);
+  return 10 ** (-0.17 * logM * logM + 0.888 * logM + 3.671);
+}
+
+// ---------------------------------------------------------------------------
+// Mass-Radius Relation
+// ---------------------------------------------------------------------------
+// Four-piece relation, each boundary blended for continuity:
+//
+// M ≤ 0.5 Msol: Schweitzer et al. (2019, A&A 625, A68) linear relation
+//   R = 0.0282 + 0.935 M  (55 detached eclipsing M-dwarf binaries,
+//   0.09–0.6 Msol, RMS scatter ~0.02 Rsol).
+// 0.5 < M ≤ 0.7 Msol: Linear blend between Schweitzer and Eker quadratic.
+// 0.7 < M ≤ 1.5 Msol: Eker et al. (2018) quadratic (Table 5) from
+//   eclipsing binaries:  R = 0.438 M² + 0.479 M + 0.075  (calibrated
+//   0.179–1.5 Msol). Normalised so R(1.0) = 1.0 Rsol.
+// M > 1.5 Msol: Derived from Eker MLR + MTR via Stefan-Boltzmann
+//   (R = √L × (5776/T)²), with a normalisation factor to ensure
+//   continuity at the 1.5 Msol boundary.
+const MRR_NORM = 1.0 / 0.992;
+const MRR_SB_NORM = (() => {
+  const quadAt1_5 = (0.438 * 2.25 + 0.479 * 1.5 + 0.075) * MRR_NORM;
+  const L = massToLuminosity(1.5);
+  const T = massToTeff(1.5);
+  return quadAt1_5 / (Math.sqrt(L) * (5776 / T) ** 2);
+})();
+
+/** Schweitzer (2019) linear M-dwarf MRR. */
+function schweitzerRadius(m) {
+  return 0.0282 + 0.935 * m;
+}
+
+/** Eker (2018) quadratic MRR, solar-normalised. */
+function ekerQuadRadius(m) {
+  return (0.438 * m * m + 0.479 * m + 0.075) * MRR_NORM;
+}
+
+/**
+ * Converts stellar mass to radius using a four-piece relation:
+ *
+ * - M ≤ 0.5: Schweitzer et al. (2019) linear (M-dwarf eclipsing binaries)
+ * - 0.5 < M ≤ 0.7: linear blend from Schweitzer to Eker quadratic
+ * - 0.7 < M ≤ 1.5: Eker et al. (2018) quadratic (solar-normalised)
+ * - M > 1.5: Stefan-Boltzmann derivation from Eker MLR + MTR
+ *
+ * The Sun (1.0 Msol) gives exactly 1.0 Rsol. All boundaries are continuous.
+ * Mass is clamped to 0.075--100 Msol.
  *
  * @param {number} massMsol - Stellar mass in solar masses (Msol)
  * @returns {number} Radius in solar radii (Rsol)
  */
 export function massToRadius(massMsol) {
   const m = clamp(massMsol, 0.075, 100);
-  if (m <= 1.0) return (0.438 * m * m + 0.479 * m + 0.075) * MRR_NORM;
-  return m ** 0.57;
+  if (m <= 0.5) return schweitzerRadius(m);
+  if (m <= 0.7) {
+    // Linear blend: t=0 at 0.5 (Schweitzer), t=1 at 0.7 (Eker quadratic)
+    const t = (m - 0.5) / 0.2;
+    return schweitzerRadius(m) * (1 - t) + ekerQuadRadius(m) * t;
+  }
+  if (m <= 1.5) return ekerQuadRadius(m);
+  const L = massToLuminosity(m);
+  const T = massToTeff(m);
+  return Math.sqrt(L) * (5776 / T) ** 2 * MRR_SB_NORM;
 }
 
 /**

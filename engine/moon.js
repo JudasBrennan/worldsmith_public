@@ -25,7 +25,17 @@
 //          object, and moon parameters (mass, density, albedo, orbit).
 // Outputs: structured object with inputs, physical, orbit, tides, and
 //          display tiers (see STYLE_GUIDE.md § Return shape).
-import { clamp, eccentricityFactor, fmt, k2LoveNumber, toFinite } from "./utils.js";
+import {
+  clamp,
+  eccentricityFactor,
+  escapeTimescaleSeconds,
+  fmt,
+  jeansParameter,
+  k2LoveNumber,
+  MOON_VOLATILE_TABLE,
+  toFinite,
+  vaporPressurePa,
+} from "./utils.js";
 import { calcPlanetExact } from "./planet.js";
 import { massToLuminosity, massToRadius } from "./star.js";
 
@@ -145,6 +155,72 @@ function compositionFromClass(className) {
     "Iron-rich": { mu: 100e9, Q: 80, compositionClass: "Iron-rich" },
   };
   return MAP[className] || null;
+}
+
+/**
+ * Analyse which volatile ices are present on a moon's surface, whether
+ * they sublimate, and whether the released gas is gravitationally retained
+ * over geological timescales.
+ *
+ * A species requires BOTH instantaneous retention (Jeans λ > 6) AND
+ * geological retention (escape timescale > system age) to sustain a
+ * thin atmosphere.  SO₂ from active volcanism is exempt from the
+ * timescale check because volcanic venting continuously resupplies gas.
+ *
+ * @param {number} densityGcm3 - Moon bulk density
+ * @param {number} tSurfK - Surface temperature (K)
+ * @param {number} vEscKmS - Escape velocity (km/s)
+ * @param {number} gravityMs2 - Moon surface gravity (m/s²)
+ * @param {number} ageGyr - System age (Gyr)
+ * @param {boolean} tidalFeedbackActive - True if moon is partially molten (volcanic)
+ * @returns {Array<Object>} Per-species volatile status
+ */
+function analyseMoonVolatiles(
+  densityGcm3,
+  tSurfK,
+  vEscKmS,
+  gravityMs2,
+  ageGyr,
+  tidalFeedbackActive,
+) {
+  const vEscMs = vEscKmS * 1000;
+  const ageSeconds = ageGyr * 3.156e16;
+  return MOON_VOLATILE_TABLE.map((vol) => {
+    // SO₂ requires active volcanism (direct volcanic venting); others need low density
+    const present = vol.species === "SO\u2082" ? tidalFeedbackActive : densityGcm3 < vol.maxRho;
+    // SO₂ on volcanically active moons is outgassed directly, not surface-sublimated
+    const sublimating =
+      present && (vol.species === "SO\u2082" ? tidalFeedbackActive : tSurfK >= vol.subK);
+    const lambda = sublimating ? jeansParameter(vol.massAmu, vEscMs, tSurfK) : 0;
+    const pressurePa = sublimating ? vaporPressurePa(vol, tSurfK) : 0;
+
+    // Instantaneous retention (λ > 6) is necessary but not sufficient.
+    // Geological retention requires escape timescale > system age,
+    // except for volcanically resupplied SO₂.
+    let retained = lambda > 6;
+    if (retained && vol.species !== "SO\u2082") {
+      const tEsc = escapeTimescaleSeconds(pressurePa, gravityMs2, vol.massAmu, tSurfK, lambda);
+      retained = tEsc > ageSeconds;
+    }
+
+    let status;
+    if (!present) status = "Absent";
+    else if (!sublimating) status = "Stable ice";
+    else if (retained) status = "Thin atmosphere";
+    else status = "Exosphere";
+
+    return {
+      species: vol.species,
+      label: vol.label,
+      massAmu: vol.massAmu,
+      present,
+      sublimating,
+      retained,
+      lambda,
+      pressurePa,
+      status,
+    };
+  });
 }
 
 function lockTimeSeconds(omega, aM, I, Q, mOtherKg, k2, radiusM) {
@@ -466,6 +542,20 @@ export function calcMoonExact({
   const tSurfK = tSurf4 > 0 ? Math.round(Math.sqrt(Math.sqrt(tSurf4))) : 0;
   const tSurfC = tSurfK - 273;
 
+  // ── Volatile inventory ────────────────────────────────────────────────
+  const volatileResults = analyseMoonVolatiles(
+    rhoMoonGcm3,
+    tSurfK,
+    vEscKmS,
+    gMoonMs2,
+    ageGyr,
+    tidalFeedbackActive,
+  );
+  const retained = volatileResults.filter((v) => v.status === "Thin atmosphere");
+  const primary =
+    retained.length > 0 ? retained.reduce((a, b) => (a.pressurePa > b.pressurePa ? a : b)) : null;
+  const stableIces = volatileResults.filter((v) => v.status === "Stable ice");
+
   // ── Magnetospheric radiation ────────────────────────────────────────
   // Dipole field at moon orbit: B(r) = B_surface × (R_planet / r)³
   const rPlanetKm = rPlanetRE * KM_PER_REARTH;
@@ -600,6 +690,13 @@ export function calcMoonExact({
       radiogenicWm2,
     },
 
+    volatiles: {
+      inventory: volatileResults,
+      primaryAtmosphere: primary ? primary.species : null,
+      surfacePressurePa: primary ? primary.pressurePa : 0,
+      hasVolatileAtmosphere: retained.length > 0,
+    },
+
     radiation: {
       magnetosphericRadRemDay,
       magnetosphericLabel: radiationLabel(magnetosphericRadRemDay),
@@ -700,6 +797,12 @@ export function calcMoonExact({
       moonLocked: moonLockedToPlanet,
       planetLockedMoon: planetLockedToMoon || "—",
       planetLockedStar: planetLockedToStar,
+      surfaceIces: stableIces.map((v) => v.species).join(", ") || "None",
+      volatileAtmosphere: primary
+        ? primary.pressurePa >= 1
+          ? primary.species + " (~" + fmt(primary.pressurePa, 0) + " Pa)"
+          : primary.species + " (~" + primary.pressurePa.toExponential(1) + " Pa)"
+        : "None",
       tMoonLock: fmt(tMoonLockGyr, 6) + " Gyr",
       tPlanetMoon: fmt(tPlanetLockToMoonGyr, 6) + " Gyr",
       tPlanetStar: fmt(tPlanetLockToStarGyr, 6) + " Gyr",

@@ -12,6 +12,7 @@ import {
   createCelestialVisualPreviewController,
   renderCelestialRecipeBatch,
 } from "./celestialVisualPreview.js";
+import { createTutorial } from "./tutorial.js";
 import {
   GAS_GIANT_RADIUS_MAX_RJ,
   GAS_GIANT_RADIUS_MIN_RJ,
@@ -137,6 +138,8 @@ const TIP_LABEL = {
     "Core radius as a fraction of the total planetary radius. Estimated via CRF \u2248 CMF^0.5 (Zeng & Jacobsen 2017).\n\nEarth: CRF \u2248 0.55 (core radius ~3,485 km).",
   "Water Regime":
     "Surface water state derived from water mass fraction (WMF).\n\nDry: < 0.01% WMF\nShallow oceans: 0.01\u20130.1% WMF (Earth ~0.02%\u2014thin but widespread oceans)\nExtensive oceans: 0.1\u20131% WMF (deeper oceans, less exposed land)\nGlobal ocean: 1\u201310% WMF (no exposed land)\nDeep ocean: 10\u201330% WMF (high-pressure ice at seafloor)\nIce world: > 30% WMF",
+  "Climate State":
+    "Global climate stability classification based on surface temperature and absorbed stellar flux.\n\nStable: normal climate regime.\nSnowball: global glaciation from ice-albedo feedback (T < 240 K with surface water).\nMoist greenhouse: stratospheric water vapour enables hydrogen escape, risking long-term ocean loss (T > 340 K).\nRunaway greenhouse: absorbed flux exceeds the outgoing radiation limit; surface water boils off (flux > 282 W/m\u00b2).\n\nDry worlds are always classified as Stable.\n\nReference: Goldblatt et al. (2013); Kasting (1988); Budyko (1969).",
   "Magnetic Field":
     "Estimated surface magnetic field strength relative to Earth (1.0\u00d7 = Earth's field).\n\nUses simplified Olson & Christensen (2006) dynamo scaling: field strength depends on core size, bulk density, heat flux, and core solidification state.\n\nTidal heating from assigned moons can extend core liquid lifetime, potentially sustaining a dynamo that would otherwise shut down. Shown as 'tidally sustained' when moon heating exceeds 10% of the planet's internal heat budget.\n\nA dipolar field (like Earth's) provides strong magnetospheric protection. Multipolar fields (slow rotators, P > ~96 h) are ~20\u00d7 weaker at the surface.\n\nStrong (> 0.5\u00d7): good protection from stellar wind\nModerate (0.1\u20130.5\u00d7): partial protection\nWeak (< 0.1\u00d7): minimal protection\nNone: no active dynamo",
   "Moon Tidal Heating":
@@ -177,11 +180,19 @@ const TIP_LABEL = {
     "Whether the planet's semi-major axis falls within the star's conservative habitable zone (liquid water on the surface). The HZ boundaries use temperature-dependent Seff polynomials.",
   "Liquid water":
     "Whether the average surface temperature and pressure allow liquid water to exist. Checks against the water phase diagram: pressure â‰¥ triple point (0.006 atm) and temperature between freezing (273 K) and the pressure-dependent boiling point.",
+  "Temp at periapsis":
+    "Equilibrium temperature (no greenhouse) at the closest orbital approach. Uses the same blackbody formula as average T_eq but substitutes the periapsis distance. Only shown for eccentric orbits (e > 0.005).",
+  "Nearest resonance":
+    "Checks whether this body\u2019s orbit lies close to a mean-motion resonance with a system gas giant. Shows the closest p:q ratio, the exact resonance distance, and how far off the planet is (%). Example: Pluto is in Neptune\u2019s 3:2 resonance.",
+  "Volatile ices":
+    "For dwarf planets (mass < 0.01 M\u2295), checks whether surface ices (N\u2082, CO, CH\u2084, H\u2082O, CO\u2082) can sublimate at periapsis and apoapsis temperatures. Transient atmospheres form when periapsis is warm enough to sublimate but apoapsis is not.",
   "Vegetation colour":
     "Estimated plant/vegetation colour based on photosynthetic pigment adaptation to the host star's spectrum.\n\nHotter stars (F/A) â†’ plants absorb UV/blue and reflect yellow-orange.\nSun-like stars (G) â†’ green, like Earth.\nCool stars (K) â†’ dark green/teal, broader absorption.\nRed dwarfs (M) â†’ near-black, absorbing all available light.\n\nGradient shows low concentration (pale) â†’ high concentration (deep).\n\nReferences: Kiang (2007), Lehmer et al. (2021), Arp et al. (2020), PanoptesV.",
   "Vegetation colour (twilight)":
     "Plant colours adapted to the permanent twilight zone on tidally locked worlds. Only shown for K/M star planets that are tidally locked.\n\nOrganisms at the terminator receive only scattered and refracted starlight, so pigments are paler and more tan/brown.",
   "Atmospheric circulation": "Derived circulation-cell summary for the current planet.",
+  "Derived atmosphere":
+    "Atmospheric pressure, composition, partial pressures, and escape analysis.",
 
   // â”€â”€ Gas giant inputs â”€â”€
   "GG Slot":
@@ -195,6 +206,16 @@ const TIP_LABEL = {
     "Sidereal rotation period in hours. Jupiter rotates in ~9.9 h, Saturn in ~10.7 h. Faster rotation strengthens the magnetic dynamo, increases the number of atmospheric jet streams (bands), and raises equatorial wind speeds.",
   "GG Metallicity":
     "Atmospheric heavy-element enrichment relative to solar (Z/Z\u2299). If blank, estimated from mass via Thorngren & Fortney 2019. Higher metallicity increases CH\u2084, NH\u2083, and H\u2082O cloud abundances. Jupiter is ~3* solar; Saturn ~10*; Uranus/Neptune ~50\u2013100*.",
+  "GG Eccentricity":
+    "Orbital eccentricity (0 = circular, 0.99 = nearly parabolic). Affects periapsis/apoapsis distances, equilibrium temperature variation, and tidal circularisation timescale.\n\nJupiter e = 0.048, Saturn e = 0.054, HD 80606b e = 0.93.",
+  "GG Inclination":
+    "Orbital inclination relative to the reference plane (0\u2013180\u00b0). Inclination > 90\u00b0 indicates a retrograde orbit.\n\nMost solar system giants have inclinations < 3\u00b0.",
+  "GG Axial Tilt":
+    "Obliquity \u2014 the angle between the rotation axis and the orbital normal (0\u2013180\u00b0). Affects seasonal atmospheric variation and ring illumination geometry.\n\nJupiter 3.1\u00b0, Saturn 26.7\u00b0, Uranus 97.8\u00b0, Neptune 28.3\u00b0.",
+  "GG Insolation":
+    "Stellar energy received relative to Earth (L\u2609 / d\u00b2). Drives cloud formation, Sudarsky classification, and weather patterns.",
+  "GG Nearest Resonance":
+    "Checks whether this gas giant\u2019s orbit lies close to a mean-motion resonance with another gas giant in the system. Example: Jupiter and Saturn are near a 5:2 resonance.",
 
   // â”€â”€ Gas giant outputs â”€â”€
   "GG Output Radius":
@@ -213,8 +234,14 @@ const TIP_LABEL = {
     "Detailed atmospheric, thermal, magnetic, and gravitational properties computed from the input parameters and host-star luminosity.",
   "GG Oblateness":
     "Rotational flattening f = (R_eq \u2212 R_pol)/R_eq. Faster spin \u2192 more oblate. Gas giants use f/q \u2248 0.75; ice giants \u2248 0.9. Jupiter f = 0.065, Saturn f = 0.098. J\u2082 is the quadrupole gravity moment.",
+  "GG Magnetic Field":
+    "Surface dipole field from Christensen (2009) energy-flux dynamo scaling, self-normalised to Jupiter (4.28 G).\n\nAccounts for: bulk density, internal heat flux (with 0.2 W/m\u00b2 compositional convection floor), dynamo shell geometry (metallic hydrogen depth for gas giants, ionic ocean for ice giants), and conductivity regime.\n\nGas giants: dipolar fields (deep metallic-H shell).\nIce giants: multipolar fields (thin ionic conducting shell).\n\nMoon tidal heating contributes to the heat flux driving the dynamo.",
+  "GG Moon Tidal":
+    "Tidal heating deposited on the gas giant by orbiting moons (Peale et al. 1979). Uses fluid Love number k\u2082 (Wahl+ 2016, Lainey+ 2017) and tidal quality factor Q. Jupiter Q \u2248 10\u2075, Saturn Q \u2248 3\u00d710\u00b3 (resonance locking, Fuller+ 2016). Fraction is relative to the giant's intrinsic internal heat flux.",
   "GG Mass Loss":
     "Energy-limited atmospheric escape driven by stellar XUV radiation (Ribas et al. 2005). Hot Jupiters at <0.1 AU can lose >10\u2076 kg/s. Evaporation timescale \u226b Hubble time for most giants. Roche lobe overflow flags planets exceeding the Eggleton (1983) tidal radius.",
+  "GG Jeans Escape":
+    "Per-species Jeans escape for the gas giant\u2019s atmosphere. The Jeans parameter \u03bb = v_esc\u00b2 \u00d7 m / (2 R T_exo) measures how firmly each species is bound at the exobase.\n\n\u03bb \u2265 6: Retained. 3 \u2264 \u03bb < 6: Marginal. \u03bb < 3: Lost.\n\nH\u2082 and He experience non-thermal escape (charge exchange, ion pickup) which raises effective retention thresholds.\n\nGas giant exobase temperature accounts for extended H\u2082/He envelope XUV absorption. Hot Jupiters can reach T_exo \u2248 10,000 K (hydrodynamic blow-off).\n\nReferences: Jeans (1925), Murray-Clay et al. (2009, ApJ 693, 23).",
   "GG Interior":
     "Heavy-element budget from Thorngren et al. (2016): M_Z = 49.3 \u00d7 (M/Mj)^0.61 M\u2295. Core mass capped at 25 M\u2295 per Juno constraints. Bulk metallicity Z = M_Z / M_total.",
   "GG Suggested Radius":
@@ -269,6 +296,64 @@ function numWithSlider(id, label, unit, hint, min, max, step, tipKey) {
 
 /* â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Planets page configures rocky planets and gas giants. Select a body " +
+      "from the dropdown at the top, or create a new one. Inputs are on the " +
+      "left; derived outputs update live on the right.",
+  },
+  {
+    title: "Creating Bodies",
+    body:
+      "Click New Rocky Planet or New Gas Giant. Assign each body to an orbital " +
+      "slot, then give it a name. The Delete button removes the selected body.",
+  },
+  {
+    title: "Mass and Composition",
+    body:
+      "For rocky planets, set Mass, Core Mass Fraction (CMF), and Water Mass " +
+      "Fraction (WMF). The Auto button for CMF derives a value from stellar " +
+      "metallicity. Composition class and radius are computed from these.",
+  },
+  {
+    title: "Orbit and Rotation",
+    body:
+      "Set semi-major axis, eccentricity, inclination, and rotation period. " +
+      "These determine year length, tidal locking, and day/night cycles. " +
+      "Habitable zone status appears in outputs.",
+  },
+  {
+    title: "Atmosphere",
+    body:
+      "Set atmospheric pressure and gas composition. Choose a greenhouse mode: " +
+      "Core uses CO\u2082/H\u2082O/CH\u2084, Full adds expert gases, Manual lets you set " +
+      "the effect directly. Toggle atmospheric escape to model gas loss.",
+  },
+  {
+    title: "Surface and Interior",
+    body:
+      "Choose a tectonic regime, set mantle oxidation, and configure internal " +
+      "heat. Vegetation colours can be auto-derived from star type or set " +
+      "manually. These shape the planet\u2019s visual appearance.",
+  },
+  {
+    title: "Gas Giants",
+    body:
+      "Gas giants use radius as the primary input; mass and metallicity can be " +
+      "auto-derived. Sudarsky class, ring type, and atmospheric bands are " +
+      "computed from temperature and composition.",
+  },
+  {
+    title: "Recipes",
+    body:
+      "Click Recipes on the appearance preview to apply preset configurations. " +
+      "Recipes set multiple inputs at once for quick planet archetypes like " +
+      "ocean worlds, desert planets, or ice giants.",
+  },
+];
+
 export function initPlanetPage(mountEl) {
   // CMF auto-mode state (shared between selection handler and renderRockyOutputs)
   let cmfAutoBtn = null;
@@ -310,7 +395,7 @@ export function initPlanetPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--inner-planets" aria-hidden="true"></span><span>Planets</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="planetTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Create and configure rocky planets and gas giants, then assign each to a system slot for placement and visualisation.</div>
@@ -353,6 +438,12 @@ export function initPlanetPage(mountEl) {
     </div>
   `;
   mountEl.appendChild(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.planet.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#planetTutorials"),
+  });
 
   const previewCleanupObserver = new MutationObserver(() => {
     if (wrap.isConnected) return;
@@ -1043,6 +1134,10 @@ export function initPlanetPage(mountEl) {
       .filter((m) => m.planetId === planet.id)
       .map((m) => m.inputs);
     const sov = getStarOverrides(world.star);
+    const sysGiants = listSystemGasGiants(world).map((g) => ({
+      name: g.name,
+      au: g.au,
+    }));
     const model = calcPlanetExact({
       starMassMsol: Number(world.star.massMsol),
       starAgeGyr: Number(world.star.ageGyr),
@@ -1052,6 +1147,7 @@ export function initPlanetPage(mountEl) {
       starEvolutionMode: sov.ev,
       planet: planet.inputs,
       moons: assignedMoons,
+      gasGiants: sysGiants,
     });
     const d = model.derived;
     const p = planet.inputs || {};
@@ -1075,6 +1171,12 @@ export function initPlanetPage(mountEl) {
 
     const items = [
       {
+        label: "Appearance",
+        value: d.compositionClass,
+        meta: d.waterRegime,
+        isRockyPreview: true,
+      },
+      {
         label: "Body Class",
         value: model.display.bodyClass,
         meta:
@@ -1083,15 +1185,38 @@ export function initPlanetPage(mountEl) {
             : "",
       },
       {
-        label: "Appearance",
-        value: d.compositionClass,
-        meta: d.waterRegime,
-        isRockyPreview: true,
-      },
-      {
         label: "Composition",
         value: model.display.compositionClass,
         meta: `CMF ${fmt(model.inputs.cmfPct, 1)}%${d.cmfIsAuto ? " (auto)" : ""}, WMF ${fmt(model.inputs.wmfPct, 2)}%`,
+      },
+      { label: "Radius", value: model.display.radius },
+      { label: "Density", value: model.display.density },
+      { label: "Gravity", value: model.display.gravity },
+      { label: "Escape Velocity", value: model.display.escape },
+      {
+        label: "Magnetic Field",
+        value: model.display.magneticField,
+        meta: d.dynamoActive
+          ? `${model.display.fieldMorphology}, ${d.coreState}` +
+            (d.planetTidalFraction > 0.1 ? " (tidally sustained)" : "")
+          : d.dynamoReason,
+      },
+      {
+        label: "Avg Surface Temp",
+        tipLabel: "Surface Temperature (Avg.)",
+        value: model.display.tempK,
+        meta: model.display.tempC,
+      },
+      {
+        label: "Climate State",
+        value: model.display.climateState,
+        meta: `Absorbed flux: ${model.display.absorbedFlux}`,
+      },
+      {
+        label: "Year Length",
+        tipLabel: "Year length",
+        value: model.display.yearDays,
+        meta: model.display.localDays,
       },
       {
         label: "Core Radius",
@@ -1101,14 +1226,6 @@ export function initPlanetPage(mountEl) {
         label: "Water Regime",
         value: model.display.waterRegime,
         meta: `~${fmt(model.inputs.wmfPct, 2)}% water by mass`,
-      },
-      {
-        label: "Magnetic Field",
-        value: model.display.magneticField,
-        meta: d.dynamoActive
-          ? `${model.display.fieldMorphology}, ${d.coreState}` +
-            (d.planetTidalFraction > 0.1 ? " (tidally sustained)" : "")
-          : d.dynamoReason,
       },
       model.display.moonTidalHeating && {
         label: "Moon Tidal Heating",
@@ -1138,23 +1255,7 @@ export function initPlanetPage(mountEl) {
         value: model.display.suggestedCmf + (d.cmfIsAuto ? " (active)" : ""),
         meta: model.display.suggestedCmfNote,
       },
-      { label: "Density", value: model.display.density },
-      { label: "Radius", value: model.display.radius },
-      { label: "Gravity", value: model.display.gravity },
-      { label: "Escape Velocity", value: model.display.escape },
-      {
-        label: "Avg Surface Temp",
-        tipLabel: "Surface Temperature (Avg.)",
-        value: model.display.tempK,
-        meta: model.display.tempC,
-      },
       { label: "Horizon Distance", value: model.display.horizon },
-      {
-        label: "Year Length",
-        tipLabel: "Year length",
-        value: model.display.yearDays,
-        meta: model.display.localDays,
-      },
       {
         label: "Star Apparent Size",
         tipLabel: "Star apparent size",
@@ -1299,7 +1400,7 @@ export function initPlanetPage(mountEl) {
     bodyOutputsEl.innerHTML = `
       <div class="kpi-grid">${kpiHtml}</div>
       <div style="margin-top:14px">
-        <div class="label">Derived details ${tipIcon(TIP_LABEL["Details"])}</div>
+        <div class="label">Orbit & habitability ${tipIcon(TIP_LABEL["Details"])}</div>
         <div class="derived-readout">Habitable zone: ${model.display.hz}
 In habitable zone: ${d.inHabitableZone ? "Yes" : "No"}
 Insolation: ${model.display.insolation}
@@ -1308,10 +1409,13 @@ Liquid water: ${d.liquidWaterPossible ? "Possible" : "Unlikely"}
 Rotation direction: ${d.rotationDirection}
 Tropics: ${d.tropics}\u00b0 N/S
 Polar circles: ${d.polarCircles}\u00b0 N/S
-Periapsis: ${model.display.peri}
-Apoapsis: ${model.display.apo}
-
-${ghModeLine}
+Periapsis: ${model.display.peri}${model.display.tempPeri ? ` (T\u2091q ${model.display.tempPeri})` : ""}
+Apoapsis: ${model.display.apo}${model.display.tempApo ? ` (T\u2091q ${model.display.tempApo})` : ""}
+Nearest resonance: ${model.display.resonance}${model.display.volatileSummary ? `\nVolatile ices: ${model.display.volatileSummary}` : ""}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Atmosphere ${tipIcon(TIP_LABEL["Derived atmosphere"])}</div>
+        <div class="derived-readout">${ghModeLine}
 Atmospheric pressure: ${model.display.pressureKpa}
 ${gasMixLine}
 ${ppLine}
@@ -1319,7 +1423,7 @@ Atmospheric weight: ${model.display.atmWeight}
 Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
       </div>
       <div style="margin-top:14px">
-        <div class="label">Derived atmospheric circulation ${tipIcon(TIP_LABEL["Atmospheric circulation"])}</div>
+        <div class="label">Atmospheric circulation ${tipIcon(TIP_LABEL["Atmospheric circulation"])}</div>
         <div class="derived-readout">${`Cell count: ${d.circulationCellCount}\n${d.circulationCellRanges.length ? d.circulationCellRanges.map((c) => `${c.name}: ${c.rangeDegNS}\u00b0 N/S`).join("\n") : "-"}`}</div>
       </div>
     `;
@@ -1825,6 +1929,45 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
         </div>
       </div>
 
+      <div style="height:10px"></div>
+      <div class="label">Orbit & Orientation</div>
+
+      <div class="form-row" style="margin-top:8px">
+        <div>
+          <div class="label">Eccentricity ${tipIcon(TIP_LABEL["GG Eccentricity"])}</div>
+          <div class="hint">0 = circular. Jupiter 0.048.</div>
+        </div>
+        <div class="input-pair">
+          <input id="ggEcc" type="number" step="0.001" value="${giant.eccentricity != null ? giant.eccentricity : ""}" placeholder="0" />
+          <input id="ggEccSlider" type="range" />
+          <div class="range-meta"><span>0</span><span>0.99</span></div>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:8px">
+        <div>
+          <div class="label">Inclination <span class="unit">\u00b0</span> ${tipIcon(TIP_LABEL["GG Inclination"])}</div>
+          <div class="hint">0\u00b0 = coplanar. >90\u00b0 = retrograde.</div>
+        </div>
+        <div class="input-pair">
+          <input id="ggInc" type="number" step="0.1" value="${giant.inclinationDeg != null ? giant.inclinationDeg : ""}" placeholder="0" />
+          <input id="ggIncSlider" type="range" />
+          <div class="range-meta"><span>0</span><span>180</span></div>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top:8px">
+        <div>
+          <div class="label">Axial Tilt <span class="unit">\u00b0</span> ${tipIcon(TIP_LABEL["GG Axial Tilt"])}</div>
+          <div class="hint">Jupiter 3.1\u00b0, Saturn 26.7\u00b0, Uranus 97.8\u00b0.</div>
+        </div>
+        <div class="input-pair">
+          <input id="ggTilt" type="number" step="0.1" value="${giant.axialTiltDeg != null ? giant.axialTiltDeg : ""}" placeholder="0" />
+          <input id="ggTiltSlider" type="range" />
+          <div class="range-meta"><span>0</span><span>180</span></div>
+        </div>
+      </div>
+
       <!-- Appearance is data-driven; recipe picker lives in the KPI output -->
     `;
 
@@ -1855,6 +1998,12 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
       g.rotationPeriodHours = rotVal !== "" ? Number(rotVal) || null : null;
       const metVal = bodyInputsEl.querySelector("#ggMetallicity").value;
       g.metallicity = metVal !== "" ? Number(metVal) || null : null;
+      const eccVal = bodyInputsEl.querySelector("#ggEcc").value;
+      g.eccentricity = eccVal !== "" ? Number(eccVal) || null : null;
+      const incVal = bodyInputsEl.querySelector("#ggInc").value;
+      g.inclinationDeg = incVal !== "" ? Number(incVal) || null : null;
+      const tiltVal = bodyInputsEl.querySelector("#ggTilt").value;
+      g.axialTiltDeg = tiltVal !== "" ? Number(tiltVal) || null : null;
       // Auto-derive visual style and rings from physics
       const starData = {
         starMassMsol: Number(world.star.massMsol) || 1,
@@ -1866,8 +2015,15 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
         massMjup: g.massMjup,
         radiusRj: g.radiusRj,
         orbitAu: Number(g.au) || sysModel.frostLineAu,
+        eccentricity: g.eccentricity,
+        inclinationDeg: g.inclinationDeg,
+        axialTiltDeg: g.axialTiltDeg,
         rotationPeriodHours: g.rotationPeriodHours,
         metallicity: g.metallicity,
+        otherGiants: now.filter((x) => x.id !== g.id).map((x) => ({ name: x.name, au: x.au })),
+        moons: listMoons(loadWorld())
+          .filter((mm) => mm.planetId === g.id)
+          .map((mm) => mm.inputs),
         ...starData,
       });
       g.style = suggestStyles(ggCalc).primary;
@@ -1948,6 +2104,48 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
       },
     });
 
+    const eccEl = bodyInputsEl.querySelector("#ggEcc");
+    const eccSlider = bodyInputsEl.querySelector("#ggEccSlider");
+    bindNumberAndSlider({
+      numberEl: eccEl,
+      sliderEl: eccSlider,
+      min: 0,
+      max: 0.99,
+      step: 0.001,
+      mode: "auto",
+      onChange: () => {
+        if (!hydrating) saveGiant();
+      },
+    });
+
+    const incEl = bodyInputsEl.querySelector("#ggInc");
+    const incSlider = bodyInputsEl.querySelector("#ggIncSlider");
+    bindNumberAndSlider({
+      numberEl: incEl,
+      sliderEl: incSlider,
+      min: 0,
+      max: 180,
+      step: 0.1,
+      mode: "auto",
+      onChange: () => {
+        if (!hydrating) saveGiant();
+      },
+    });
+
+    const tiltEl = bodyInputsEl.querySelector("#ggTilt");
+    const tiltSlider = bodyInputsEl.querySelector("#ggTiltSlider");
+    bindNumberAndSlider({
+      numberEl: tiltEl,
+      sliderEl: tiltSlider,
+      min: 0,
+      max: 180,
+      step: 0.1,
+      mode: "auto",
+      onChange: () => {
+        if (!hydrating) saveGiant();
+      },
+    });
+
     bodyInputsEl.querySelector("#ggSlot").addEventListener("change", () => {
       if (hydrating) return;
       bodyInputsEl.querySelector("#ggCustomAuRow").style.display = bodyInputsEl.querySelector(
@@ -1963,7 +2161,7 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
     });
 
     // Fire initial slider sync
-    [auEl, radiusEl, massEl, rotEl, metEl].forEach((el) => {
+    [auEl, radiusEl, massEl, rotEl, metEl, eccEl, incEl, tiltEl].forEach((el) => {
       el.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
@@ -1981,12 +2179,22 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
       starAgeGyr: Number(world.star.ageGyr) || 4.6,
       starRadiusRsol: sysModel.star.radiusRsol,
     };
+    const allGiants = listSystemGasGiants(world);
     const m = calcGasGiant({
       massMjup: giant.massMjup,
       radiusRj: giant.radiusRj,
       orbitAu: Number(giant.au) || sysModel.frostLineAu,
+      eccentricity: giant.eccentricity,
+      inclinationDeg: giant.inclinationDeg,
+      axialTiltDeg: giant.axialTiltDeg,
       rotationPeriodHours: giant.rotationPeriodHours,
       metallicity: giant.metallicity,
+      otherGiants: allGiants
+        .filter((x) => x.id !== giant.id)
+        .map((x) => ({ name: x.name, au: x.au })),
+      moons: listMoons(world)
+        .filter((mm) => mm.planetId === giant.id)
+        .map((mm) => mm.inputs),
       ...starData,
     });
     const clouds = m.clouds.map((c) => c.name).join(", ") || "None";
@@ -2038,14 +2246,14 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
           <div class="kpi__meta">${massNote}</div>
         </div></div>
         <div class="kpi-wrap"><div class="kpi">
-          <div class="kpi__label">Radius ${tipIcon(TIP_LABEL["GG Output Radius"])}</div>
-          <div class="kpi__value">${m.display.radius}</div>
-          <div class="kpi__meta">${radiusNote}</div>
-        </div></div>
-        <div class="kpi-wrap"><div class="kpi">
           <div class="kpi__label">Metallicity ${tipIcon(TIP_LABEL["GG Metallicity"])}</div>
           <div class="kpi__value">${m.display.metallicity}</div>
           <div class="kpi__meta">${metNote}</div>
+        </div></div>
+        <div class="kpi-wrap"><div class="kpi">
+          <div class="kpi__label">Radius ${tipIcon(TIP_LABEL["GG Output Radius"])}</div>
+          <div class="kpi__value">${m.display.radius}</div>
+          <div class="kpi__meta">${radiusNote}</div>
         </div></div>
         <div class="kpi-wrap"><div class="kpi">
           <div class="kpi__label">Density ${tipIcon(TIP_LABEL["GG Density"])}</div>
@@ -2054,6 +2262,15 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
         <div class="kpi-wrap"><div class="kpi">
           <div class="kpi__label">Gravity ${tipIcon(TIP_LABEL["GG Gravity"])}</div>
           <div class="kpi__value">${m.display.gravity}</div>
+        </div></div>
+        <div class="kpi-wrap"><div class="kpi">
+          <div class="kpi__label">Escape Velocity ${tipIcon(TIP_LABEL["GG Escape Velocity"])}</div>
+          <div class="kpi__value">${m.display.escapeVelocity}</div>
+        </div></div>
+        <div class="kpi-wrap"><div class="kpi">
+          <div class="kpi__label">Magnetic Field ${tipIcon(TIP_LABEL["GG Magnetic Field"])}</div>
+          <div class="kpi__value">${m.display.magneticField}</div>
+          <div class="kpi__meta">${m.display.magneticMorphology} — ${m.magnetic.dynamoReason}</div>
         </div></div>
         <div class="kpi-wrap"><div class="kpi">
           <div class="kpi__label">Equilibrium Temp ${tipIcon(TIP_LABEL["GG Equilibrium Temp"])}</div>
@@ -2067,41 +2284,65 @@ Atmospheric density: ${model.display.atmDensity}${gasMixNote}${jeansLines}</div>
         </div></div>
       </div>
       <div style="margin-top:14px">
-        <div class="label">Derived details ${tipIcon(TIP_LABEL["GG Derived"])}</div>
-        <div class="derived-readout">Atmosphere: H\u2082 ${m.atmosphere.h2Pct}%, He ${m.atmosphere.hePct}%${m.atmosphere.ch4Pct > 0 ? `, CH\u2084 ${m.atmosphere.ch4Pct}%` : ""}${m.atmosphere.coPct > 0 ? `, CO ${m.atmosphere.coPct}%` : ""}
+        <div class="label">Atmosphere ${tipIcon(TIP_LABEL["GG Derived"])}</div>
+        <div class="derived-readout">H₂ ${m.atmosphere.h2Pct}%, He ${m.atmosphere.hePct}%${m.atmosphere.ch4Pct > 0 ? `, CH₄ ${m.atmosphere.ch4Pct}%` : ""}${m.atmosphere.coPct > 0 ? `, CO ${m.atmosphere.coPct}%` : ""}
 Dominant trace: ${m.atmosphere.dominantTrace}
 Cloud layers: ${clouds}
 Bond albedo: ${fmt(m.thermal.bondAlbedo, 2)}
-Internal heat ratio: ${fmt(m.thermal.internalHeatRatio, 2)}
-
-Magnetic field: ${m.display.magneticField}
-Magnetosphere: ${m.display.magnetosphere}
-
-Hill sphere: ${m.display.hillSphere}
+Internal heat ratio: ${fmt(m.thermal.internalHeatRatio, 2)}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Orbit</div>
+        <div class="derived-readout">Insolation: ${m.display.insolation} ${tipIcon(TIP_LABEL["GG Insolation"])}${m.display.peri ? `\nPeriapsis: ${m.display.peri} (${m.display.tempPeri})` : ""}${m.display.apo ? `\nApoapsis: ${m.display.apo} (${m.display.tempApo})` : ""}
+Orbital direction: ${m.display.orbitalDirection}
+Local days per year: ${m.display.localDaysPerYear}
+Nearest resonance: ${m.display.resonance} ${tipIcon(TIP_LABEL["GG Nearest Resonance"])}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Magnetism</div>
+        <div class="derived-readout">Magnetosphere: ${m.display.magnetosphere}
+Moon tidal heating: ${m.display.moonTidalHeating} ${tipIcon(TIP_LABEL["GG Moon Tidal"])}
+Atmospheric sputtering: ${m.display.sputteringPlasma}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Gravity &amp; zones</div>
+        <div class="derived-readout">Hill sphere: ${m.display.hillSphere}
 Roche limit: ${m.display.rocheLimit}
 Chaotic zone: ${m.display.chaoticZone}
-Ring zone: ${fmt(m.gravity.ringZoneInnerKm, 0)}\u2013${fmt(m.gravity.ringZoneOuterKm, 0)} km
-
-Dynamics: ${m.display.bands}
+Ring zone: ${fmt(m.gravity.ringZoneInnerKm, 0)}–${fmt(m.gravity.ringZoneOuterKm, 0)} km</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Dynamics</div>
+        <div class="derived-readout">Bands: ${m.display.bands}
 Wind speed: ${m.display.windSpeed}
-
 Oblateness: ${m.display.oblateness} ${tipIcon(TIP_LABEL["GG Oblateness"])}
-Equatorial/Polar: ${m.display.equatorialRadius}
-
-Interior: ${m.display.heavyElements} ${tipIcon(TIP_LABEL["GG Interior"])}
-Bulk metallicity: ${m.display.bulkMetallicity}
-
-Mass loss: ${m.display.massLossRate} ${tipIcon(TIP_LABEL["GG Mass Loss"])}
+Equatorial/Polar: ${m.display.equatorialRadius}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Interior ${tipIcon(TIP_LABEL["GG Interior"])}</div>
+        <div class="derived-readout">Heavy elements: ${m.display.heavyElements}
+Bulk metallicity: ${m.display.bulkMetallicity}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Stability ${tipIcon(TIP_LABEL["GG Mass Loss"])}</div>
+        <div class="derived-readout">Mass loss: ${m.display.massLossRate}
 Evaporation: ${m.display.evaporationTimescale}
 Roche lobe: ${m.display.rocheLobeRadius}
-
-Suggested radius: ${m.display.suggestedRadius} ${tipIcon(TIP_LABEL["GG Suggested Radius"])}
-${m.display.radiusAgeNote}
-
-Rings: ${m.display.ringType} ${tipIcon(TIP_LABEL["GG Ring Properties"])}
-Ring details: ${m.display.ringDetails}
-
-Tidal locking: ${m.display.tidalLocking} ${tipIcon(TIP_LABEL["GG Tidal"])}
+${m.display.jeansEscape} ${tipIcon(TIP_LABEL["GG Jeans Escape"])}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Suggested radius ${tipIcon(TIP_LABEL["GG Suggested Radius"])}</div>
+        <div class="derived-readout">${m.display.suggestedRadius}
+${m.display.radiusAgeNote}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Rings ${tipIcon(TIP_LABEL["GG Ring Properties"])}</div>
+        <div class="derived-readout">Type: ${m.display.ringType}
+Details: ${m.display.ringDetails}</div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="label">Tidal evolution ${tipIcon(TIP_LABEL["GG Tidal"])}</div>
+        <div class="derived-readout">Tidal locking: ${m.display.tidalLocking}
 Circularisation: ${m.display.circularisation}</div>
       </div>
     `;

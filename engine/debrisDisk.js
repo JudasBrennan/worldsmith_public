@@ -218,6 +218,75 @@ export function calcDebrisDiskSuggestions({ gasGiants, starLuminosityLsol, count
   return n > 0 ? suggestions.slice(0, n) : suggestions;
 }
 
+/* ── Resonance finder (any body vs gas giants) ─────────────────── */
+
+const RES_3_1 = (3 / 1) ** (2 / 3);
+const RES_4_1 = (4 / 1) ** (2 / 3);
+const RES_1_3 = (1 / 3) ** (2 / 3);
+const RES_2_3 = (2 / 3) ** (2 / 3);
+const RES_2_5 = (2 / 5) ** (2 / 3);
+
+/** All resonance ratios to check (exterior and interior). */
+const ALL_RESONANCES = [
+  /* exterior: body farther than giant */
+  { p: 3, q: 2, factor: RES_3_2 },
+  { p: 2, q: 1, factor: RES_2_1 },
+  { p: 5, q: 2, factor: RES_5_2 },
+  { p: 3, q: 1, factor: RES_3_1 },
+  { p: 4, q: 1, factor: RES_4_1 },
+  /* interior: body closer than giant */
+  { p: 1, q: 2, factor: RES_1_2 },
+  { p: 1, q: 3, factor: RES_1_3 },
+  { p: 1, q: 4, factor: RES_1_4 },
+  { p: 2, q: 3, factor: RES_2_3 },
+  { p: 2, q: 5, factor: RES_2_5 },
+];
+
+/**
+ * Find the nearest mean-motion resonance between a body and a set of
+ * gas giants.  Returns the closest match within the given tolerance,
+ * or null if none is close enough.
+ *
+ * @param {number} bodyAu  Semi-major axis of the body (AU)
+ * @param {Array<{name:string, au:number}>} gasGiants
+ * @param {number} [tolerance=0.08]  Fractional tolerance (default 8%)
+ * @returns {?{giantName:string, giantAu:number, ratio:string,
+ *             resonanceAu:number, deltaAu:number, deltaPct:number, label:string}}
+ */
+export function findNearestResonance(bodyAu, gasGiants, tolerance = 0.08) {
+  const body = toFinite(bodyAu, 0);
+  if (body <= 0) return null;
+
+  const giants = Array.isArray(gasGiants)
+    ? gasGiants.filter((g) => Number.isFinite(Number(g.au)) && Number(g.au) > 0)
+    : [];
+  if (giants.length === 0) return null;
+
+  let best = null;
+
+  for (const g of giants) {
+    const gAu = Number(g.au);
+    for (const res of ALL_RESONANCES) {
+      const resAu = gAu * res.factor;
+      const delta = Math.abs(body - resAu);
+      const pct = delta / resAu;
+      if (pct <= tolerance && (!best || pct < best.deltaPct)) {
+        best = {
+          giantName: g.name || "Gas giant",
+          giantAu: round(gAu, 4),
+          ratio: `${res.p}:${res.q}`,
+          resonanceAu: round(resAu, 4),
+          deltaAu: round(delta, 4),
+          deltaPct: pct,
+          label: `${g.name || "Giant"} ${res.p}:${res.q}`,
+        };
+      }
+    }
+  }
+
+  return best;
+}
+
 /* ── Composition classification ──────────────────────────────────── */
 
 function classifyComposition(tempInnerK, tempMidK, tempOuterK, starMetallicityFeH = 0) {

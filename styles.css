@@ -420,6 +420,9 @@ a:hover {
 .icon--population {
   background-image: url("./assets/icons/population.svg");
 }
+.icon--lessons {
+  background-image: url("./assets/icons/lessons.svg");
+}
 
 .panel {
   background: rgba(var(--panel-rgb), 0.7);
@@ -908,6 +911,9 @@ button.danger:hover {
 .planet-card__meta {
   font-size: 12px;
   opacity: 0.75;
+}
+#moonsList .planet-card {
+  margin: 5px 0 5px 0;
 }
 .dropzone {
   border: 1px dashed rgba(var(--overlay-color), 0.18);
@@ -1486,7 +1492,7 @@ input.auto-value {
 }
 .physics-trio-toggle input[type="radio"] {
   position: absolute;
-  height: 30px;
+  height: 50px;
   top: 2px;
   margin: 0;
   opacity: 0;
@@ -1562,7 +1568,7 @@ input.auto-value {
   z-index: 3;
 }
 .physics-duo-toggle input[type="radio"]:nth-of-type(1) {
-  left: 0;
+  left: 1px;
 }
 .physics-duo-toggle input[type="radio"]:nth-of-type(2) {
   left: 50%;
@@ -1916,8 +1922,8 @@ input.auto-value {
   justify-content: center;
   background: radial-gradient(
     ellipse at 50% 40%,
-    rgba(15, 20, 42, 0.94) 0%,
-    rgba(5, 9, 20, 0.99) 70%
+    rgba(var(--bg-rgb), 0.94) 0%,
+    rgba(var(--bg-rgb), 0.99) 70%
   );
   backdrop-filter: blur(6px);
   opacity: 1;
@@ -2917,17 +2923,201 @@ input.auto-value {
 }
 .calendar-workspace {
   display: grid;
-  grid-template-columns: minmax(360px, 520px) minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
   gap: var(--gap);
   align-items: start;
 }
-.calendar-controls-stack {
+.calendar-toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--pad);
+  background: var(--panel);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.calendar-toolbar__left,
+.calendar-toolbar__nav,
+.calendar-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.calendar-toolbar__nav {
+  margin: 0 auto;
+}
+.calendar-toolbar__profile {
+  max-width: 150px;
+}
+.calendar-toolbar__year {
+  width: 72px;
+}
+.calendar-toolbar__select {
+  max-width: 140px;
+}
+.calendar-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.06);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.calendar-toolbar__btn:hover {
+  background: rgba(var(--overlay-color), 0.12);
+  border-color: rgba(var(--overlay-color), 0.18);
+}
+.calendar-toolbar__btn.is-active {
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+.calendar-drawer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+  background: var(--panel);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  animation: drawer-slide-in 0.15s ease;
+}
+.calendar-drawer.is-hidden {
+  display: none;
+}
+.calendar-drawer-backdrop {
+  display: none;
+}
+.calendar-drawer-backdrop.is-visible {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 2999;
+  background: rgba(0, 0, 0, 0.35);
+}
+@keyframes drawer-slide-in {
+  from {
+    transform: translateX(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.calendar-drawer__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 0;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.calendar-drawer__tab {
+  flex: 1;
+  padding: 8px 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.calendar-drawer__tab:hover {
+  background: rgba(var(--overlay-color), 0.06);
+  color: var(--text);
+}
+.calendar-drawer__tab.is-active {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+.calendar-drawer__body {
+  padding: var(--pad);
+  flex: 1;
+  min-height: 0;
+}
+.calendar-drawer__section {
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  min-width: 0;
 }
-.calendar-controls-stack .grid-2 {
+.calendar-drawer__section[hidden] {
+  display: none;
+}
+.calendar-drawer__subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 0 var(--gap);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--gap);
+}
+.calendar-drawer__subtab {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.calendar-drawer__subtab:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.calendar-drawer__subtab.is-active {
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+[data-rules-section][hidden] {
+  display: none;
+}
+.calendar-derived-details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--gap);
+  margin-bottom: var(--gap);
+}
+.calendar-derived-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: var(--gap);
+}
+.calendar-derived-details[open] > summary {
+  margin-bottom: var(--gap);
+}
+.calendar-workspace.drawer-open {
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+}
+.calendar-workspace:not(.drawer-open) {
+  grid-template-columns: 1fr;
+}
+.calendar-drawer__section .grid-2 {
   grid-template-columns: 1fr;
 }
 .calendar-collapsible-header {
@@ -2984,7 +3174,7 @@ input.auto-value {
 .calendar-collapse-toggle[data-state="collapsed"] .calendar-collapse-toggle__icon {
   transform: rotate(45deg);
 }
-.calendar-controls-stack .panel.is-collapsed .panel__header {
+.calendar-drawer__section .panel.is-collapsed .panel__header {
   border-bottom-color: transparent;
 }
 .calendar-month-panel {
@@ -3963,8 +4153,19 @@ input.auto-value {
   margin-top: 8px;
 }
 @media (max-width: 1200px) {
-  .calendar-workspace {
+  .calendar-workspace,
+  .calendar-workspace.drawer-open {
     grid-template-columns: 1fr;
+  }
+  .calendar-drawer {
+    position: fixed;
+    inset: 0;
+    right: auto;
+    width: min(85vw, 420px);
+    z-index: 3000;
+    max-height: 100vh;
+    border-radius: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
   }
   .calendar-special-form,
   .calendar-special-form--leap {
@@ -4003,11 +4204,136 @@ input.auto-value {
   }
 }
 @media (max-width: 640px) {
+  .calendar-toolbar {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .calendar-toolbar__nav {
+    order: 1;
+    justify-content: center;
+  }
   .calendar-season-band {
     padding-bottom: 8px;
   }
   .calendar-season-band__tick-label {
     display: none;
+  }
+}
+
+/* ── Tutorial toast panel (shared) ────────────────────────────── */
+
+.ws-tutorial {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 3500;
+  width: 340px;
+  max-width: calc(100vw - 48px);
+  background: rgba(var(--panel-rgb), 0.94);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  border-radius: var(--radius);
+  padding: var(--pad) 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  animation: ws-tutorial-in 0.25s ease-out;
+  font-family: var(--sans);
+}
+@keyframes ws-tutorial-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.ws-tutorial__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.ws-tutorial__step-indicator {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ws-tutorial__close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+.ws-tutorial__close:hover {
+  color: var(--text);
+}
+.ws-tutorial__title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ws-tutorial__body {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.ws-tutorial__nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ws-tutorial__nav-btn {
+  padding: 5px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.06);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.ws-tutorial__nav-btn:hover:not(:disabled) {
+  background: rgba(var(--overlay-color), 0.12);
+  border-color: rgba(var(--overlay-color), 0.18);
+}
+.ws-tutorial__nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ws-tutorial-trigger {
+  background: none;
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--sans);
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.ws-tutorial-trigger:hover,
+.ws-tutorial-trigger.is-active {
+  color: var(--text);
+  border-color: rgba(var(--overlay-color), 0.2);
+}
+[data-theme="light"] .ws-tutorial {
+  background: rgba(var(--panel-rgb), 0.96);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+@media (max-width: 640px) {
+  .ws-tutorial {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
   }
 }
 
@@ -4242,6 +4568,180 @@ input.auto-value {
   .sci-try__row input[type="number"] {
     max-width: 100%;
   }
+}
+
+/* ── Lessons page ──────────────────────────────────────────────── */
+
+.les-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 12px 0 0;
+}
+.les-toc__unit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.les-toc__unit-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.les-toc__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.les-toc__link {
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(var(--overlay-color), 0.04);
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  text-decoration: none;
+}
+.les-toc__link:hover {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.les-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.les-section {
+  background: rgba(var(--panel-rgb), 0.7);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.les-section__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(var(--overlay-color), 0.03);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.les-section__summary::-webkit-details-marker {
+  display: none;
+}
+.les-section__summary::before {
+  content: "\25B6";
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.les-section[open] > .les-section__summary {
+  border-bottom: 1px solid var(--border);
+}
+.les-section[open] > .les-section__summary::before {
+  transform: rotate(90deg);
+}
+.les-section__number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 24px;
+}
+.les-section__title {
+  font-weight: 700;
+  font-size: 15px;
+  flex: 1;
+}
+.les-section__meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+.les-section__body {
+  padding: 16px;
+}
+
+.les-concept {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(var(--overlay-color), 0.02);
+  margin-bottom: 12px;
+}
+.les-concept:last-child {
+  margin-bottom: 0;
+}
+.les-concept__name {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.les-concept__body {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.les-concept__body p {
+  margin: 6px 0;
+}
+.les-concept__body b {
+  color: var(--text);
+}
+
+.les-analogy {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 10px 0;
+  background: rgba(var(--accent-rgb), 0.08);
+  border-left: 3px solid var(--accent);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.les-analogy__icon {
+  margin-right: 8px;
+}
+
+.les-key-idea {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 10px 0;
+  background: rgba(var(--good-rgb, 76, 175, 80), 0.08);
+  border-left: 3px solid var(--good);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  font-weight: 500;
+}
+.les-key-idea__icon {
+  margin-right: 8px;
+}
+
+.les-unit-divider {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 8px 0 0;
+}
+
+.les-mode-toggle {
+  min-width: 200px;
+  width: auto;
 }
 
 /* ── Sky canvas (apparent page) ─────────────────────────────── */
@@ -4650,4 +5150,507 @@ input.auto-value {
 .pop-dist-table td {
   padding: 2px 8px;
   border-bottom: 1px solid var(--border);
+}
+
+/* Science Visualiser */
+.science-viz__lede {
+  margin: 0;
+  max-width: 88ch;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.science-viz__subsection--first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.science-viz__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.science-viz__field input,
+.science-viz__field select {
+  width: 100%;
+}
+.science-viz__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+}
+.science-viz__summary-line {
+  margin: 10px 0 0;
+}
+.science-viz__results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.science-viz__result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--overlay-color), 0.03);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.science-viz__result:hover,
+.science-viz__result.is-active {
+  border-color: rgba(var(--accent-rgb), 0.38);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+.science-viz__result-title {
+  font-weight: 600;
+}
+.science-viz__result-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+.science-viz__checklist {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.science-viz__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.03);
+  font-size: 13px;
+}
+.science-viz__check input {
+  margin: 0;
+}
+.science-viz__canvas {
+  min-height: 620px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--overlay-color), 0.08);
+  background:
+    linear-gradient(180deg, rgba(var(--panel-rgb), 0.5), rgba(var(--bg-rgb), 0.42)),
+    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.12), transparent 48%);
+  overflow: auto;
+}
+.science-viz__svg {
+  display: block;
+  width: 100%;
+  min-width: 1080px;
+  height: auto;
+}
+.science-viz__section rect {
+  fill: rgba(var(--overlay-color), 0.03);
+  stroke: rgba(var(--overlay-color), 0.08);
+}
+.science-viz__section-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.science-viz__edge {
+  fill: none;
+  stroke-width: 2.4;
+  opacity: 0.78;
+  transition:
+    opacity 180ms ease,
+    stroke-width 180ms ease;
+}
+.science-viz__edge--runtime {
+  stroke: rgba(var(--accent-rgb), 0.82);
+}
+.science-viz__edge--documented {
+  stroke: rgba(var(--good-rgb), 0.8);
+  stroke-dasharray: 9 7;
+}
+.science-viz__edge--curated {
+  stroke: rgba(var(--warn-rgb), 0.8);
+  stroke-dasharray: 3 7;
+}
+.science-viz__edge.is-connected {
+  opacity: 1;
+  stroke-width: 3;
+}
+.science-viz__edge.is-muted {
+  opacity: 0.16;
+}
+.science-viz__node {
+  cursor: pointer;
+  transition: opacity 180ms ease;
+}
+.science-viz__node rect {
+  fill: rgba(var(--panel-rgb), 0.94);
+  stroke: rgba(var(--overlay-color), 0.12);
+  stroke-width: 1.2;
+  transition:
+    stroke 180ms ease,
+    stroke-width 180ms ease,
+    fill 180ms ease;
+}
+.science-viz__node--input rect {
+  fill: rgba(var(--accent-rgb), 0.12);
+  stroke: rgba(var(--accent-rgb), 0.34);
+}
+.science-viz__node--model rect {
+  fill: rgba(var(--warn-rgb), 0.12);
+  stroke: rgba(var(--warn-rgb), 0.34);
+}
+.science-viz__node--classifier rect {
+  fill: rgba(var(--good-rgb), 0.1);
+  stroke: rgba(var(--good-rgb), 0.3);
+}
+.science-viz__node.is-selected rect {
+  stroke: rgba(var(--accent-rgb), 0.96);
+  stroke-width: 2.8;
+}
+.science-viz__node.is-connected rect {
+  stroke: rgba(var(--accent-rgb), 0.48);
+}
+.science-viz__node.is-muted {
+  opacity: 0.32;
+}
+.science-viz__node:focus rect,
+.science-viz__node:hover rect {
+  stroke-width: 2;
+}
+.science-viz__node-label,
+.science-viz__node-meta {
+  pointer-events: none;
+}
+.science-viz__node-label {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.science-viz__node-meta {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.science-viz__inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.science-viz__inspector-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.science-viz__eyebrow,
+.science-viz__label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.science-viz__inspector-title {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+.science-viz__summary {
+  margin: 0;
+  line-height: 1.55;
+}
+.science-viz__formula {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--overlay-color), 0.08);
+  background: rgba(var(--overlay-color), 0.03);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.science-viz__inspector-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.science-viz__chip-row,
+.science-viz__code-row,
+.science-viz__tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.science-viz__chip,
+.science-viz__link-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--overlay-color), 0.03);
+  color: var(--text);
+  font-size: 12px;
+  text-decoration: none;
+}
+.science-viz__chip {
+  cursor: pointer;
+}
+.science-viz__chip:hover,
+.science-viz__link-chip:hover {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  background: rgba(var(--accent-rgb), 0.08);
+  text-decoration: none;
+}
+.science-viz__code-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--overlay-color), 0.03);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.science-viz__tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(var(--overlay-color), 0.06);
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: lowercase;
+}
+.science-viz__empty {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.science-viz__empty--canvas {
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  text-align: center;
+}
+.science-viz__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(var(--overlay-color), 0.08);
+  background: rgba(var(--overlay-color), 0.03);
+  margin-top: 10px;
+}
+.science-viz__legend-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.science-viz__legend-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.science-viz__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.science-viz__legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1.2px solid rgba(var(--overlay-color), 0.12);
+  background: rgba(var(--panel-rgb), 0.94);
+}
+.science-viz__legend-swatch--input {
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.34);
+}
+.science-viz__legend-swatch--model {
+  background: rgba(var(--warn-rgb), 0.12);
+  border-color: rgba(var(--warn-rgb), 0.34);
+}
+.science-viz__legend-swatch--classifier {
+  background: rgba(var(--good-rgb), 0.1);
+  border-color: rgba(var(--good-rgb), 0.3);
+}
+.science-viz__legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 0;
+  border-top: 2.4px solid rgba(var(--accent-rgb), 0.82);
+}
+.science-viz__legend-line--documented {
+  border-top-style: dashed;
+  border-top-color: rgba(var(--good-rgb), 0.8);
+}
+.science-viz__legend-line--curated {
+  border-top-style: dotted;
+  border-top-color: rgba(var(--warn-rgb), 0.8);
+}
+
+@media (max-width: 1100px) {
+  .science-viz__row,
+  .science-viz__inspector-grid,
+  .science-viz__checklist {
+    grid-template-columns: 1fr;
+  }
+
+  .science-viz__canvas {
+    min-height: 520px;
+  }
+}
+
+/* Science Visualiser - visualiser-style layout overrides */
+.science-viz-layout {
+  display: block;
+}
+.science-viz-panel {
+  overflow: hidden;
+}
+.science-viz-canvas-area {
+  position: relative;
+}
+.science-viz__actions {
+  margin-left: auto;
+}
+.science-viz-controls-dropdown {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.science-viz-controls-dropdown__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.science-viz-controls-dropdown__row + .science-viz-controls-dropdown__row {
+  margin-top: 12px;
+}
+.science-viz-controls-dropdown__row--dual > * {
+  flex: 1 1 280px;
+}
+.science-viz__dropdown-block {
+  flex: 1 1 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.06);
+}
+.science-viz__dropdown-block--results {
+  max-height: 240px;
+  overflow: auto;
+}
+.science-viz__dropdown-label,
+.science-viz__details-title {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.science-viz__dropdown-label {
+  margin-bottom: 8px;
+}
+.science-viz__field--grow {
+  flex: 1 1 100%;
+}
+.science-viz__field--select {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--overlay-color), 0.1);
+  background: rgba(var(--overlay-color), 0.06);
+}
+.science-viz__status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(var(--overlay-color), 0.03);
+}
+.science-viz__summary-line {
+  margin: 6px 0 0;
+}
+.science-viz__results {
+  margin-top: 0;
+}
+.science-viz__checklist {
+  gap: 10px;
+}
+.science-viz__canvas {
+  min-height: clamp(620px, 72vh, 980px);
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(var(--panel-rgb), 0.52), rgba(var(--bg-rgb), 0.46)),
+    radial-gradient(circle at top left, rgba(var(--accent-rgb), 0.14), transparent 48%);
+  overflow: auto;
+}
+.science-viz__details {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: var(--gap);
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: rgba(var(--overlay-color), 0.03);
+}
+.science-viz__details-block {
+  min-width: 0;
+}
+.science-viz__details-title {
+  margin-bottom: 10px;
+}
+.science-viz__kpis {
+  padding-bottom: 0;
+}
+.science-viz__details-block--inspector {
+  padding: 12px 14px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--overlay-color), 0.08);
+  background: rgba(var(--overlay-color), 0.03);
+}
+
+@media (max-width: 1100px) {
+  .science-viz-controls-dropdown__row--dual > * {
+    flex-basis: 100%;
+  }
+
+  .science-viz__status {
+    flex-direction: column;
+  }
+
+  .science-viz__details {
+    grid-template-columns: 1fr;
+  }
 }

@@ -399,9 +399,8 @@ const ARRAKIS_PRESET_WORLD = {
           primaryMoonId: "m_krelln",
           extraMoonIds: ["m_arvon", "", ""],
           monthsPerYear: 12,
-          solarWeeksPerMonth: 4,
-          lunarWeeksPerMonth: 4,
-          lunisolarWeeksPerMonth: 4,
+          daysPerMonth: null,
+          daysPerWeek: null,
         },
         ui: {
           calendarName: "Imperial Standard",

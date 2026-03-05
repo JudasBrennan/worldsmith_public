@@ -4,6 +4,7 @@ import { calcDebrisDisk, calcDebrisDiskSuggestions } from "../engine/debrisDisk.
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
+import { createTutorial } from "./tutorial.js";
 import { escapeHtml } from "./uiHelpers.js";
 import {
   loadWorld,
@@ -75,6 +76,36 @@ const TIP_LABEL = {
   "Debris disks count": "Total number of debris disk zones in this system.",
 };
 
+const TUTORIAL_STEPS = [
+  {
+    title: "Getting Started",
+    body:
+      "The Other Objects page models debris disks \u2014 asteroid belts, " +
+      "Kuiper-belt analogs, and other non-planetary material orbiting your star.",
+  },
+  {
+    title: "Disk Geometry",
+    body:
+      "Set the inner and outer edges of each disk in AU. The centre and width " +
+      "are derived automatically. Composition and temperature depend on " +
+      "distance from the star.",
+  },
+  {
+    title: "Suggest Feature",
+    body:
+      "Click Suggest to auto-generate debris disk positions based on " +
+      "mean-motion resonances with your gas giants. This produces realistic " +
+      "belt structures like the asteroid and Kuiper belts.",
+  },
+  {
+    title: "Derived Properties",
+    body:
+      "Review collision velocities, ice-to-rock ratios, and infrared " +
+      "detectability. These help determine whether a disk is visible and " +
+      "how it interacts with planet formation.",
+  },
+];
+
 export function initOuterObjectsPage(mountEl) {
   const wrap = document.createElement("div");
   wrap.className = "page";
@@ -82,7 +113,7 @@ export function initOuterObjectsPage(mountEl) {
     <div class="panel">
       <div class="panel__header">
         <h1 class="panel__title"><span class="ws-icon icon--outer-objects" aria-hidden="true"></span><span>Other Objects</span></h1>
-        <div class="badge">Interactive tool</div>
+        <button id="outerTutorials" type="button" class="ws-tutorial-trigger">Tutorials</button>
       </div>
       <div class="panel__body">
         <div class="hint">Configure debris disks and other non-planetary system components. Derived physical properties are computed from orbit and host-star data.</div>
@@ -107,6 +138,12 @@ export function initOuterObjectsPage(mountEl) {
   `;
   mountEl.appendChild(wrap);
   attachTooltips(wrap);
+  createTutorial({
+    steps: TUTORIAL_STEPS,
+    storageKey: "worldsmith.outer.tutorial",
+    container: wrap,
+    triggerBtn: wrap.querySelector("#outerTutorials"),
+  });
 
   const summaryEl = wrap.querySelector("#outerSummary");
   const debrisEditorEl = wrap.querySelector("#debrisDisksEditor");

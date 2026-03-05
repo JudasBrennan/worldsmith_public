@@ -613,9 +613,8 @@ const REALMSPACE_PRESET_WORLD = {
           primaryMoonId: "m_selune",
           extraMoonIds: ["", "", ""],
           monthsPerYear: 12,
-          solarWeeksPerMonth: 3,
-          lunarWeeksPerMonth: 3,
-          lunisolarWeeksPerMonth: 3,
+          daysPerMonth: 30,
+          daysPerWeek: 10,
         },
         ui: {
           calendarName: "Calendar of Harptos",
