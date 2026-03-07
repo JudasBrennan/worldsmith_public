@@ -1,4 +1,5 @@
-﻿// Planet model (spreadsheet-faithful port)
+// SPDX-License-Identifier: MPL-2.0
+// Planet model (spreadsheet-faithful port)
 //
 // Derives physical, orbital, thermal, and atmospheric properties for a
 // terrestrial planet from user inputs plus host-star parameters.  Implements

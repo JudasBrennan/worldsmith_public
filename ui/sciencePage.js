@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { evaluateVolatileRetention } from "../physics/escape.js";
 import { jeansParameter, MOON_VOLATILE_TABLE, vaporPressurePa } from "../utils.js";
 

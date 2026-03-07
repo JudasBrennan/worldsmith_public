@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 /**
  * Cluster snapshot builder for the local-cluster visualiser.
  */

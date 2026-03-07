@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { clamp } from "../../engine/utils.js";
 import { GAS_GIANT_RADIUS_MAX_RJ, GAS_GIANT_RADIUS_MIN_RJ } from "../store.js";
 import { gasStylePalette } from "../gasGiantStyles.js";

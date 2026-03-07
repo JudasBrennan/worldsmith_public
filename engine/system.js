@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Planetary System layout engine
 //
 // Computes orbital architecture for a planetary system around a

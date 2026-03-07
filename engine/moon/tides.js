@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { fmt } from "../utils.js";
 import {
   EARTHLIKE_HOST_TIDAL_QUALITY_FACTOR,

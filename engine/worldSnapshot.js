@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { calcStar } from "./star.js";
 import { calcSystem } from "./system.js";
 import { calcPlanetExact } from "./planet.js";

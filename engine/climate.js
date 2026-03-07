@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 /**
  * Procedural Köppen climate zone classification for terrestrial planets.
  *

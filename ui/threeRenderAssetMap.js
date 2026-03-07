@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 function norm(value) {
   return String(value || "")
     .trim()

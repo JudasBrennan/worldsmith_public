@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const SUBLIMATION_TABLE = [
   { species: "N\u2082", tempK: 63, label: "nitrogen" },
   { species: "CO", tempK: 68, label: "carbon monoxide" },

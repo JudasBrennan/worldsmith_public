@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { calcPlanetExact, ISOTOPE_HEAT_FRACTIONS } from "../engine/planet.js";
 import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { RESERVED_IMPORT_KEYS } from "./importValidation.js";
 
 export function deepMerge(a, b) {

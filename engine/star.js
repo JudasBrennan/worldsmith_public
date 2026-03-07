@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Star calculator
 // Mass-luminosity from Eker et al. (2018, MNRAS 479, 5491) — six-piece
 // empirical relation calibrated from 509 eclipsing binary components.

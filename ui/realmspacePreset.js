@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // ──────────────────────────────────────────────────
 // Realmspace preset — Forgotten Realms / Spelljammer
 // ──────────────────────────────────────────────────

@@ -1,4 +1,5 @@
-﻿import { calcStar } from "../engine/star.js";
+// SPDX-License-Identifier: MPL-2.0
+import { calcStar } from "../engine/star.js";
 import { computeStellarActivityModel } from "../engine/stellarActivity.js";
 import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";

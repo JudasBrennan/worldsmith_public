@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { clamp, fmt, toFinite } from "./utils.js";
 import { compositionFromClass, compositionFromDensity } from "./moon/composition.js";
 import { computeMoonOrbit } from "./moon/orbit.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // 3D planet splash overlay — shows an animated Three.js planet on every page load.
 // Three.js and its addons load from local package-backed modules so the source
 // app can run without CDN fetches and the production build can bundle them.

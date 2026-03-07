@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Persistent IndexedDB cache for celestial texture RGBA buffers.
 // Survives browser refresh. Graceful degradation: returns null
 // if IndexedDB is unavailable (private browsing, quota exceeded).

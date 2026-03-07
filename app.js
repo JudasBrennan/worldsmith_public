@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { initStarPage } from "./ui/starPage.js";
 import { initSystemPage } from "./ui/systemPage.js";
 import { initOuterObjectsPage } from "./ui/outerObjectsPage.js";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { clamp, round } from "../utils.js";
 import { totalMoonSelfHeating, totalMoonSputteringPlasmaW } from "./moonEffects.js";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // ─── Shared canvas rendering utilities ──────────────────────────────
 //
 // Common helpers used by celestial body visual systems (rocky planets,

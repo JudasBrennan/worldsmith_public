@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Helper to bind a number input and a slider input together.
 // For huge ranges, the slider uses a log scale automatically (unless forced).
 //

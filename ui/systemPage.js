@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";
 import { fmt } from "../engine/utils.js";

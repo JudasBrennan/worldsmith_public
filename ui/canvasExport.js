@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const GIF_JS_URL = "./assets/vendor/gif.js";
 const GIF_WORKER_URL = "./assets/vendor/gif.worker.js";
 

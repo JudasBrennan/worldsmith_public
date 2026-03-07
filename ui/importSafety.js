@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export const JSON_TEXT_IMPORT_LIMIT_BYTES = 4 * 1024 * 1024;
 export const JSON_FILE_IMPORT_LIMIT_BYTES = 4 * 1024 * 1024;
 export const XLSX_FILE_IMPORT_LIMIT_BYTES = 12 * 1024 * 1024;

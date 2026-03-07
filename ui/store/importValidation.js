@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export const RESERVED_IMPORT_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 function isPlainObjectLike(value) {

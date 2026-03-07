@@ -1,4 +1,5 @@
-﻿import { calcCalendarModel } from "../engine/calendar.js";
+// SPDX-License-Identifier: MPL-2.0
+import { calcCalendarModel } from "../engine/calendar.js";
 import { fmt } from "../engine/utils.js";
 import {
   describeMoonPhase,

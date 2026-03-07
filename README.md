@@ -176,6 +176,16 @@ Community:
 - Artifexian Discord: https://discord.com/invite/hPvqDBPkhg
 - Judas Brennan Discord: https://discord.gg/f63SfkW7vh
 
+## License
+
+Unless otherwise noted, first-party files in this repository are
+licensed under the Mozilla Public License 2.0. See `LICENSE`.
+
+Vendored third-party components under `ui/vendor/` and `assets/vendor/`
+are not relicensed under MPL-2.0 and remain under their original
+licenses. See `THIRD_PARTY_NOTICES.md` for the component list, scope,
+and included third-party license texts.
+
 ## Changelog
 
 See `CHANGELOG.md` for full release history and detailed change notes.

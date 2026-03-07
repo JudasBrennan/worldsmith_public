@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export const CALENDAR_PHASES = [
   ["N", "New Moon"],
   ["WC", "Waxing Crescent"],

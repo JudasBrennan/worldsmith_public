@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export function clampGasGiantRadiusRj(value, min, max, step) {
   const raw = Number(value);
   if (!Number.isFinite(raw)) return min;

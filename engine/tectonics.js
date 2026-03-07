@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Tectonics engine — mountain range profiles, erosion, ocean depth curves,
 // isostasy, volcanic arcs, continental margins, shield volcanism, and rifts.
 //

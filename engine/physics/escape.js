@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { escapeTimescaleSeconds } from "../utils.js";
 
 const DEFAULT_EARTH_XUV_FLUX_ERG_CM2_S = 4.64;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const AU_M = 149597870000;
 const AU_KM = 149597870;
 const KG_PER_MSOL = 1.989e30;

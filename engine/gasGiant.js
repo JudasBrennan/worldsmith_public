@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { clamp, fmt, round, toFinite } from "./utils.js";
 import { findNearestResonance } from "./debrisDisk.js";
 import { calcDynamics, calcOblateness } from "./gasGiant/dynamics.js";

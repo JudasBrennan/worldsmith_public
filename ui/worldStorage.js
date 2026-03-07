@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const DB_NAME = "worldsmith-world-storage";
 const DB_VERSION = 1;
 const META_STORE = "meta";

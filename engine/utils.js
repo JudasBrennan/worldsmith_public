@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Utility helpers used across calculators.
 
 export { eccentricityFactor, k2LoveNumber, spinOrbitResonance } from "./physics/rotation.js";

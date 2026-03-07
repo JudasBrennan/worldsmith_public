@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { createElement, replaceChildren } from "../domHelpers.js";
 import { createKpiGrid, createReadoutSections } from "../planet/outputRender.js";
 

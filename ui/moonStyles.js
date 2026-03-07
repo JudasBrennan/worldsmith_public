@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // ─── Moon visual rendering ──────────────────────────────────────────
 //
 // Physics-driven visual system for moons. Engine-computed properties

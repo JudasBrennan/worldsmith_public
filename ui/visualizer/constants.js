@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export const VISUALIZER_TIP_LABEL = {
   Labels: "Show or hide text labels for star, planets, moons, gas giants, and debris disks.",
   "Label leader lines": "Show or hide connector lines from labels to the body they describe.",

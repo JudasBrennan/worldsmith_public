@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { calcMoon } from "../engine/moon.js";
 import { calcGasGiant } from "../engine/gasGiant.js";
 import { fmt } from "../engine/utils.js";

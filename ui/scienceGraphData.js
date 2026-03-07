@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Curated science graph for the Science Visualiser page.
 //
 // The graph is intentionally metadata-first. Nodes represent major concepts,

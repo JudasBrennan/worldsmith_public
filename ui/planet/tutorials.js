@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export const PLANET_TUTORIAL_STEPS = [
   {
     title: "Getting Started",

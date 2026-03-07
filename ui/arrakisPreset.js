@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // ─── Arrakis (Dune) system preset ──────────────────────────────────
 //
 // Star "Canopus" is modelled as a 1.15 Msol F-type main-sequence star

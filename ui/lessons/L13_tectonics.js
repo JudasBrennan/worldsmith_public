@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 /**
  * Lesson 13 — Interiors & Tectonics
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Apparent magnitude and sky-visibility engine
 //
 // Computes how stars, planets, and moons appear from a home world:

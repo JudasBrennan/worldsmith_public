@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { LOCAL_CLUSTER_DEFAULTS, normalizeLocalClusterInputs } from "../../engine/localCluster.js";
 import { sanitizeImportedValue } from "./importValidation.js";
 import { normalizeGasGiant } from "./gasGiantModel.js";

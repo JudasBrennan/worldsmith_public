@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { fmt } from "../../engine/utils.js";
 import { createElement, replaceChildren, replaceSelectOptions } from "../domHelpers.js";
 import { buildBodySelectorOptions } from "./bodySelector.js";

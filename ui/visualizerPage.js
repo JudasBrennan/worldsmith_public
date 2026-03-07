@@ -1,4 +1,5 @@
-﻿import { loadWorld } from "./store.js";
+// SPDX-License-Identifier: MPL-2.0
+import { loadWorld } from "./store.js";
 import { calcLagrangePoints } from "../engine/lagrange.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { makeTimestampToken } from "./canvasExport.js";

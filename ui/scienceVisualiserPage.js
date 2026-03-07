@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import {
   SCIENCE_GRAPH_EDGES,
   SCIENCE_GRAPH_NODES,

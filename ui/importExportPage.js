@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import * as store from "./store.js";
 import { isXlsxFile, importLegacyWorldsmithWorkbook } from "./legacyXlsxImport.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";

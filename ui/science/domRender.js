@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { createElement, replaceChildren } from "../domHelpers.js";
 
 export function renderScienceText(node, text) {

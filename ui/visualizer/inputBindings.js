@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { captureCanvasGif, downloadCanvasPng } from "../canvasExport.js";
 
 function mapTouches(touches) {

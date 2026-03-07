@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { auToMeters } from "./orbital.js";
 
 const SOLAR_LUMINOSITY_W = 3.828e26;

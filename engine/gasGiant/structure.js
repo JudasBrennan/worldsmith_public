@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { clamp, fmt, round, toFinite } from "../utils.js";
 
 const JUPITER_RADIUS_KM = 69911;

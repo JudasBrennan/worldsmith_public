@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 export function initAboutPage(mountEl) {
   const el = document.createElement("div");
   el.className = "page";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { buildWorldSnapshot, buildWorldStarSystemContext } from "./worldSnapshot.js";
 import { bondToGeometricAlbedo, classifyBodyType } from "./apparent.js";
 

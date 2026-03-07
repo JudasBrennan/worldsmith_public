@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { round } from "../utils.js";
 import { calcEccentricityFactor } from "../physics/rotation.js";
 

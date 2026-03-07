@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { createElement, replaceChildren, replaceSelectOptions } from "../domHelpers.js";
 import { createTipIconNode } from "./outputRender.js";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // ─── Rocky planet visual rendering ─────────────────────────────────
 //
 // Physics-driven visual system for rocky planets. No user-selectable

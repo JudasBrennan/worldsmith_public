@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 const CELESTIAL_TEX_WORKER_URL = new URL("./celestialTextureWorker.js", import.meta.url);
 
 let workerInstance = null;

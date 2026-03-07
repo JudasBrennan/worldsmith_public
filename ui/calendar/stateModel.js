@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 import { calcMoon } from "../../engine/moon.js";
 import { calcPlanetExact } from "../../engine/planet.js";
 import {

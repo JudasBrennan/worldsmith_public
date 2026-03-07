@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 // Debris Disk physics engine
 //
 // Computes debris disk properties from orbital boundaries, host-star
