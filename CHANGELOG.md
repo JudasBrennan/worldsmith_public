@@ -2,6 +2,524 @@
 
 All notable changes to WorldSmith Web will be documented in this file.
 
+## Unreleased
+
+## 1.21.0 — 2026-03-08
+
+### Navigation Lock Toggle
+
+**Added a desktop nav lock button in the sidebar footer**
+(index.html, app.js, styles.css, tests/appStorageUi.ui.test.js)
+
+Added a padlock control next to the theme toggle that pins the desktop
+sidebar open until it is explicitly unlocked. The lock state now
+persists in local storage, the button hides whenever the sidebar is in
+its collapsed rail state, and locked navigation no longer auto-collapses
+on outside clicks or route changes.
+
+**Tests** (tests/appStorageUi.ui.test.js)
+
+- Added app-shell regression coverage for expand, lock, route-click,
+  unlock, and collapse behavior
+
+### Input Stability and Mobile Editing
+
+**Stabilized moon, planet, and star input editing**
+(ui/bind.js, ui/moonPage.js, ui/planetPage.js, ui/starPage.js,
+tests/inputDraftStability.ui.test.js, .gitignore)
+
+Reworked the shared number-and-slider binding so draft numeric text is
+no longer treated as committed state on every `input` event. Empty or
+partial edits now remain in the field while the user is typing, invalid
+blur restores the last committed value, and slider interactions still
+commit immediately.
+
+The Star page now keeps typed drafts local while editing instead of
+writing sanitized or clamped values back into focused controls on every
+keystroke. The Moon page no longer reloads its editor on raw text
+entry, and the Planet page's rocky and gas-giant numeric controls now
+commit on change instead of every keypress. This removes the focus and
+caret churn users were reporting, especially on mobile keyboards.
+
+**Tests** (tests/inputDraftStability.ui.test.js)
+
+- Added regression coverage for shared numeric draft handling and for
+  commit behavior on the Star, Moon, and Planet pages
+
+### Persistence Recovery and Write-path Hardening
+
+**Made unreadable saves visible, recoverable, and cheaper to persist**
+(ui/store.js, ui/store/persistenceBridge.js, ui/worldStorage.js,
+app.js, index.html, styles.css, tests/storeLoadFailure.test.js,
+tests/worldStorage.test.js, tests/appStorageUi.ui.test.js,
+tests/browser/smoke.spec.js)
+
+Completed the persistence-hardening follow-up by distinguishing missing
+state from unreadable saved state, surfacing storage and load failures
+in the main UI, and adding a recovery path that clears only the broken
+current save while preserving backups for restore. The app now exposes a
+durable alert/recovery flow instead of silently falling back to a fresh
+default world when stored data cannot be parsed or migrated.
+
+The storage write path was also tightened so normal current-world saves
+no longer rewrite the entire backup history. Backup persistence is now
+incremental, restore behavior remains durable, and IndexedDB/localStorage
+fallback coverage was expanded around the new save and recovery flow.
+
+**Tests** (tests/storeLoadFailure.test.js, tests/worldStorage.test.js,
+tests/appStorageUi.ui.test.js, tests/browser/smoke.spec.js)
+
+- Added direct regression coverage for unreadable-save detection,
+  backup-preserving reset, storage-recovery UI, and backup persistence
+  durability
+
+### Remaining Safer-DOM Follow-Up
+
+**Finished the last user-influenced DOM cleanup on the targeted pages**
+(ui/climatePage.js, ui/tectonicsPage.js, ui/starPage.js,
+ui/outerObjectsPage.js, ui/scienceVisualiserPage.js,
+tests/pageDomSafety.ui.test.js)
+
+Completed the planned safer-DOM follow-up on the remaining high-risk
+surfaces called out after the earlier render splits. User-influenced
+selectors, summaries, search results, and inspector/detail surfaces on
+the Climate, Tectonics, Star, Outer Objects, and Science Visualiser
+pages were moved off string-built dynamic markup and onto explicit
+DOM-safe rendering paths.
+
+This narrows the remaining `innerHTML` usage on those pages to static
+shells or tightly controlled internal fragments rather than the main
+edited or imported data path.
+
+**Tests** (tests/pageDomSafety.ui.test.js)
+
+- Added hostile-string regressions covering the migrated climate,
+  tectonics, star, outer-objects, and science-visualiser surfaces
+
+### Targeted Test Expansion
+
+**Added direct seam tests for the newest extracted modules and recovery UI**
+(ui/visualizer/inputBindings.js, tests/visualizerInputBindings.test.js,
+tests/appStorageUi.ui.test.js, tests/pageDomSafety.ui.test.js)
+
+Finished the implementation-plan test-expansion pass by adding direct
+coverage for the extracted visualizer input-binding layer and for the
+new storage-error and unreadable-save recovery UI. These behaviors are
+now guarded by focused tests rather than relying only on browser smoke
+or broader end-to-end coverage.
+
+This keeps the recently extracted modules honest at the seam level and
+raises confidence that later refactors to the visualizer controls,
+storage alerts, and recovery overlay will fail in a local test before
+they regress the built app.
+
+**Tests** (tests/visualizerInputBindings.test.js,
+tests/appStorageUi.ui.test.js, tests/pageDomSafety.ui.test.js)
+
+- Added focused control-binding, recovery-UI, and DOM-safety regression
+  coverage for the newest extracted seams
+
+### Runtime and Dependency Alignment
+
+**Bundled critical runtime dependencies and aligned shipped versions**
+(package.json, package-lock.json, index.html, themeBoot.js,
+ui/runtimeDeps.js, ui/vendor/, ui/threeBridge2d.js,
+ui/legacyXlsxImport.js, ui/sciencePage.js, ui/lessonsPage.js,
+ui/katexLoader.js, scripts/runtime-deps.config.mjs,
+scripts/check-runtime-deps.mjs, scripts/build.mjs, assets/vendor/)
+
+Moved Three.js, XLSX, KaTeX, and related runtime assets onto bundled or
+repo-local delivery paths so the browser no longer depends on live CDN
+imports for critical functionality. Theme bootstrapping was extracted
+from inline HTML into a dedicated script, runtime dependency checks were
+added to guard against version drift, and the release build now emits
+only the files needed at runtime.
+
+### Security and Import Hardening
+
+**Hardened the browser runtime and large import paths**
+(index.html, themeBoot.js, ui/importSafety.js,
+ui/importExportPage.js, ui/legacyXlsxImport.js,
+tests/importSafety.test.js, tests/importExportPage.ui.test.js,
+tests/calendarPage.data.ui.test.js, tests/planetBodySelector.test.js)
+
+Reduced remote execution exposure, tightened browser-side import
+validation, and added regression coverage around hostile or oversized
+inputs. Import flows now fail with clearer user-facing errors instead of
+attempting to parse unsafe payloads unchecked on the main thread.
+
+### UI Module Decomposition
+
+**Split large UI controllers into smaller shared modules**
+(ui/calendar/, ui/visualizer/, ui/planet/, ui/calendarPage.js,
+ui/visualizerPage.js, ui/planetPage.js, tests/calendarIo.test.js,
+tests/visualizerScaleMath.test.js, tests/planetBodySelector.test.js)
+
+Refactored the heaviest page controllers by extracting shared constants,
+math helpers, selectors, rendering helpers, tutorials, and import/export
+logic into focused submodules. The router-facing page entry points stay
+stable, but the code is easier to test, reason about, and extend.
+
+### Persistence and Data Safety
+
+**Moved primary world persistence to IndexedDB with safer saves**
+(ui/worldStorage.js, ui/store.js, app.js, ui/aboutPage.js,
+ui/importExportPage.js, README.md, tests/worldStorage.test.js,
+tests/importExport.test.js, tests/planetStore.test.js,
+tests/calendarPage.ui.test.js, tests/calendarPage.data.ui.test.js)
+
+Introduced IndexedDB-backed world and backup storage with migration from
+legacy localStorage saves, while keeping localStorage for lightweight
+preferences and boot markers. Save behavior is now debounced and the app
+waits for storage readiness at startup so large worlds do not block or
+corrupt the UI as data grows.
+
+### Release Confidence
+
+**Added browser smoke tests, release verification, and CI gating**
+(tests/browser/smoke.spec.js, playwright.config.js,
+scripts/serve-dist.mjs, package.json, RELEASE_CHECKLIST.md,
+.github/workflows/ci.yml)
+
+Added a Playwright smoke suite covering production boot, import/export,
+visualizer load, and fallback behavior against the built app. The
+project now includes a release checklist, a single `npm run
+release:verify` command, and CI gates that exercise the main static-app
+release path before shipping.
+
+### Bundle and Delivery Performance
+
+**Reduced initial bundle weight and enforced a bundle budget**
+(app.js, scripts/build.mjs, scripts/check-bundle-budget.mjs,
+package.json, README.md)
+
+Lazy-loaded the heaviest routes, trimmed the production artifact set,
+and added an automated budget check for release builds. The entry bundle
+dropped from roughly 3.0 MB to about 491 KB, with the largest lazy chunk
+around 698 KB after the route split.
+
+### Encoding Integrity
+
+**Repaired mojibake corruption and added automated detection**
+(engine/planet.js, ui/planetPage.js, ui/starPage.js, ui/systemPage.js,
+tests/planet.test.js, scripts/check-mojibake.mjs,
+tests/mojibakeCheck.test.js)
+
+Repaired corrupted unit and symbol strings across the affected engine,
+UI, and test files, then added a repo-wide mojibake check to the main
+verification pipeline so future encoding regressions fail quickly.
+
+### Store and Persistence Completion
+
+**Finished the store split and hardened import and save boundaries**
+(ui/store.js, ui/store/worldSchema.js, ui/store/systemCollections.js,
+ui/store/gasGiantModel.js, ui/store/bodyMutations.js,
+ui/store/worldMigration.js, ui/store/persistenceBridge.js,
+ui/store/importValidation.js, ui/store/deepMerge.js,
+ui/worldStorage.js, tests/importSanitization.test.js,
+tests/worldMigration.test.js, tests/persistenceBridge.test.js,
+tests/bodyMutations.test.js, tests/storeSystemFacade.test.js,
+tests/worldStorage.test.js)
+
+Closed the remaining store-side remediation work by reducing `ui/store.js`
+to a thin compatibility facade and moving schema defaults, collection
+helpers, gas-giant model behavior, mutations, migration orchestration,
+merge hardening, and persistence bridging into dedicated modules.
+Recursive reserved-key import sanitization now rejects or strips hostile
+`__proto__`, `constructor`, and `prototype` payloads before imported
+world data is normalized into app state.
+
+Persistence follow-up also added lifecycle flushes for pending writes on
+page hide, unload, and hidden-document transitions, so large saves and
+backup updates are less likely to be dropped when the browser tab is
+closed or backgrounded.
+
+**Tests** (tests/importSanitization.test.js, tests/worldMigration.test.js,
+tests/persistenceBridge.test.js, tests/bodyMutations.test.js,
+tests/storeSystemFacade.test.js, tests/worldStorage.test.js)
+
+- Added regression coverage for reserved-key imports, world migration,
+  persistence bridge behavior, extracted body mutations, store facade
+  wiring, and lifecycle save flushing
+
+### Rendering Hygiene Completion
+
+**Moved the remaining user-influenced UI rendering onto DOM-safe paths**
+(ui/domHelpers.js, ui/importExportPage.js, ui/calendarPage.js,
+ui/planetPage.js, ui/planet/domRender.js, ui/planet/outputRender.js,
+ui/planet/inputRender.js, ui/apparentPage.js, ui/moonPage.js,
+ui/systemPage.js, ui/localClusterPage.js, ui/sciencePage.js,
+tests/calendarPage.data.ui.test.js, tests/planetDomRender.test.js,
+tests/planetOutputRender.test.js, tests/planetInputRender.test.js,
+tests/apparentDomRender.test.js, tests/moonDomRender.test.js,
+tests/systemDomRender.test.js, tests/localClusterDomRender.test.js,
+tests/scienceDomRender.test.js)
+
+Completed the safer-DOM rollout across the remaining high-risk UI
+surfaces. Selectors, KPI cards, tables, overlays, recipe pickers,
+detail panels, output summaries, and the final rocky and gas-giant
+input-form shells were moved off string-built HTML onto DOM-construction
+helpers and page-local render modules.
+
+As a result, the remaining `innerHTML` usage is now limited to static
+route shells, mount clearing, or tightly controlled internal fragments
+rather than the main user-facing render path for imported or edited
+world data.
+
+**Tests** (tests/calendarPage.data.ui.test.js,
+tests/planetDomRender.test.js, tests/planetOutputRender.test.js,
+tests/planetInputRender.test.js, tests/apparentDomRender.test.js,
+tests/moonDomRender.test.js, tests/systemDomRender.test.js,
+tests/localClusterDomRender.test.js, tests/scienceDomRender.test.js)
+
+- Added hostile-string and DOM-render regressions for the migrated
+  calendar, planet, apparent, moon, system, local-cluster, and science
+  surfaces
+
+### Verification and Delivery Hardening
+
+**Made release verification deterministic and expanded production smoke**
+(playwright.config.js, scripts/build.mjs, scripts/backup-live.mjs, scripts/dev.mjs,
+scripts/serve-dist.mjs, scripts/check-bundle-budget.mjs,
+tests/browser/smoke.spec.js, README.md, IMPLEMENTATION_PLAN.md)
+
+Separated development and production output so local `npm run dev` no
+longer interferes with Playwright or release verification. Development
+work now builds into `dist-dev/`, release verification uses a dedicated
+production server, and release builds emit machine-readable summary
+data for bundle checks.
+
+The production smoke suite was expanded to cover legacy storage
+migration, IndexedDB fallback, hostile and oversized import rejection,
+backup restore after repeated imports, lazy-route loading, calendar
+export, legacy XLSX import, and visualizer control interactions. This
+closed the earlier nondeterministic browser-smoke failure mode while
+adding broader end-to-end coverage to the shipped static build.
+
+The live backup archive now also includes `themeBoot.js`, closing a
+release-packaging gap in the boot path for source-root deployments and
+recovery snapshots.
+
+**Tests** (tests/browser/smoke.spec.js)
+
+- Expanded Playwright smoke coverage for import flows, storage
+  resilience, route loading, exports, XLSX import, and visualizer
+  controls in the production bundle
+
+### Visualizer Interaction Follow-Up
+
+**Extracted visualizer input and event-binding orchestration**
+(ui/visualizerPage.js, ui/visualizer/inputBindings.js,
+tests/browser/smoke.spec.js)
+
+Finished the planned visualizer follow-up by moving pointer, wheel,
+touch, toolbar, cluster-control, and cross-tab refresh listeners out of
+`ui/visualizerPage.js` and into a dedicated binding module. The page now
+acts more cleanly as the visualizer orchestration shell while the
+interaction layer evolves independently.
+
+This keeps the visualizer in a better position for future mechanics
+work, where renderer and state changes are likely to continue but the
+page controller should not grow back into a single interaction-heavy
+file.
+
+**Tests** (tests/browser/smoke.spec.js)
+
+- Extended browser smoke to verify the controls dropdown, help overlay,
+  and play/pause behavior on the built visualizer route
+
+### Runtime Cleanup and Repository Hygiene
+
+**Removed residual runtime footguns and cleaned generated artifacts**
+(ui/aboutPage.js, ui/canvasExport.js, .gitignore, .rgignore,
+tests/aboutPage.ui.test.js, tests/canvasExport.test.js)
+
+Removed the dead remote GIF-export fallback, fixed the About-page
+changelog modal's leaked keydown listener, and added ignore rules so
+`dist-dev/` no longer pollutes Git status or broad source searches.
+These changes were small individually, but they removed several sources
+of verification noise and reduced maintenance friction after the larger
+refactor pass.
+
+**Tests** (tests/aboutPage.ui.test.js, tests/canvasExport.test.js)
+
+- Added focused runtime regressions for changelog modal cleanup and local
+  GIF export behavior
+
+## 1.20.0 — 2026-03-06
+
+### Engine Snapshot and Regression Foundation
+
+**Added canonical fixture worlds and a world-level engine snapshot**
+(engine/worldSnapshot.js, engine/worldAdapters.js,
+tests/engineWorldFixtures.test.js, tests/worldSnapshot.test.js,
+tests/worldSnapshotParity.test.js, tests/worldAdapters.test.js)
+
+Added a fixture-driven regression layer covering six representative
+worlds, then used it to introduce `buildWorldSnapshot(world, options)`
+as the engine's canonical composition boundary. The snapshot layer now
+derives stars, systems, rocky planets, gas giants, moons, lookup maps,
+and orbit-ordered body lists from one pure engine path instead of
+relying on page-local assembly.
+
+Read-only UI consumers were moved onto the snapshot/adapters layer in
+stages. Import/export preview, System poster inputs, and Apparent-page
+body tables now consume consistent engine-derived world views instead of
+rebuilding overlapping composition logic independently.
+
+**Tests** (tests/engineWorldFixtures.test.js, tests/worldSnapshot.test.js,
+tests/worldSnapshotParity.test.js, tests/worldAdapters.test.js)
+
+- Added canonical fixture worlds for Sol-like, M-dwarf habitable,
+  gas-giant-heavy, icy-moon-system, eccentric-extremes, and
+  thin-atmosphere-edge cases
+- Added fixture invariants, golden-output regression checks, snapshot
+  contract coverage, summary/full parity checks, and adapter parity
+  coverage
+
+### Engine Modularisation and Shared Physics Kernels
+
+**Split the largest engine calculators and centralized shared physics**
+(engine/planet.js, engine/gasGiant.js, engine/moon.js,
+engine/planet/, engine/gasGiant/, engine/moon/, engine/physics/)
+
+Split the three largest body calculators behind stable public facades:
+`calcPlanetExact`, `calcGasGiant`, and `calcMoonExact` now delegate to
+smaller concern-specific modules for composition, orbit, temperature,
+atmosphere, magnetism, tectonics, rings, tides, retention, and related
+subsystems. This reduced the maintenance burden of the engine without
+changing the top-level API surface used by the rest of the app.
+
+Shared scientific logic was then consolidated into dedicated physics
+modules. Radiative, orbital, escape, materials, and rotation helpers
+now live under `engine/physics/`, replacing repeated local formulas and
+literal unit conversions across the planet, moon, gas giant, system,
+debris-disk, and apparent-model code paths.
+
+**Tests** (tests/planet.test.js, tests/gasGiant.test.js,
+tests/moon.test.js, tests/physicsRadiative.test.js,
+tests/physicsOrbital.test.js, tests/physicsEscape.test.js,
+tests/physicsMaterials.test.js, tests/physicsRotation.test.js)
+
+- Added direct seam tests for extracted planet, gas giant, and moon
+  modules
+- Added dedicated shared-physics regression suites for radiative,
+  orbital, escape, materials, and rotation helpers
+
+### Cross-Model Validation Expansion
+
+**Added integration-level validation across composed engine chains**
+(tests/crossModelHelpers.js, tests/crossModelClimate.test.js,
+tests/crossModelMoonSystems.test.js, tests/crossModelApparent.test.js,
+tests/crossModelCalendar.test.js)
+
+Expanded the validation strategy from module-level correctness to
+whole-world consistency. The test suite now checks climate chains,
+gas-giant-to-moon propagation, apparent outputs, calendar basis values,
+and snapshot parity against the canonical fixture worlds, so changes in
+composition logic fail with labeled fixture and subsystem context before
+they reach the UI.
+
+This materially raises trust in the engine as a single scientific system
+rather than a loose collection of calculators. Snapshot and downstream
+consumer regressions are now tied back to upstream star/system/body
+inputs in one shared validation harness.
+
+**Tests** (tests/crossModelClimate.test.js,
+tests/crossModelMoonSystems.test.js, tests/crossModelApparent.test.js,
+tests/crossModelCalendar.test.js)
+
+- Added cross-model fixture harness and validation matrix
+- Added climate, moon-system, apparent, and calendar integration suites
+
+### Performance and Incremental Evaluation
+
+**Made summary evaluation materially cheaper and budgeted read-only consumers**
+(scripts/profile-engine.mjs, engine/worldSnapshot.js,
+engine/worldAdapters.js, ui/apparentPage.js, ENGINE_PHASE6_BASELINE.md)
+
+Added a repeatable profiling harness, then reshaped snapshot evaluation
+so `mode: "summary"` derives only the fields summary consumers need
+instead of computing full body models and trimming them afterward.
+Request-local star/system context reuse and moon-parent override reuse
+were added inside snapshot-driven flows, and guided System poster mode
+was reduced from a full-snapshot prepass to a star/system-only prepass
+plus one poster snapshot build.
+
+The measured improvement is substantial on representative fixtures. In
+the checked-in Phase 6 baseline, `sol-like` `snapshot:summary` dropped
+from 4.625 ms to 0.606 ms, while
+`adapter:systemPoster:guided` dropped from 9.460 ms to 4.481 ms. Import
+/export preview and Apparent-page selector flows now use explicit
+summary-mode budgets, while full-detail consumers remain on the full
+path intentionally.
+
+**Tests** (tests/worldSnapshot.test.js, tests/worldAdapters.test.js)
+
+- Added structural guardrails for summary/full mode expectations
+- Added context-reuse and consumer-budget assertions alongside the
+  profiler baseline
+
+### Methane Greenhouse Coefficient Recalibration
+
+**Corrected CH₄ radiative forcing coefficient**
+(engine/planet/atmosphere.js, ui/sciencePage.js)
+
+The methane greenhouse coefficient `GH_CH4_COEFF` was 0.085, producing a
+CH₄/CO₂ forcing ratio of only 2.1% at Earth-like conditions — well below
+the 10–15% ratio from NASA GISS attribution data (Schmidt et al. 2010).
+The coefficient was originally back-fitted to Titan's _net effective_ τ
+(≈ 0.97), which conflated haze anti-greenhouse cooling with raw optical
+depth and suppressed methane's contribution everywhere else.
+
+Raised the coefficient to 0.45. At Earth conditions (1 atm, 0.042% CO₂,
+0.00019% CH₄) the CH₄/CO₂ ratio is now 11.1% and CH₄/total is 2.7%,
+both within NASA GISS targets. The Titan-like test case now validates
+against raw thermal IR optical depth (τ ≈ 5.1, within the 3–6 range from
+McKay et al. 1991 and Lorenz et al. 1997) rather than the haze-reduced
+net value. The functional forms (√ for CH₄, ln for CO₂) remain unchanged
+and match standard IPCC parameterizations (Myhre et al. 1998).
+
+| Scenario              | Old (0.085) | New (0.45) | Target             |
+| --------------------- | ----------- | ---------- | ------------------ |
+| CH₄/CO₂ ratio (Earth) | 2.1%        | 11.1%      | 10–15% (NASA GISS) |
+| CH₄/total (Earth)     | 0.5%        | 2.7%       | 2–3% (NASA GISS)   |
+| Titan raw τ           | 0.97        | 5.14       | 3–6 (McKay/Lorenz) |
+
+**Tests** (tests/greenhouse.test.js)
+
+- Updated Titan-like test: expects raw τ ≈ 5.14 ± 0.3 instead of net
+  τ ≈ 0.97 ± 0.05
+
+**References**
+
+- Schmidt, G. A. et al. (2010), "Attribution of the present-day total
+  greenhouse effect", J. Geophys. Res. 115, D20106
+- Myhre, G. et al. (1998), "New estimates of radiative forcing due to
+  well mixed greenhouse gases", Geophys. Res. Lett. 25(14), 2715–2718
+- McKay, C. P. et al. (1991), "The greenhouse and antigreenhouse effects
+  on Titan", Science 253, 1118–1121
+- Lorenz, R. D. et al. (1997), "Titan's atmosphere and surface
+  temperature", Planet. Space Sci. 45, 981–992
+
+### WebGL Route Cleanup
+
+**Explicit page disposal for route transitions**
+(app.js, ui/systemPage.js, ui/systemPosterNativeThree.js,
+ui/celestialVisualPreview.js, ui/visualizerPage.js)
+
+Leaving the Planetary System page could leak stale system-poster render work into the next route. Both `#/system → #/cluster` and `#/system → #/viz` emitted two `texImage3D` warnings per transition, while control paths such as `#/apparent → #/viz` stayed clean. That isolated the fault to System page teardown rather than general WebGL initialisation.
+
+The router now runs explicit page cleanup before replacing `#app`, and the System and Visualiser pages return real disposal functions instead of relying only on post-removal `MutationObserver` cleanup. System poster texture pre-warming and snapshot rendering also gained cancellation guards so abandoned work stops before uploading textures into a renderer that is no longer current. In Brave retests, the warning count dropped from 2 per transition to 0 across 3 repeated `system → cluster` runs and 3 repeated `system → viz` runs.
+
+**Tests** (manual browser walkthrough, npm scripts)
+
+- `npm run lint`
+- `npm run check:syntax`
+- `npm test`
+- Manual Brave retest: `system → cluster` ×3, `system → viz` ×3,
+  `apparent → viz` ×2 control; all produced zero WebGL warnings after the fix.
+
 ## 1.19.0 — 2026-03-05
 
 ### Collapsible Sidebar Navigation

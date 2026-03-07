@@ -3,9 +3,9 @@ import { calcSystem } from "../engine/system.js";
 import { calcDebrisDisk, calcDebrisDiskSuggestions } from "../engine/debrisDisk.js";
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
-import { attachTooltips, tipIcon } from "./tooltip.js";
+import { createElement, replaceChildren } from "./domHelpers.js";
+import { attachTooltips } from "./tooltip.js";
 import { createTutorial } from "./tutorial.js";
-import { escapeHtml } from "./uiHelpers.js";
 import {
   loadWorld,
   getStarOverrides,
@@ -174,6 +174,331 @@ export function initOuterObjectsPage(mountEl) {
   // Persisted across re-renders but not saved to the world model.
   const ddInputModes = new Map();
 
+  function tipIconNode(text) {
+    if (!text) return null;
+    return createElement("span", {
+      className: "tip-icon",
+      attrs: { tabindex: "0", role: "note", "aria-label": "Info" },
+      dataset: { tip: text },
+      text: "i",
+    });
+  }
+
+  function labelWithTipNode(text, tipText, { unit = null, className = "label" } = {}) {
+    return createElement("div", { className }, [
+      text,
+      unit ? " " : "",
+      unit ? createElement("span", { className: "unit", text: unit }) : null,
+      tipText ? " " : "",
+      tipIconNode(tipText),
+    ]);
+  }
+
+  function rangeMetaNode(minLabel, maxLabel) {
+    return createElement("div", { className: "range-meta" }, [
+      createElement("span", { text: minLabel }),
+      createElement("span", { text: maxLabel }),
+    ]);
+  }
+
+  function numberSliderPairNode({
+    inputClass,
+    sliderClass,
+    value,
+    step,
+    min,
+    max,
+    placeholder = null,
+    rangeMinLabel,
+    rangeMaxLabel,
+  }) {
+    const normalizedValue = value == null ? "" : String(value);
+    return createElement("div", { className: "input-pair" }, [
+      createElement("input", {
+        className: inputClass,
+        attrs: {
+          type: "number",
+          step,
+          min,
+          max,
+          placeholder,
+          value: normalizedValue,
+        },
+      }),
+      createElement("input", {
+        className: sliderClass,
+        attrs: { type: "range", value: normalizedValue },
+      }),
+      rangeMetaNode(rangeMinLabel, rangeMaxLabel),
+    ]);
+  }
+
+  function setInputValue(node, value) {
+    if (!node) return node;
+    node.value = value == null ? "" : String(value);
+    return node;
+  }
+
+  function debrisRowNode(disk, index) {
+    const inner = Number(disk.innerAu || 0);
+    const outer = Number(disk.outerAu || 0);
+    const center = Math.round(((inner + outer) / 2) * 100) / 100;
+    const width = Math.round((outer - inner) * 100) / 100;
+    const mode = ddInputModes.get(disk.id) || "edges";
+    const row = createElement("div", {
+      className: "dd-row",
+      dataset: { ddId: disk.id },
+    });
+
+    const head = createElement("div", { className: "dd-row__head" }, [
+      labelWithTipNode("Name", TIP_LABEL["Disk name"]),
+      createElement("input", { className: "dd-name", attrs: { type: "text" } }),
+      createElement("button", {
+        className: "small danger dd-remove",
+        attrs: { type: "button" },
+        text: "Remove",
+      }),
+    ]);
+    setInputValue(head.querySelector(".dd-name"), disk.name || `Debris disk ${index + 1}`);
+    row.appendChild(head);
+
+    row.appendChild(
+      createElement(
+        "div",
+        {
+          className: "physics-duo-toggle dd-mode-toggle",
+          attrs: { style: "margin-top:8px", "data-toggle": "dd-mode" },
+        },
+        [
+          createElement("input", {
+            attrs: {
+              type: "radio",
+              name: `ddMode_${disk.id}`,
+              id: `ddModeEdges_${disk.id}`,
+              value: "edges",
+            },
+            checked: mode === "edges",
+          }),
+          createElement("label", {
+            attrs: { for: `ddModeEdges_${disk.id}` },
+            text: "Inner / Outer",
+          }),
+          createElement("input", {
+            attrs: {
+              type: "radio",
+              name: `ddMode_${disk.id}`,
+              id: `ddModeCenter_${disk.id}`,
+              value: "center",
+            },
+            checked: mode === "center",
+          }),
+          createElement("label", {
+            attrs: { for: `ddModeCenter_${disk.id}` },
+            text: "Center / Width",
+          }),
+          createElement("span"),
+        ],
+      ),
+    );
+
+    const edgesGroup = createElement("div", {
+      className: "dd-edges-group",
+      attrs: { style: mode === "center" ? "display:none" : "" },
+    });
+    const innerRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Inner edge", TIP_LABEL["Inner edge"], { unit: "AU" }),
+        ]),
+        numberSliderPairNode({
+          inputClass: "dd-inner",
+          sliderClass: "dd-inner-slider",
+          value: inner,
+          step: "0.01",
+          min: "0.01",
+          max: "1000",
+          rangeMinLabel: "0.01",
+          rangeMaxLabel: "1000",
+        }),
+      ],
+    );
+    setInputValue(innerRow.querySelector(".dd-inner"), inner);
+    edgesGroup.appendChild(innerRow);
+
+    const outerRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Outer edge", TIP_LABEL["Outer edge"], { unit: "AU" }),
+        ]),
+        numberSliderPairNode({
+          inputClass: "dd-outer",
+          sliderClass: "dd-outer-slider",
+          value: outer,
+          step: "0.01",
+          min: "0.01",
+          max: "1000",
+          rangeMinLabel: "0.01",
+          rangeMaxLabel: "1000",
+        }),
+      ],
+    );
+    setInputValue(outerRow.querySelector(".dd-outer"), outer);
+    edgesGroup.appendChild(outerRow);
+    row.appendChild(edgesGroup);
+
+    const centerGroup = createElement("div", {
+      className: "dd-center-group",
+      attrs: { style: mode === "edges" ? "display:none" : "" },
+    });
+    const centerRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Center", TIP_LABEL["Disk center"], { unit: "AU" }),
+        ]),
+        numberSliderPairNode({
+          inputClass: "dd-center",
+          sliderClass: "dd-center-slider",
+          value: center,
+          step: "0.01",
+          min: "0.01",
+          max: "1000",
+          rangeMinLabel: "0.01",
+          rangeMaxLabel: "1000",
+        }),
+      ],
+    );
+    setInputValue(centerRow.querySelector(".dd-center"), center);
+    centerGroup.appendChild(centerRow);
+
+    const widthRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Width", TIP_LABEL["Disk width"], { unit: "AU" }),
+        ]),
+        numberSliderPairNode({
+          inputClass: "dd-width",
+          sliderClass: "dd-width-slider",
+          value: width,
+          step: "0.01",
+          min: "0.01",
+          max: "500",
+          rangeMinLabel: "0.01",
+          rangeMaxLabel: "500",
+        }),
+      ],
+    );
+    setInputValue(widthRow.querySelector(".dd-width"), width);
+    centerGroup.appendChild(widthRow);
+    row.appendChild(centerGroup);
+
+    const eccentricityRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Eccentricity", TIP_LABEL["Disk Eccentricity"]),
+        ]),
+        numberSliderPairNode({
+          inputClass: "dd-ecc",
+          sliderClass: "dd-ecc-slider",
+          value: disk.eccentricity != null ? disk.eccentricity : "",
+          step: "0.01",
+          min: "0",
+          max: "0.5",
+          placeholder: "0.05",
+          rangeMinLabel: "0",
+          rangeMaxLabel: "0.5",
+        }),
+      ],
+    );
+    setInputValue(
+      eccentricityRow.querySelector(".dd-ecc"),
+      disk.eccentricity != null ? disk.eccentricity : "",
+    );
+    row.appendChild(eccentricityRow);
+
+    const inclinationRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Inclination", TIP_LABEL["Disk Inclination"], { unit: "\u00b0" }),
+        ]),
+        numberSliderPairNode({
+          inputClass: "dd-inc",
+          sliderClass: "dd-inc-slider",
+          value: disk.inclination != null ? disk.inclination : "",
+          step: "1",
+          min: "0",
+          max: "90",
+          placeholder: "0",
+          rangeMinLabel: "0",
+          rangeMaxLabel: "90",
+        }),
+      ],
+    );
+    setInputValue(
+      inclinationRow.querySelector(".dd-inc"),
+      disk.inclination != null ? disk.inclination : "",
+    );
+    row.appendChild(inclinationRow);
+
+    const massRow = createElement(
+      "div",
+      { className: "form-row", attrs: { style: "margin-top:8px" } },
+      [
+        createElement("div", {}, [
+          labelWithTipNode("Total mass", TIP_LABEL["Disk Mass Override"], { unit: "M\u2295" }),
+        ]),
+        createElement("div", { className: "input-pair" }, [
+          createElement("input", {
+            className: "dd-mass",
+            attrs: {
+              type: "number",
+              step: "0.001",
+              min: "0",
+              placeholder: "Auto",
+            },
+          }),
+          createElement("button", {
+            className: "small dd-mass-clear",
+            attrs: { type: "button", style: "margin-left:4px" },
+            text: "Auto",
+          }),
+        ]),
+      ],
+    );
+    setInputValue(
+      massRow.querySelector(".dd-mass"),
+      disk.totalMassMearth != null ? disk.totalMassMearth : "",
+    );
+    row.appendChild(massRow);
+
+    return row;
+  }
+
+  function createOuterKpiCard(label, value, meta, tipText) {
+    return createElement("div", { className: "kpi-wrap" }, [
+      createElement("div", { className: "kpi" }, [
+        createElement("div", { className: "kpi__label" }, [
+          label,
+          tipText ? " " : "",
+          tipIconNode(tipText),
+        ]),
+        createElement("div", { className: "kpi__value", text: value }),
+        createElement("div", { className: "kpi__meta", text: meta || "" }),
+      ]),
+    ]);
+  }
+
   function renderDebrisDisksEditor(world, model) {
     const disks = getDebrisDisks(world);
 
@@ -183,153 +508,102 @@ export function initOuterObjectsPage(mountEl) {
       gasGiants: gasGiants.map((g) => ({ name: g.name, au: g.au })),
       starLuminosityLsol: model.star.luminosityLsol,
     });
-
-    const suggestPreviewHtml = zones.length
-      ? `<div class="dd-suggest-preview">
-          <div class="label" style="margin-top:8px">Possible zones ${tipIcon(TIP_LABEL["Suggest"])}</div>
-          <div class="hint">Select zones to add. Based on ${gasGiants.length ? "gas giant resonances" : "frost line estimate"}. Recommended zones are pre-selected.</div>
-          <div class="dd-suggest-list">
-            ${zones
-              .map(
-                (z, i) => `
-              <label class="dd-suggest-item${z.recommended ? "" : " dd-suggest-item--alt"}">
-                <input type="checkbox" ${z.recommended ? "checked" : ""} data-zone-idx="${i}" />
-                <span class="dd-suggest-priority">P${z.priority}</span>
-                <span class="dd-suggest-label">${escapeHtml(z.label)}</span>
-                <span class="dd-suggest-range">${fmt(z.innerAu, 2)}\u2013${fmt(z.outerAu, 2)} AU</span>
-                <span class="dd-suggest-res">${z.resonanceInner && z.resonanceOuter ? `${z.resonanceInner} \u2192 ${z.resonanceOuter}` : "Frost-line scaled"}${z.sculptorName ? ` (${escapeHtml(z.sculptorName)})` : ""}</span>
-              </label>`,
+    replaceChildren(debrisEditorEl, [
+      createElement("div", { className: "subsection" }, [
+        createElement("div", { className: "subsection__title" }, [
+          "Debris disks",
+          " ",
+          tipIconNode(TIP_LABEL["Debris disks"]),
+        ]),
+        createElement("div", {
+          className: "hint",
+          text: "Debris disk positions can be auto-suggested from gas giant resonances (or frost line if no giants), or set manually.",
+        }),
+        createElement("div", { className: "dd-suggest-preview" }, [
+          zones.length
+            ? createElement("div", { className: "label", attrs: { style: "margin-top:8px" } }, [
+                "Possible zones",
+                " ",
+                tipIconNode(TIP_LABEL["Suggest"]),
+              ])
+            : null,
+          zones.length
+            ? createElement("div", {
+                className: "hint",
+                text: `Select zones to add. Based on ${
+                  gasGiants.length ? "gas giant resonances" : "frost line estimate"
+                }. Recommended zones are pre-selected.`,
+              })
+            : createElement("div", {
+                className: "hint",
+                attrs: { style: "margin-top:8px" },
+                text: "No suggestions available. Add gas giants or adjust star parameters.",
+              }),
+          zones.length
+            ? createElement(
+                "div",
+                { className: "dd-suggest-list" },
+                zones.map((zone, index) =>
+                  createElement(
+                    "label",
+                    {
+                      className: `dd-suggest-item${
+                        zone.recommended ? "" : " dd-suggest-item--alt"
+                      }`,
+                    },
+                    [
+                      createElement("input", {
+                        attrs: { type: "checkbox" },
+                        dataset: { zoneIdx: index },
+                        checked: zone.recommended,
+                      }),
+                      createElement("span", {
+                        className: "dd-suggest-priority",
+                        text: `P${zone.priority}`,
+                      }),
+                      createElement("span", {
+                        className: "dd-suggest-label",
+                        text: zone.label,
+                      }),
+                      createElement("span", {
+                        className: "dd-suggest-range",
+                        text: `${fmt(zone.innerAu, 2)}\u2013${fmt(zone.outerAu, 2)} AU`,
+                      }),
+                      createElement("span", {
+                        className: "dd-suggest-res",
+                        text: `${
+                          zone.resonanceInner && zone.resonanceOuter
+                            ? `${zone.resonanceInner} \u2192 ${zone.resonanceOuter}`
+                            : "Frost-line scaled"
+                        }${zone.sculptorName ? ` (${zone.sculptorName})` : ""}`,
+                      }),
+                    ],
+                  ),
+                ),
               )
-              .join("")}
-          </div>
-          <div class="button-row" style="margin-top:6px"><button id="btn-dd-add-selected" type="button">Add selected</button></div>
-        </div>`
-      : `<div class="dd-suggest-preview">
-          <div class="hint" style="margin-top:8px">No suggestions available. Add gas giants or adjust star parameters.</div>
-        </div>`;
-
-    debrisEditorEl.innerHTML = `
-      <div class="subsection">
-        <div class="subsection__title">Debris disks ${tipIcon(TIP_LABEL["Debris disks"])}</div>
-        <div class="hint">Debris disk positions can be auto-suggested from gas giant resonances (or frost line if no giants), or set manually.</div>
-
-        ${suggestPreviewHtml}
-
-        <div class="dd-list">
-          ${disks
-            .map((d, idx) => {
-              const inner = Number(d.innerAu || 0);
-              const outer = Number(d.outerAu || 0);
-              const center = Math.round(((inner + outer) / 2) * 100) / 100;
-              const width = Math.round((outer - inner) * 100) / 100;
-              const mode = ddInputModes.get(d.id) || "edges";
-              return `
-            <div class="dd-row" data-dd-id="${escapeHtml(d.id)}">
-              <div class="dd-row__head">
-                <div class="label">Name ${tipIcon(TIP_LABEL["Disk name"])}</div>
-                <input class="dd-name" type="text" value="${escapeHtml(d.name || `Debris disk ${idx + 1}`)}" />
-                <button class="small danger dd-remove" type="button">Remove</button>
-              </div>
-
-              <div class="physics-duo-toggle dd-mode-toggle" style="margin-top:8px" data-toggle="dd-mode">
-                <input type="radio" name="ddMode_${escapeHtml(d.id)}" id="ddModeEdges_${escapeHtml(d.id)}" value="edges" ${mode === "edges" ? "checked" : ""} />
-                <label for="ddModeEdges_${escapeHtml(d.id)}">Inner / Outer</label>
-                <input type="radio" name="ddMode_${escapeHtml(d.id)}" id="ddModeCenter_${escapeHtml(d.id)}" value="center" ${mode === "center" ? "checked" : ""} />
-                <label for="ddModeCenter_${escapeHtml(d.id)}">Center / Width</label>
-                <span></span>
-              </div>
-
-              <div class="dd-edges-group" style="${mode === "center" ? "display:none" : ""}">
-                <div class="form-row" style="margin-top:8px">
-                  <div>
-                    <div class="label">Inner edge <span class="unit">AU</span> ${tipIcon(TIP_LABEL["Inner edge"])}</div>
-                  </div>
-                  <div class="input-pair">
-                    <input class="dd-inner" type="number" step="0.01" value="${inner}" />
-                    <input class="dd-inner-slider" type="range" />
-                    <div class="range-meta"><span>0.01</span><span>1000</span></div>
-                  </div>
-                </div>
-
-                <div class="form-row" style="margin-top:8px">
-                  <div>
-                    <div class="label">Outer edge <span class="unit">AU</span> ${tipIcon(TIP_LABEL["Outer edge"])}</div>
-                  </div>
-                  <div class="input-pair">
-                    <input class="dd-outer" type="number" step="0.01" value="${outer}" />
-                    <input class="dd-outer-slider" type="range" />
-                    <div class="range-meta"><span>0.01</span><span>1000</span></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="dd-center-group" style="${mode === "edges" ? "display:none" : ""}">
-                <div class="form-row" style="margin-top:8px">
-                  <div>
-                    <div class="label">Center <span class="unit">AU</span> ${tipIcon(TIP_LABEL["Disk center"])}</div>
-                  </div>
-                  <div class="input-pair">
-                    <input class="dd-center" type="number" step="0.01" value="${center}" />
-                    <input class="dd-center-slider" type="range" />
-                    <div class="range-meta"><span>0.01</span><span>1000</span></div>
-                  </div>
-                </div>
-
-                <div class="form-row" style="margin-top:8px">
-                  <div>
-                    <div class="label">Width <span class="unit">AU</span> ${tipIcon(TIP_LABEL["Disk width"])}</div>
-                  </div>
-                  <div class="input-pair">
-                    <input class="dd-width" type="number" step="0.01" value="${width}" />
-                    <input class="dd-width-slider" type="range" />
-                    <div class="range-meta"><span>0.01</span><span>500</span></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-row" style="margin-top:8px">
-                <div>
-                  <div class="label">Eccentricity ${tipIcon(TIP_LABEL["Disk Eccentricity"])}</div>
-                </div>
-                <div class="input-pair">
-                  <input class="dd-ecc" type="number" step="0.01" min="0" max="0.5" value="${d.eccentricity != null ? d.eccentricity : ""}" placeholder="0.05" />
-                  <input class="dd-ecc-slider" type="range" />
-                  <div class="range-meta"><span>0</span><span>0.5</span></div>
-                </div>
-              </div>
-
-              <div class="form-row" style="margin-top:8px">
-                <div>
-                  <div class="label">Inclination <span class="unit">\u00b0</span> ${tipIcon(TIP_LABEL["Disk Inclination"])}</div>
-                </div>
-                <div class="input-pair">
-                  <input class="dd-inc" type="number" step="1" min="0" max="90" value="${d.inclination != null ? d.inclination : ""}" placeholder="0" />
-                  <input class="dd-inc-slider" type="range" />
-                  <div class="range-meta"><span>0</span><span>90</span></div>
-                </div>
-              </div>
-
-              <div class="form-row" style="margin-top:8px">
-                <div>
-                  <div class="label">Total mass <span class="unit">M\u2295</span> ${tipIcon(TIP_LABEL["Disk Mass Override"])}</div>
-                </div>
-                <div class="input-pair">
-                  <input class="dd-mass" type="number" step="0.001" min="0" value="${d.totalMassMearth != null ? d.totalMassMearth : ""}" placeholder="Auto" />
-                  <button class="small dd-mass-clear" type="button" style="margin-left:4px">Auto</button>
-                </div>
-              </div>
-            </div>
-          `;
-            })
-            .join("")}
-        </div>
-
-        <div class="button-row" style="margin-top:10px">
-          <button id="btn-dd-add" type="button">Add debris disk</button>
-        </div>
-      </div>
-    `;
-    attachTooltips(debrisEditorEl);
+            : null,
+          zones.length
+            ? createElement(
+                "div",
+                { className: "button-row", attrs: { style: "margin-top:6px" } },
+                [
+                  createElement("button", {
+                    attrs: { id: "btn-dd-add-selected", type: "button" },
+                    text: "Add selected",
+                  }),
+                ],
+              )
+            : null,
+        ]),
+        createElement("div", { className: "dd-list" }, disks.map(debrisRowNode)),
+        createElement("div", { className: "button-row", attrs: { style: "margin-top:10px" } }, [
+          createElement("button", {
+            attrs: { id: "btn-dd-add", type: "button" },
+            text: "Add debris disk",
+          }),
+        ]),
+      ]),
+    ]);
 
     const ddRows = [...debrisEditorEl.querySelectorAll(".dd-row")];
     let hydrating = true;
@@ -574,109 +848,143 @@ export function initOuterObjectsPage(mountEl) {
       }),
     );
 
-    // Per-debris-disk KPI card sections
-    let ddSections = "";
-    for (let i = 0; i < disks.length; i++) {
-      const d = disks[i];
-      const dm = ddModels[i];
-
-      const speciesRows = dm.composition.species
-        .map(
-          (s) =>
-            `<tr><td>${s.name}</td><td>${s.condensationK} K</td><td>${s.presentAtInner ? "\u2713" : "\u2717"}</td><td>${s.presentAtMid ? "\u2713" : "\u2717"}</td><td>${s.presentAtOuter ? "\u2713" : "\u2717"}</td></tr>`,
-        )
-        .join("");
-
-      ddSections += `
-        <div class="label" style="margin-top:18px">${escapeHtml(d.name)}</div>
-        <div class="kpi-grid">
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Range ${tipIcon(TIP_LABEL["Disk Range"])}</div>
-            <div class="kpi__value">${dm.display.range}</div>
-            <div class="kpi__meta">${dm.inputs.eccentricity > 0 ? dm.display.periApo : ""}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Temperature ${tipIcon(TIP_LABEL["Disk Temperature"])}</div>
-            <div class="kpi__value">${dm.display.temperature}</div>
-            <div class="kpi__meta"></div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Composition ${tipIcon(TIP_LABEL["Disk Composition"])}</div>
-            <div class="kpi__value">${dm.display.composition}</div>
-            <div class="kpi__meta">${dm.composition.dominantMaterials.join(", ")}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Classification ${tipIcon(TIP_LABEL["Resonance"])}</div>
-            <div class="kpi__value">${dm.display.classification}</div>
-            <div class="kpi__meta">${dm.display.frostLine}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Estimated Mass ${tipIcon(TIP_LABEL["Estimated Mass"])}</div>
-            <div class="kpi__value">${dm.display.mass} M\u2295</div>
-            <div class="kpi__meta">${dm.display.massSource}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Orbital Period ${tipIcon(TIP_LABEL["Disk Orbital Period"])}</div>
-            <div class="kpi__value">${dm.display.orbitalPeriod}</div>
-            <div class="kpi__meta">At midpoint</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Collision Velocity ${tipIcon(TIP_LABEL["Collision Velocity"])}</div>
-            <div class="kpi__value">${dm.display.collisionVelocity}</div>
-            <div class="kpi__meta">${dm.display.collisionRegime}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Surface Density ${tipIcon(TIP_LABEL["Surface Density"])}</div>
-            <div class="kpi__value">${dm.display.surfaceDensity} g/cm\u00b2</div>
-            <div class="kpi__meta">${dm.display.surfaceDensityVsMMSN}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">IR Excess ${tipIcon(TIP_LABEL["IR Excess"])}</div>
-            <div class="kpi__value">${dm.display.irExcess}</div>
-            <div class="kpi__meta">${dm.display.irExcessLabel}</div>
-          </div></div>
-          <div class="kpi-wrap"><div class="kpi">
-            <div class="kpi__label">Stability ${tipIcon(TIP_LABEL["Disk Stability"])}</div>
-            <div class="kpi__value">${dm.display.stability}</div>
-            <div class="kpi__meta"></div>
-          </div></div>
-        </div>
-        <div style="margin-top:14px">
-          <div class="label">Derived details ${tipIcon(TIP_LABEL["Disk Derived"])}</div>
-          <div class="derived-readout">Fractional luminosity: ${dm.display.luminosity}
-Optical depth: ${dm.display.opticalDepth}
-
-Grain blowout size: ${dm.display.blowout}
-PR drag timescale: ${dm.display.prDrag}
-Collisional lifetime: ${dm.display.collisional}
-Dominant process: ${dm.display.dominantProcess}
-
-Dust production: ${dm.display.dustProduction}
-Zodiacal delivery: ${dm.display.zodiacalInflow} (${dm.display.zodiacalLabel})
-Ice-to-rock ratio: ${dm.display.iceToRock}</div>
-        </div>
-        <div style="margin-top:14px">
-          <div class="label">Condensation species ${tipIcon(TIP_LABEL["Condensation Species"])}</div>
-          <div class="derived-readout"><table class="mini-table">
-<thead><tr><th>Species</th><th>T<sub>cond</sub></th><th>Inner</th><th>Mid</th><th>Outer</th></tr></thead>
-<tbody>${speciesRows}</tbody>
-</table>
-<div style="margin-top:4px">Ice-to-rock ratio ${tipIcon(TIP_LABEL["Ice-to-Rock Ratio"])}: ${dm.display.iceToRock}</div></div>
-        </div>
-      `;
-    }
-
-    summaryEl.innerHTML = `
-      <div class="kpi-grid">
-        <div class="kpi-wrap"><div class="kpi">
-          <div class="kpi__label">Debris disks ${tipIcon(TIP_LABEL["Debris disks count"])}</div>
-          <div class="kpi__value">${disks.length}</div>
-        </div></div>
-      </div>
-
-      ${ddSections}
-    `;
-    attachTooltips(summaryEl);
+    replaceChildren(summaryEl, [
+      createElement("div", { className: "kpi-grid" }, [
+        createOuterKpiCard("Debris disks", disks.length, "", TIP_LABEL["Debris disks count"]),
+      ]),
+      disks.map((disk, index) => {
+        const diskModel = ddModels[index];
+        return [
+          createElement("div", {
+            className: "label",
+            attrs: { style: "margin-top:18px" },
+            text: disk.name,
+          }),
+          createElement("div", { className: "kpi-grid" }, [
+            createOuterKpiCard(
+              "Range",
+              diskModel.display.range,
+              diskModel.inputs.eccentricity > 0 ? diskModel.display.periApo : "",
+              TIP_LABEL["Disk Range"],
+            ),
+            createOuterKpiCard(
+              "Temperature",
+              diskModel.display.temperature,
+              "",
+              TIP_LABEL["Disk Temperature"],
+            ),
+            createOuterKpiCard(
+              "Composition",
+              diskModel.display.composition,
+              diskModel.composition.dominantMaterials.join(", "),
+              TIP_LABEL["Disk Composition"],
+            ),
+            createOuterKpiCard(
+              "Classification",
+              diskModel.display.classification,
+              diskModel.display.frostLine,
+              TIP_LABEL["Resonance"],
+            ),
+            createOuterKpiCard(
+              "Estimated Mass",
+              `${diskModel.display.mass} M\u2295`,
+              diskModel.display.massSource,
+              TIP_LABEL["Estimated Mass"],
+            ),
+            createOuterKpiCard(
+              "Orbital Period",
+              diskModel.display.orbitalPeriod,
+              "At midpoint",
+              TIP_LABEL["Disk Orbital Period"],
+            ),
+            createOuterKpiCard(
+              "Collision Velocity",
+              diskModel.display.collisionVelocity,
+              diskModel.display.collisionRegime,
+              TIP_LABEL["Collision Velocity"],
+            ),
+            createOuterKpiCard(
+              "Surface Density",
+              `${diskModel.display.surfaceDensity} g/cm\u00b2`,
+              diskModel.display.surfaceDensityVsMMSN,
+              TIP_LABEL["Surface Density"],
+            ),
+            createOuterKpiCard(
+              "IR Excess",
+              diskModel.display.irExcess,
+              diskModel.display.irExcessLabel,
+              TIP_LABEL["IR Excess"],
+            ),
+            createOuterKpiCard(
+              "Stability",
+              diskModel.display.stability,
+              "",
+              TIP_LABEL["Disk Stability"],
+            ),
+          ]),
+          createElement("div", { attrs: { style: "margin-top:14px" } }, [
+            createElement("div", { className: "label" }, [
+              "Derived details",
+              " ",
+              tipIconNode(TIP_LABEL["Disk Derived"]),
+            ]),
+            createElement("div", {
+              className: "derived-readout",
+              text:
+                `Fractional luminosity: ${diskModel.display.luminosity}\n` +
+                `Optical depth: ${diskModel.display.opticalDepth}\n\n` +
+                `Grain blowout size: ${diskModel.display.blowout}\n` +
+                `PR drag timescale: ${diskModel.display.prDrag}\n` +
+                `Collisional lifetime: ${diskModel.display.collisional}\n` +
+                `Dominant process: ${diskModel.display.dominantProcess}\n\n` +
+                `Dust production: ${diskModel.display.dustProduction}\n` +
+                `Zodiacal delivery: ${diskModel.display.zodiacalInflow} (${diskModel.display.zodiacalLabel})\n` +
+                `Ice-to-rock ratio: ${diskModel.display.iceToRock}`,
+            }),
+          ]),
+          createElement("div", { attrs: { style: "margin-top:14px" } }, [
+            createElement("div", { className: "label" }, [
+              "Condensation species",
+              " ",
+              tipIconNode(TIP_LABEL["Condensation Species"]),
+            ]),
+            createElement("div", { className: "derived-readout" }, [
+              createElement("table", { className: "mini-table" }, [
+                createElement("thead", {}, [
+                  createElement("tr", {}, [
+                    createElement("th", { text: "Species" }),
+                    createElement("th", {}, ["T", createElement("sub", { text: "cond" })]),
+                    createElement("th", { text: "Inner" }),
+                    createElement("th", { text: "Mid" }),
+                    createElement("th", { text: "Outer" }),
+                  ]),
+                ]),
+                createElement(
+                  "tbody",
+                  {},
+                  diskModel.composition.species.map((species) =>
+                    createElement("tr", {}, [
+                      createElement("td", { text: species.name }),
+                      createElement("td", { text: `${species.condensationK} K` }),
+                      createElement("td", { text: species.presentAtInner ? "\u2713" : "\u2717" }),
+                      createElement("td", { text: species.presentAtMid ? "\u2713" : "\u2717" }),
+                      createElement("td", { text: species.presentAtOuter ? "\u2713" : "\u2717" }),
+                    ]),
+                  ),
+                ),
+              ]),
+              createElement("div", { attrs: { style: "margin-top:4px" } }, [
+                "Ice-to-rock ratio",
+                " ",
+                tipIconNode(TIP_LABEL["Ice-to-Rock Ratio"]),
+                ": ",
+                diskModel.display.iceToRock,
+              ]),
+            ]),
+          ]),
+        ];
+      }),
+    ]);
   }
 
   /* ── Main render ────────────────────────────────────────────────── */

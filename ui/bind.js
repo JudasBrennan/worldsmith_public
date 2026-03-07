@@ -17,9 +17,28 @@ export function bindNumberAndSlider({
   step,
   mode = "auto",
   onChange,
+  commitOnInput = true,
 }) {
   const span = max - min;
   const ratio = min > 0 ? max / min : Infinity;
+  const clampValue = (value) => Math.min(max, Math.max(min, value));
+
+  function readNumberValue() {
+    const raw = String(numberEl.value ?? "");
+    if (!raw.trim()) return Number.NaN;
+    const asNumber = numberEl.valueAsNumber;
+    if (Number.isFinite(asNumber)) return asNumber;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+
+  let lastCommittedValue = null;
+
+  function emitCommitted(clamped) {
+    if (Number.isFinite(lastCommittedValue) && Object.is(clamped, lastCommittedValue)) return;
+    lastCommittedValue = clamped;
+    onChange?.(clamped);
+  }
 
   const useLog = mode === "log" || (mode === "auto" && (span > 5000 || ratio > 2000) && min > 0);
 
@@ -47,12 +66,29 @@ export function bindNumberAndSlider({
       return 10 ** lv;
     }
 
-    function syncFromNumber() {
-      const v = Number(numberEl.value);
-      if (!Number.isFinite(v)) return;
-      const clamped = Math.min(max, Math.max(min, v));
-      sliderEl.value = String(valueToSlider(clamped));
-      onChange?.(clamped);
+    function syncSliderFromValue(value) {
+      sliderEl.value = String(valueToSlider(value));
+    }
+
+    function restoreLastCommittedValue() {
+      if (!Number.isFinite(lastCommittedValue)) return null;
+      numberEl.value = String(lastCommittedValue);
+      syncSliderFromValue(lastCommittedValue);
+      return lastCommittedValue;
+    }
+
+    function syncFromNumber({ commit = commitOnInput, normalize = false } = {}) {
+      const v = readNumberValue();
+      if (!Number.isFinite(v)) {
+        if (normalize) return restoreLastCommittedValue();
+        return null;
+      }
+      const clamped = clampValue(v);
+      syncSliderFromValue(clamped);
+      if (normalize) numberEl.value = String(clamped);
+      if (commit) emitCommitted(clamped);
+      else if (!Number.isFinite(lastCommittedValue)) lastCommittedValue = clamped;
+      return clamped;
     }
 
     function syncFromSlider() {
@@ -65,16 +101,22 @@ export function bindNumberAndSlider({
       }
       if (Number(sliderEl.value) <= S_MIN) vv = min;
       else if (Number(sliderEl.value) >= S_MAX) vv = max;
-      const clamped = Math.min(max, Math.max(min, vv));
+      const clamped = clampValue(vv);
       numberEl.value = String(clamped);
-      onChange?.(clamped);
+      emitCommitted(clamped);
+      return clamped;
     }
 
-    numberEl.addEventListener("input", syncFromNumber);
+    numberEl.addEventListener("input", () => {
+      syncFromNumber();
+    });
+    numberEl.addEventListener("change", () => {
+      syncFromNumber({ commit: true, normalize: true });
+    });
     sliderEl.addEventListener("input", syncFromSlider);
 
     // initial
-    syncFromNumber();
+    syncFromNumber({ commit: false, normalize: false });
     return { useLog: true, syncFromNumber, syncFromSlider };
   }
 
@@ -83,25 +125,49 @@ export function bindNumberAndSlider({
   sliderEl.max = String(max);
   sliderEl.step = String(step ?? "any");
 
-  function syncFromNumber() {
-    const v = Number(numberEl.value);
-    if (!Number.isFinite(v)) return;
-    const clamped = Math.min(max, Math.max(min, v));
-    sliderEl.value = String(clamped);
-    onChange?.(clamped);
+  function syncSliderFromValue(value) {
+    sliderEl.value = String(value);
+  }
+
+  function restoreLastCommittedValue() {
+    if (!Number.isFinite(lastCommittedValue)) return null;
+    numberEl.value = String(lastCommittedValue);
+    syncSliderFromValue(lastCommittedValue);
+    return lastCommittedValue;
+  }
+
+  function syncFromNumber({ commit = commitOnInput, normalize = false } = {}) {
+    const v = readNumberValue();
+    if (!Number.isFinite(v)) {
+      if (normalize) return restoreLastCommittedValue();
+      return null;
+    }
+    const clamped = clampValue(v);
+    syncSliderFromValue(clamped);
+    if (normalize) numberEl.value = String(clamped);
+    if (commit) emitCommitted(clamped);
+    else if (!Number.isFinite(lastCommittedValue)) lastCommittedValue = clamped;
+    return clamped;
   }
 
   function syncFromSlider() {
     const v = Number(sliderEl.value);
-    if (!Number.isFinite(v)) return;
-    numberEl.value = String(v);
-    onChange?.(v);
+    if (!Number.isFinite(v)) return null;
+    const clamped = clampValue(v);
+    numberEl.value = String(clamped);
+    emitCommitted(clamped);
+    return clamped;
   }
 
-  numberEl.addEventListener("input", syncFromNumber);
+  numberEl.addEventListener("input", () => {
+    syncFromNumber();
+  });
+  numberEl.addEventListener("change", () => {
+    syncFromNumber({ commit: true, normalize: true });
+  });
   sliderEl.addEventListener("input", syncFromSlider);
 
   // initial
-  syncFromNumber();
+  syncFromNumber({ commit: false, normalize: false });
   return { useLog: false, syncFromNumber, syncFromSlider };
 }

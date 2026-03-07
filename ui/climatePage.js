@@ -2,8 +2,8 @@ import { calcClimateZones } from "../engine/climate.js";
 import { calcPlanetExact } from "../engine/planet.js";
 import { fmt } from "../engine/utils.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
-import { escapeHtml } from "./uiHelpers.js";
 import { bindNumberAndSlider } from "./bind.js";
+import { createElement, replaceChildren, replaceSelectOptions } from "./domHelpers.js";
 import {
   getSelectedPlanet,
   getStarOverrides,
@@ -316,90 +316,135 @@ export function initClimatePage(containerEl) {
     X: "Special",
   };
 
-  function dynamicHTML(model, ctx) {
+  function tipIconNode(text) {
+    if (!text) return null;
+    return createElement("span", {
+      className: "tip-icon",
+      attrs: { tabindex: "0", role: "note", "aria-label": "Info" },
+      dataset: { tip: text },
+      text: "i",
+    });
+  }
+
+  function kpiNode(label, value, tipText) {
+    return createElement("div", { className: "kpi-wrap" }, [
+      createElement("div", { className: "kpi" }, [
+        createElement("div", { className: "kpi__label" }, [
+          label,
+          tipText ? " " : "",
+          tipIconNode(tipText),
+        ]),
+        createElement("div", { className: "kpi__value", text: value }),
+      ]),
+    ]);
+  }
+
+  function detailRowNode(label, text) {
+    return createElement("p", { className: "clim-detail-row" }, [
+      createElement("strong", { text: label }),
+      " ",
+      text,
+    ]);
+  }
+
+  function renderClimateDynamic(container, model, ctx) {
     const dominantLabel =
       DOMINANT_NAMES[model.display.dominantClass] || model.display.dominantClass;
+    const legendItems = Object.entries(MASTER_COLORS)
+      .filter(([key]) => model.zones.some((zone) => zone.master === key))
+      .map(([key, color]) =>
+        createElement("span", { className: "clim-legend-item" }, [
+          createElement("span", {
+            className: "clim-legend-swatch",
+            attrs: { style: `background:${color}` },
+          }),
+          key === "A"
+            ? "Tropical"
+            : key === "B"
+              ? "Arid"
+              : key === "C"
+                ? "Temperate"
+                : key === "D"
+                  ? "Continental"
+                  : key === "E"
+                    ? "Polar"
+                    : "Special",
+        ]),
+      );
 
-    return `
-      ${model.advisory ? `<div class="clim-advisory">${escapeHtml(model.advisory)}</div>` : ""}
-
-      <div class="kpi-grid">
-        <div class="kpi-wrap"><div class="kpi">
-          <div class="kpi__label">Zone Count ${tipIcon(TIP_LABEL["Zone Count"])}</div>
-          <div class="kpi__value">${model.display.zoneCount}</div>
-        </div></div>
-        <div class="kpi-wrap"><div class="kpi">
-          <div class="kpi__label">Mean Surface Temp ${tipIcon(TIP_LABEL["Mean Surface Temp"])}</div>
-          <div class="kpi__value">${fmt(ctx.surfaceTempK - 273.15, 1)} \u00b0C</div>
-        </div></div>
-        <div class="kpi-wrap"><div class="kpi">
-          <div class="kpi__label">Dominant Class ${tipIcon(TIP_LABEL["Dominant Class"])}</div>
-          <div class="kpi__value">${escapeHtml(dominantLabel)}</div>
-        </div></div>
-        <div class="kpi-wrap"><div class="kpi">
-          <div class="kpi__label">Water Regime ${tipIcon(TIP_LABEL["Water Regime"])}</div>
-          <div class="kpi__value">${escapeHtml(ctx.waterRegime)}</div>
-        </div></div>
-      </div>
-
-      <div class="subsection" style="margin-top:12px">
-        <h3>Latitude Bands ${tipIcon(TIP_LABEL["Latitude Temperature"])}</h3>
-        <canvas id="climBandCanvas" class="clim-canvas"></canvas>
-        <div class="clim-legend">${tipIcon(TIP_LABEL["Climate Legend"])}
-          ${Object.entries(MASTER_COLORS)
-            .filter(([k]) => model.zones.some((z) => z.master === k))
-            .map(
-              ([k, c]) =>
-                `<span class="clim-legend-item"><span class="clim-legend-swatch" style="background:${c}"></span>${
-                  k === "A"
-                    ? "Tropical"
-                    : k === "B"
-                      ? "Arid"
-                      : k === "C"
-                        ? "Temperate"
-                        : k === "D"
-                          ? "Continental"
-                          : k === "E"
-                            ? "Polar"
-                            : "Special"
-                }</span>`,
-            )
-            .join("")}
-        </div>
-      </div>
-
-      <div class="subsection" style="margin-top:12px">
-        <h3>Zone Details ${tipIcon(TIP_LABEL["Zone Card"])} ${tipIcon(TIP_LABEL["Aridity Index"])}</h3>
-        <div class="clim-zone-list">
-          ${model.zones
-            .map(
-              (z) => `
-            <details class="clim-zone-card">
-              <summary class="clim-zone-summary">
-                <span class="clim-zone-badge" style="background:${MASTER_COLORS[z.master] || "var(--muted)"}">${escapeHtml(z.code)}</span>
-                <span class="clim-zone-name">${escapeHtml(z.name)}</span>
-                ${z.variant !== "general" ? `<span class="clim-zone-variant">${escapeHtml(z.variant)}</span>` : ""}
-                <span class="clim-zone-range">${escapeHtml(z.rangeLabel)}</span>
-                <span class="clim-zone-temp">${fmt(z.meanTempC, 1)} \u00b0C</span>
-              </summary>
-              <div class="clim-zone-detail">
-                <p>${escapeHtml(z.description)}</p>
-                ${z.environment ? `<p class="clim-detail-row"><strong>Environment:</strong> ${escapeHtml(z.environment)}</p>` : ""}
-                ${z.location ? `<p class="clim-detail-row"><strong>Location:</strong> ${escapeHtml(z.location)}</p>` : ""}
-                <p class="clim-detail-row">
-                  <strong>Temperature:</strong>
-                  warmest ${fmt(z.warmestMonthC, 1)} \u00b0C,
-                  coldest ${fmt(z.coldestMonthC, 1)} \u00b0C
-                </p>
-                <p class="clim-detail-row">
-                  <strong>Aridity index:</strong> ${fmt(z.aridity, 2)}
-                </p>
-              </div>
-            </details>`,
-            )
-            .join("")}
-        </div>
-      </div>`;
+    replaceChildren(container, [
+      model.advisory
+        ? createElement("div", { className: "clim-advisory", text: model.advisory })
+        : null,
+      createElement("div", { className: "kpi-grid" }, [
+        kpiNode("Zone Count", model.display.zoneCount, TIP_LABEL["Zone Count"]),
+        kpiNode(
+          "Mean Surface Temp",
+          `${fmt(ctx.surfaceTempK - 273.15, 1)} \u00b0C`,
+          TIP_LABEL["Mean Surface Temp"],
+        ),
+        kpiNode("Dominant Class", dominantLabel, TIP_LABEL["Dominant Class"]),
+        kpiNode("Water Regime", ctx.waterRegime, TIP_LABEL["Water Regime"]),
+      ]),
+      createElement("div", { className: "subsection", attrs: { style: "margin-top:12px" } }, [
+        createElement("h3", {}, [
+          "Latitude Bands",
+          " ",
+          tipIconNode(TIP_LABEL["Latitude Temperature"]),
+        ]),
+        createElement("canvas", { attrs: { id: "climBandCanvas" }, className: "clim-canvas" }),
+        createElement("div", { className: "clim-legend" }, [
+          tipIconNode(TIP_LABEL["Climate Legend"]),
+          ...legendItems,
+        ]),
+      ]),
+      createElement("div", { className: "subsection", attrs: { style: "margin-top:12px" } }, [
+        createElement("h3", {}, [
+          "Zone Details",
+          " ",
+          tipIconNode(TIP_LABEL["Zone Card"]),
+          " ",
+          tipIconNode(TIP_LABEL["Aridity Index"]),
+        ]),
+        createElement(
+          "div",
+          { className: "clim-zone-list" },
+          model.zones.map((zone) =>
+            createElement("details", { className: "clim-zone-card" }, [
+              createElement("summary", { className: "clim-zone-summary" }, [
+                createElement("span", {
+                  className: "clim-zone-badge",
+                  attrs: { style: `background:${MASTER_COLORS[zone.master] || "var(--muted)"}` },
+                  text: zone.code,
+                }),
+                createElement("span", { className: "clim-zone-name", text: zone.name }),
+                zone.variant !== "general"
+                  ? createElement("span", { className: "clim-zone-variant", text: zone.variant })
+                  : null,
+                createElement("span", { className: "clim-zone-range", text: zone.rangeLabel }),
+                createElement("span", {
+                  className: "clim-zone-temp",
+                  text: `${fmt(zone.meanTempC, 1)} \u00b0C`,
+                }),
+              ]),
+              createElement("div", { className: "clim-zone-detail" }, [
+                createElement("p", { text: zone.description }),
+                zone.environment ? detailRowNode("Environment:", zone.environment) : null,
+                zone.location ? detailRowNode("Location:", zone.location) : null,
+                detailRowNode(
+                  "Temperature:",
+                  `warmest ${fmt(zone.warmestMonthC, 1)} \u00b0C, coldest ${fmt(
+                    zone.coldestMonthC,
+                    1,
+                  )} \u00b0C`,
+                ),
+                detailRowNode("Aridity index:", fmt(zone.aridity, 2)),
+              ]),
+            ]),
+          ),
+        ),
+      ]),
+    ]);
   }
 
   /** Lightweight refresh — replaces only the dynamic area below the inputs. */
@@ -410,9 +455,7 @@ export function initClimatePage(containerEl) {
 
     const dyn = containerEl.querySelector("#climDynamic");
     if (!dyn) return;
-    dyn.innerHTML = dynamicHTML(model, ctx);
-
-    attachTooltips(dyn);
+    renderClimateDynamic(dyn, model, ctx);
     requestAnimationFrame(() => {
       const canvas = dyn.querySelector("#climBandCanvas");
       if (canvas) drawLatitudeBands(canvas, model.zones);
@@ -427,15 +470,6 @@ export function initClimatePage(containerEl) {
     const ctx = getClimateContext(w);
     const model = calcClimateZones({ ...ctx, altitudeM: state.altitudeM });
 
-    // Planet selector options
-    const planetOptions = pList
-      .map((p) => {
-        const name = escapeHtml(p.name || p.inputs?.name || p.id);
-        const sel = p.id === selected?.id ? " selected" : "";
-        return `<option value="${escapeHtml(p.id)}"${sel}>${name}</option>`;
-      })
-      .join("");
-
     containerEl.innerHTML = `
       <div class="page">
         <div class="panel">
@@ -447,7 +481,7 @@ export function initClimatePage(containerEl) {
 
             <div class="form-row">
               <label for="climPlanetSelect">Planet</label>
-              <select id="climPlanetSelect">${planetOptions}</select>
+              <select id="climPlanetSelect"></select>
             </div>
 
             <div class="form-row">
@@ -460,9 +494,7 @@ export function initClimatePage(containerEl) {
               </div>
             </div>
 
-            <div id="climDynamic">
-              ${dynamicHTML(model, ctx)}
-            </div>
+            <div id="climDynamic"></div>
 
           </div>
         </div>
@@ -470,15 +502,29 @@ export function initClimatePage(containerEl) {
 
     attachTooltips(containerEl);
 
+    const dyn = containerEl.querySelector("#climDynamic");
+    if (dyn) renderClimateDynamic(dyn, model, ctx);
+
+    const planetSelect = containerEl.querySelector("#climPlanetSelect");
+    if (planetSelect) {
+      replaceSelectOptions(
+        planetSelect,
+        pList.map((planet) => ({
+          value: planet.id,
+          label: planet.name || planet.inputs?.name || planet.id,
+          selected: planet.id === selected?.id,
+        })),
+      );
+    }
+
     requestAnimationFrame(() => {
       const canvas = containerEl.querySelector("#climBandCanvas");
       if (canvas) drawLatitudeBands(canvas, model.zones);
     });
 
-    const sel = containerEl.querySelector("#climPlanetSelect");
-    if (sel) {
-      sel.addEventListener("change", () => {
-        selectPlanet(sel.value);
+    if (planetSelect) {
+      planetSelect.addEventListener("change", () => {
+        selectPlanet(planetSelect.value);
         render();
       });
     }

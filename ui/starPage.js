@@ -3,6 +3,7 @@ import { computeStellarActivityModel } from "../engine/stellarActivity.js";
 import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { createCelestialVisualPreviewController } from "./celestialVisualPreview.js";
+import { createElement, replaceChildren } from "./domHelpers.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { loadWorld, updateWorld } from "./store.js";
 import { createTutorial } from "./tutorial.js";
@@ -104,6 +105,67 @@ const TUTORIAL_STEPS = [
       "and moon calculations on other pages.",
   },
 ];
+
+function tipIconNode(text) {
+  if (!text) return null;
+  return createElement("span", {
+    className: "tip-icon",
+    attrs: { tabindex: "0", role: "note", "aria-label": "Info" },
+    dataset: { tip: text },
+    text: "i",
+  });
+}
+
+function renderStarKpis(container, items = []) {
+  replaceChildren(
+    container,
+    (items || []).map((item) => {
+      const tipText = TIP_LABEL[item.tipLabel] || TIP_LABEL[item.label] || "";
+      if (item.kind === "sunVisual") {
+        return createElement("div", { className: "kpi-wrap kpi-wrap--sun-preview" }, [
+          createElement("div", { className: "kpi kpi--sun-preview" }, [
+            createElement("div", { className: "kpi__label" }, [
+              item.label,
+              tipText ? " " : "",
+              tipIconNode(tipText),
+              createElement("span", {
+                className: "kpi__expand-indicator",
+                attrs: { "aria-hidden": "true" },
+                text: "\u25be",
+              }),
+            ]),
+            createElement("canvas", {
+              className: "sun-preview-canvas",
+              attrs: { width: "180", height: "180", "aria-label": "Star visual preview" },
+            }),
+            createElement("div", { className: "kpi__value sun-preview-value", text: item.value }),
+            createElement("div", { className: "sun-preview-caption", text: item.meta }),
+          ]),
+        ]);
+      }
+
+      return createElement("div", { className: "kpi-wrap" }, [
+        createElement(
+          "div",
+          {
+            className: `kpi ${item.kpiClass || ""}`.trim(),
+            attrs: { style: item.kpiStyle || null },
+          },
+          [
+            createElement("div", { className: "kpi__label" }, [
+              item.label,
+              tipText ? " " : "",
+              tipIconNode(tipText),
+            ]),
+            createElement("div", { className: "kpi__value", text: item.value }),
+            createElement("div", { className: "kpi__meta", text: item.meta }),
+          ],
+        ),
+      ]);
+    }),
+  );
+  return container;
+}
 
 export function initStarPage(mountEl) {
   const defaults = { name: "Star", massMsol: 0.8653, ageGyr: 6.254 }; // workbook defaults
@@ -208,7 +270,7 @@ export function initStarPage(mountEl) {
           <div class="form-row">
             <div>
               <div class="label">Metallicity [Fe/H] <span class="unit">dex</span> ${tipIcon(TIP_LABEL["Metallicity [Fe/H]"] || "")}</div>
-              <div class="hint">Sun = 0.0 Â· Metal-poor halo â‰ˆ âˆ'2 Â· Metal-rich disk â‰ˆ +0.3</div>
+              <div class="hint">Sun = 0.0 · Metal-poor halo ≈ −2 · Metal-rich disk ≈ +0.3</div>
             </div>
             <div class="input-pair">
             <input id="metallicity" type="number" step="0.01" min="-3" max="1" aria-label="Metallicity [Fe/H]" />
@@ -232,14 +294,14 @@ export function initStarPage(mountEl) {
             <div class="label" style="margin-bottom:6px">Derivation Mode</div>
             <div class="physics-trio-toggle">
               <input type="radio" name="physicsDerivMode" id="derivModeRl" value="rl" />
-              <label for="derivModeRl">R + L â†' T</label>
+              <label for="derivModeRl">R + L → T</label>
               <input type="radio" name="physicsDerivMode" id="derivModeRt" value="rt" />
-              <label for="derivModeRt">R + T â†' L</label>
+              <label for="derivModeRt">R + T → L</label>
               <input type="radio" name="physicsDerivMode" id="derivModeLt" value="lt" />
-              <label for="derivModeLt">L + T â†' R</label>
+              <label for="derivModeLt">L + T → R</label>
               <span></span>
             </div>
-            <div class="hint" style="margin-top:5px">R = Radius (Rsol) Â· L = Luminosity (Lsol) Â· T = Temperature (K) Â· Arrow = computed value</div>
+            <div class="hint" style="margin-top:5px">R = Radius (Rsol) · L = Luminosity (Lsol) · T = Temperature (K) · Arrow = computed value</div>
           </div>
 
           <div class="form-row" id="radiusOverrideRow">
@@ -350,13 +412,15 @@ export function initStarPage(mountEl) {
   const massMax = wrap.querySelector("#mass_max");
   massMin.textContent = "0.075";
   massMax.textContent = "100";
-  bindNumberAndSlider({
+  const massBinding = bindNumberAndSlider({
     numberEl: massEl,
     sliderEl: massSlider,
     min: 0.075,
     max: 100,
     step: 0.0001,
     mode: "auto",
+    commitOnInput: false,
+    onChange: () => applyFromInputs({ commit: true }),
   });
 
   const ageSlider = wrap.querySelector("#age_slider");
@@ -364,13 +428,15 @@ export function initStarPage(mountEl) {
   const ageMax = wrap.querySelector("#age_max");
   ageMin.textContent = "0";
   ageMax.textContent = "20";
-  bindNumberAndSlider({
+  const ageBinding = bindNumberAndSlider({
     numberEl: ageEl,
     sliderEl: ageSlider,
     min: 0,
     max: 20,
     step: 0.001,
     mode: "auto",
+    commitOnInput: false,
+    onChange: () => applyFromInputs({ commit: true }),
   });
 
   const metallicitySlider = wrap.querySelector("#metallicity_slider");
@@ -378,18 +444,67 @@ export function initStarPage(mountEl) {
   const metallicityMax = wrap.querySelector("#metallicity_max");
   metallicityMin.textContent = "-3";
   metallicityMax.textContent = "1";
-  bindNumberAndSlider({
+  const metallicityBinding = bindNumberAndSlider({
     numberEl: metallicityEl,
     sliderEl: metallicitySlider,
     min: -3,
     max: 1,
     step: 0.01,
     mode: "linear",
+    commitOnInput: false,
+    onChange: () => applyFromInputs({ commit: true }),
   });
 
   function sanitiseName(raw) {
     const txt = String(raw ?? "").trim();
     return txt || defaults.name;
+  }
+
+  function readOptionalNumberInput(inputEl) {
+    const raw = String(inputEl.value ?? "");
+    if (!raw.trim()) return null;
+    const asNumber = inputEl.valueAsNumber;
+    if (Number.isFinite(asNumber)) return asNumber;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function readClampedNumberInput(inputEl, min, max, fallback, { commit = false } = {}) {
+    const parsed = readOptionalNumberInput(inputEl);
+    if (!Number.isFinite(parsed)) {
+      if (commit && Number.isFinite(fallback)) inputEl.value = String(fallback);
+      return fallback;
+    }
+    const clamped = clamp(parsed, min, max);
+    if (commit) inputEl.value = String(clamped);
+    return clamped;
+  }
+
+  function readPositiveOverride(inputEl, { commit = false } = {}) {
+    const parsed = readOptionalNumberInput(inputEl);
+    if (!(parsed > 0)) {
+      if (commit) inputEl.value = "";
+      return null;
+    }
+    return parsed;
+  }
+
+  function persistState() {
+    updateWorld({
+      star: {
+        name: state.name,
+        massMsol: state.massMsol,
+        ageGyr: state.ageGyr,
+        metallicityFeH: state.metallicityFeH,
+        radiusRsolOverride: state.radiusRsolOverride,
+        luminosityLsolOverride: state.luminosityLsolOverride,
+        tempKOverride: state.tempKOverride,
+        physicsMode: state.physicsMode,
+        advancedDerivationMode: state.advancedDerivationMode,
+        evolutionMode: state.evolutionMode,
+        activityModelVersion: state.activityModelVersion,
+      },
+    });
   }
 
   function getDerivMode() {
@@ -417,7 +532,7 @@ export function initStarPage(mountEl) {
       if (m === "lt") return { r: null, l, t };
       return { r, l, t: null }; // "rl" (default)
     }
-    // Simple mode: all values from mass â€" no overrides reach the engine
+    // Simple mode: all values from mass — no overrides reach the engine
     return { r: null, l: null, t: null };
   }
 
@@ -493,7 +608,7 @@ export function initStarPage(mountEl) {
           " W" +
           (model.luminosityOverridden ? " (Override)" : ""),
       },
-      { label: "Density", value: fmt(model.densityGcm3, 3), meta: "g/cmÂ³" },
+      { label: "Density", value: fmt(model.densityGcm3, 3), meta: "g/cm³" },
       { label: "Temperature", value: fmt(model.tempK, 0), meta: "K" },
       {
         label: "Habitable Zone",
@@ -559,31 +674,7 @@ export function initStarPage(mountEl) {
       },
     ];
 
-    kpisEl.innerHTML = items
-      .map((x) => {
-        if (x.kind === "sunVisual") {
-          return `
-      <div class="kpi-wrap kpi-wrap--sun-preview">
-        <div class="kpi kpi--sun-preview">
-          <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.tipLabel] || TIP_LABEL[x.label] || "")}<span class="kpi__expand-indicator" aria-hidden="true">&#9662;</span></div>
-          <canvas class="sun-preview-canvas" width="180" height="180" aria-label="Star visual preview"></canvas>
-          <div class="kpi__value sun-preview-value">${x.value}</div>
-          <div class="sun-preview-caption">${x.meta}</div>
-        </div>
-      </div>
-    `;
-        }
-        return `
-      <div class="kpi-wrap">
-        <div class="kpi ${x.kpiClass || ""}" ${x.kpiAttrs || ""} style="${x.kpiStyle || ""}">
-          <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.tipLabel] || TIP_LABEL[x.label] || "")}</div>
-          <div class="kpi__value">${x.value}</div>
-          <div class="kpi__meta">${x.meta}</div>
-        </div>
-      </div>
-    `;
-      })
-      .join("");
+    renderStarKpis(kpisEl, items);
 
     sunPreviewController.attach(kpisEl.querySelector(".sun-preview-canvas"), {
       starName: state.name,
@@ -629,7 +720,7 @@ export function initStarPage(mountEl) {
     const isAdvanced = state.physicsMode === "advanced";
     advancedDerivRowEl.style.display = isAdvanced ? "" : "none";
     physicsModeHintEl.textContent = isAdvanced
-      ? "Specify any two of Radius, Luminosity, and Temperature; the third is computed via Stefan-Boltzmann (L = RÂ² Ã— (T/5776)â´)."
+      ? "Specify any two of Radius, Luminosity, and Temperature; the third is computed via Stefan-Boltzmann (L = R² × (T/5776)⁴)."
       : "All physical properties are derived from mass and age using stellar scaling laws. Toggle Advanced to override specific values.";
 
     if (isAdvanced) {
@@ -657,26 +748,22 @@ export function initStarPage(mountEl) {
   }
 
   function syncBoundInputs() {
-    massEl.dispatchEvent(new Event("input", { bubbles: true }));
-    ageEl.dispatchEvent(new Event("input", { bubbles: true }));
-    metallicityEl.dispatchEvent(new Event("input", { bubbles: true }));
+    massBinding.syncFromNumber({ commit: false, normalize: true });
+    ageBinding.syncFromNumber({ commit: false, normalize: true });
+    metallicityBinding.syncFromNumber({ commit: false, normalize: true });
   }
 
   let hydrating = false;
-  function applyFromInputs() {
+  function applyFromInputs({ commit = false } = {}) {
     if (hydrating) return;
     hydrating = true;
-    state.name = sanitiseName(nameEl.value);
-    nameEl.value = state.name;
-    const m = clamp(massEl.value, 0.075, 100);
-    const a = clamp(ageEl.value, 0, 20);
-    state.massMsol = m;
-    state.ageGyr = a;
-    const feH = clamp(Number(metallicityEl.value) || 0, -3, 1);
-    state.metallicityFeH = feH;
-    massEl.value = state.massMsol;
-    ageEl.value = state.ageGyr;
-    metallicityEl.value = state.metallicityFeH;
+    state.name = commit ? sanitiseName(nameEl.value) : sanitiseName(String(nameEl.value ?? ""));
+    if (commit) nameEl.value = state.name;
+    state.massMsol = readClampedNumberInput(massEl, 0.075, 100, state.massMsol, { commit });
+    state.ageGyr = readClampedNumberInput(ageEl, 0, 20, state.ageGyr, { commit });
+    state.metallicityFeH = readClampedNumberInput(metallicityEl, -3, 1, state.metallicityFeH, {
+      commit,
+    });
 
     state.physicsMode = wrap.querySelector('input[name="physicsMode"]:checked')?.value || "simple";
     state.advancedDerivationMode = getDerivMode();
@@ -686,41 +773,26 @@ export function initStarPage(mountEl) {
     // Read overrides only in Advanced mode; in Simple they stay dormant in state
     // so values are preserved if the user switches back to Advanced.
     if (state.physicsMode === "advanced") {
-      const rOvRaw = Number(radiusOverrideEl.value);
       state.radiusRsolOverride =
-        radiusOverrideRowEl.style.display !== "none" && Number.isFinite(rOvRaw) && rOvRaw > 0
-          ? rOvRaw
+        radiusOverrideRowEl.style.display !== "none"
+          ? readPositiveOverride(radiusOverrideEl, { commit })
           : null;
 
-      const lOvRaw = Number(luminosityOverrideEl.value);
       state.luminosityLsolOverride =
-        luminosityOverrideRowEl.style.display !== "none" && Number.isFinite(lOvRaw) && lOvRaw > 0
-          ? lOvRaw
+        luminosityOverrideRowEl.style.display !== "none"
+          ? readPositiveOverride(luminosityOverrideEl, { commit })
           : null;
 
-      const tOvRaw = Number(tempOverrideEl.value);
       state.tempKOverride =
-        tempOverrideRowEl.style.display !== "none" && Number.isFinite(tOvRaw) && tOvRaw > 0
-          ? tOvRaw
+        tempOverrideRowEl.style.display !== "none"
+          ? readPositiveOverride(tempOverrideEl, { commit })
           : null;
     }
 
-    syncBoundInputs();
-    updateWorld({
-      star: {
-        name: state.name,
-        massMsol: state.massMsol,
-        ageGyr: state.ageGyr,
-        metallicityFeH: state.metallicityFeH,
-        radiusRsolOverride: state.radiusRsolOverride,
-        luminosityLsolOverride: state.luminosityLsolOverride,
-        tempKOverride: state.tempKOverride,
-        physicsMode: state.physicsMode,
-        advancedDerivationMode: state.advancedDerivationMode,
-        evolutionMode: state.evolutionMode,
-        activityModelVersion: state.activityModelVersion,
-      },
-    });
+    if (commit) {
+      syncBoundInputs();
+      persistState();
+    }
     render();
     hydrating = false;
   }
@@ -755,39 +827,45 @@ export function initStarPage(mountEl) {
     radiusOverrideEl,
     luminosityOverrideEl,
     tempOverrideEl,
-  ].forEach((el) => el.addEventListener("input", applyFromInputs));
+  ].forEach((el) => el.addEventListener("input", () => applyFromInputs()));
+  [nameEl, radiusOverrideEl, luminosityOverrideEl, tempOverrideEl].forEach((el) =>
+    el.addEventListener("change", () => applyFromInputs({ commit: true })),
+  );
 
   wrap.querySelector("#radiusClear").addEventListener("click", () => {
     radiusOverrideEl.value = "";
+    applyFromInputs({ commit: true });
   });
 
   wrap.querySelector("#luminosityClear").addEventListener("click", () => {
     luminosityOverrideEl.value = "";
+    applyFromInputs({ commit: true });
   });
 
   wrap.querySelector("#tempClear").addEventListener("click", () => {
     tempOverrideEl.value = "";
+    applyFromInputs({ commit: true });
   });
 
   // Live-update the UI layout when the mode toggle or dropdown changes
   physicsModeRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.physicsMode = r.value;
-      applyFromInputs();
+      applyFromInputs({ commit: true });
     });
   });
 
   evolutionModeRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.evolutionMode = r.value;
-      applyFromInputs();
+      applyFromInputs({ commit: true });
     });
   });
 
   physicsDerivRadios.forEach((r) => {
     r.addEventListener("change", () => {
       state.advancedDerivationMode = getDerivMode();
-      applyFromInputs();
+      applyFromInputs({ commit: true });
     });
   });
 
@@ -816,21 +894,7 @@ export function initStarPage(mountEl) {
     if (evoOffR) evoOffR.checked = true;
     setDerivMode("rl");
     syncBoundInputs();
-    updateWorld({
-      star: {
-        name: state.name,
-        massMsol: state.massMsol,
-        ageGyr: state.ageGyr,
-        metallicityFeH: 0.0,
-        radiusRsolOverride: null,
-        luminosityLsolOverride: null,
-        tempKOverride: null,
-        physicsMode: "simple",
-        advancedDerivationMode: "rl",
-        evolutionMode: "zams",
-        activityModelVersion: state.activityModelVersion,
-      },
-    });
+    persistState();
     render();
   });
 
@@ -858,21 +922,7 @@ export function initStarPage(mountEl) {
     if (evoOffR) evoOffR.checked = true;
     setDerivMode("rl");
     syncBoundInputs();
-    updateWorld({
-      star: {
-        name: state.name,
-        massMsol: state.massMsol,
-        ageGyr: state.ageGyr,
-        metallicityFeH: 0.0,
-        radiusRsolOverride: null,
-        luminosityLsolOverride: null,
-        tempKOverride: null,
-        physicsMode: "simple",
-        advancedDerivationMode: "rl",
-        evolutionMode: "zams",
-        activityModelVersion: state.activityModelVersion,
-      },
-    });
+    persistState();
     render();
   });
 }

@@ -1,6 +1,4 @@
 ﻿import { calcCalendarModel } from "../engine/calendar.js";
-import { calcMoon } from "../engine/moon.js";
-import { calcPlanetExact } from "../engine/planet.js";
 import { fmt } from "../engine/utils.js";
 import {
   describeMoonPhase,
@@ -12,6 +10,88 @@ import {
   normalizeNameList,
 } from "../engine/usableCalendar.js";
 import { bindNumberAndSlider } from "./bind.js";
+import {
+  CALENDAR_COLLAPSIBLE_PANELS,
+  CALENDAR_PHASES as PHASES,
+  CALENDAR_TUTORIAL_STEPS as TUTORIAL_STEPS,
+  HOLIDAY_ALGORITHMS,
+  HOLIDAY_ANCHOR_TYPES,
+  HOLIDAY_CATEGORIES,
+  HOLIDAY_CATEGORY_SET,
+  HOLIDAY_CONFLICT_RULES,
+  HOLIDAY_CONFLICT_SCOPES,
+  HOLIDAY_RELATIVE_MARKERS,
+  HOLIDAY_RELATIVE_TYPES,
+  HOLIDAY_RESOLVE_MODES,
+  HOLIDAY_SCAN_MONTH_RADIUS,
+  HOLIDAY_WEEKEND_RULES,
+  MOON_COLORS,
+  OCCURRENCES,
+  RECURRENCES,
+  SEASON_MARKER_DEFS,
+  WORK_CYCLE_MODES,
+} from "./calendar/constants.js";
+import {
+  copyTextToClipboard,
+  createCalendarExportEnvelope,
+  downloadJsonFile,
+  readCalendarCandidate,
+  utcStampCompact,
+} from "./calendar/calendarIo.js";
+import {
+  analyzeHolidayRelativeIssues,
+  astronomyMarkerAggregateKey,
+  astronomyMarkerLabel,
+  astroIconClass,
+  clonePlain,
+  createCalendarStateStoreBindings,
+  cycleKindClass,
+  cycleMarkerTip,
+  cycleRuleSummary,
+  evaluateWorkCyclesForDay,
+  findById,
+  formatDisplayedYear,
+  fromLinearMonthOrdinal,
+  holidayCategoryLabel,
+  holidayCategoryOptionsHtml,
+  holidayColorClass,
+  holidayColorOptionsHtml,
+  holidayFilterControlsHtml,
+  holidayRelativeKeyLabel,
+  intListText,
+  moonsForPlanet,
+  monthLengthOverridesText,
+  namesText,
+  normEraRules,
+  normFestivalRule,
+  normFestivalRules,
+  normHolidayRule,
+  normHolidayRules,
+  normalizeAstronomySettings,
+  normalizeHolidayCategory,
+  normalizeHolidayCategoryFilters,
+  normalizeHolidayColorTag,
+  normalizeIcsIncludes,
+  normalizeIsoDate,
+  normalizeWeekendDayIndexes,
+  normalizeWeekendRule,
+  normWorkCycleRule,
+  normWorkCycleRules,
+  moonColorClass,
+  parseIntList,
+  parseStringList,
+  phaseClass,
+  pickMoonStateForHoliday,
+  recursInMonth,
+  sanitizeCycleShort,
+  splitMonthLengths,
+  splitNames,
+  toLinearMonthOrdinal,
+  uniqueSortedNumbers,
+  uniqIds,
+  weekdayOccurrence,
+} from "./calendar/stateModel.js";
+import { createElement, replaceChildren, replaceSelectOptions } from "./domHelpers.js";
 import { createTutorial } from "./tutorial.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import {
@@ -23,134 +103,6 @@ import {
   loadWorld,
   updateWorld,
 } from "./store.js";
-
-const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
-
-const PHASES = [
-  ["N", "New Moon"],
-  ["WC", "Waxing Crescent"],
-  ["1Q", "First Quarter"],
-  ["WG", "Waxing Gibbous"],
-  ["F", "Full Moon"],
-  ["NG", "Waning Gibbous"],
-  ["3Q", "Last Quarter"],
-  ["NC", "Waning Crescent"],
-];
-const HOLIDAY_RESOLVE_MODES = [
-  ["merge", "Merge"],
-  ["override", "Override"],
-];
-const RECURRENCES = [
-  ["one-off", "One-off"],
-  ["weekly", "Weekly"],
-  ["monthly", "Monthly"],
-  ["bi-monthly", "Bi-monthly"],
-  ["quarterly", "Quarterly"],
-  ["6-monthly", "6-monthly"],
-  ["yearly", "Yearly"],
-];
-const RECUR_MONTHS = { monthly: 1, "bi-monthly": 2, quarterly: 3, "6-monthly": 6, yearly: 12 };
-const HOLIDAY_RELATIVE_TYPES = [
-  ["none", "None"],
-  ["moon-phase", "Moon phase"],
-  ["astronomy-marker", "Astronomy marker"],
-  ["holiday", "Another holiday"],
-];
-const HOLIDAY_ANCHOR_TYPES = [
-  ["fixed-date", "Fixed date"],
-  ["nth-weekday", "Nth weekday"],
-  ["moon-phase", "Moon phase"],
-  ["astronomy-marker", "Astronomy marker"],
-  ["holiday", "Another holiday"],
-  ["algorithmic", "Algorithmic"],
-];
-const HOLIDAY_ALGORITHMS = [
-  ["none", "None"],
-  ["gregorian-easter-western", "Gregorian Easter (Western)"],
-];
-const HOLIDAY_WEEKEND_RULES = [
-  ["none", "No shift"],
-  ["next-monday", "Shift to next Monday"],
-  ["nearest-weekday", "Shift to nearest weekday"],
-  ["next-weekday", "Shift to next weekday"],
-  ["previous-weekday", "Shift to previous weekday"],
-];
-const HOLIDAY_CONFLICT_RULES = [
-  ["merge", "Merge labels"],
-  ["override", "Override lower priority"],
-  ["shift-forward", "Shift forward"],
-  ["shift-backward", "Shift backward"],
-  ["next-weekday", "Shift to next weekday"],
-];
-const HOLIDAY_CONFLICT_SCOPES = [
-  ["all", "All holidays"],
-  ["category", "Same category"],
-  ["ids", "Specific holidays"],
-];
-const WORK_CYCLE_MODES = [
-  ["duty", "Duty cycle (on/off)"],
-  ["interval", "Interval marker (every N days)"],
-];
-const HOLIDAY_RELATIVE_MARKERS = [
-  ["vernal-equinox", "Vernal Equinox"],
-  ["summer-solstice", "Summer Solstice"],
-  ["autumn-equinox", "Autumn Equinox"],
-  ["winter-solstice", "Winter Solstice"],
-  ["solar-eclipse-window", "Solar Eclipse Window"],
-  ["lunar-eclipse-window", "Lunar Eclipse Window"],
-];
-const SEASON_MARKER_DEFS = [
-  { key: "vernal-equinox", name: "Vernal Equinox", short: "VE", fraction: 0 },
-  { key: "summer-solstice", name: "Summer Solstice", short: "SS", fraction: 0.25 },
-  { key: "autumn-equinox", name: "Autumn Equinox", short: "AE", fraction: 0.5 },
-  { key: "winter-solstice", name: "Winter Solstice", short: "WS", fraction: 0.75 },
-];
-const HOLIDAY_SCAN_MONTH_RADIUS = 24;
-const OCCURRENCES = [
-  ["any", "Any week"],
-  ["1", "1st"],
-  ["2", "2nd"],
-  ["3", "3rd"],
-  ["4", "4th"],
-  ["last", "Last"],
-];
-const HOLIDAY_CATEGORIES = [
-  ["civic", "Civic"],
-  ["religious", "Religious"],
-  ["regional", "Regional"],
-  ["market", "Market"],
-  ["observance", "Observance"],
-  ["custom", "Custom"],
-];
-const HOLIDAY_COLOR_TAGS = [
-  ["gold", "Gold"],
-  ["azure", "Azure"],
-  ["emerald", "Emerald"],
-  ["violet", "Violet"],
-  ["rose", "Rose"],
-  ["slate", "Slate"],
-];
-const HOLIDAY_CATEGORY_SET = new Set(HOLIDAY_CATEGORIES.map(([value]) => value));
-const HOLIDAY_COLOR_TAG_SET = new Set(HOLIDAY_COLOR_TAGS.map(([value]) => value));
-const HOLIDAY_CATEGORY_LABELS = Object.fromEntries(HOLIDAY_CATEGORIES);
-const MOON_COLORS = ["moon-c0", "moon-c1", "moon-c2", "moon-c3"];
-const ASTRO_ICON_CLASS_BY_KEY = Object.freeze({
-  "vernal-equinox": "calendar-astro-icon--vernal-equinox",
-  "summer-solstice": "calendar-astro-icon--summer-solstice",
-  "autumn-equinox": "calendar-astro-icon--autumn-equinox",
-  "winter-solstice": "calendar-astro-icon--winter-solstice",
-  "solar-eclipse-window": "calendar-astro-icon--solar-eclipse-window",
-  "lunar-eclipse-window": "calendar-astro-icon--lunar-eclipse-window",
-});
-const CALENDAR_COLLAPSIBLE_PANELS = [
-  { key: "designer", title: "Calendar Designer" },
-  { key: "data", title: "Calendar Data" },
-  { key: "output", title: "Output & Utility" },
-  { key: "special", title: "Special Days" },
-  { key: "festival", title: "Festival Days" },
-  { key: "leap", title: "Leap Years" },
-  { key: "cycles", title: "Work/Rest Cycles" },
-];
 
 const TIPS = {
   "Calendar name": "Name shown on this calendar and carried in calendar-only export/import.",
@@ -376,66 +328,21 @@ const TIPS = {
   "Jump date": "Jump Month View to the specified year, month, and day.",
 };
 
-const TUTORIAL_STEPS = [
-  {
-    title: "Getting Started",
-    body:
-      "The Calendar page turns your planet and moon data into a working calendar. " +
-      "Use the settings drawer on the left to configure structure, identity, rules, " +
-      "and output. The month view on the right updates live as you make changes.",
-  },
-  {
-    title: "Choose a Source Planet and Moon",
-    body:
-      "Open the Structure tab in the drawer. Select a source planet to set the " +
-      "year length, then pick a primary moon to drive lunar cycles. You can add " +
-      "up to three extra moons for multi-moon phase displays.",
-  },
-  {
-    title: "Calendar Basis",
-    body:
-      "Choose Solar, Lunar, or Lunisolar basis in the Structure tab. Solar ties " +
-      "months to the orbital year. Lunar ties them to moon cycles. Lunisolar " +
-      "combines both, adjusting months to stay in sync with seasons.",
-  },
-  {
-    title: "Month, Day, and Week Structure",
-    body:
-      "In the Structure tab, adjust months per year, days per month, and days per " +
-      "week. By default these are derived from orbital data. Override any slider " +
-      "for a custom calendar. Enable Month lengths to set irregular day counts " +
-      "per month (like Earth's 31/28/31/30 pattern). The structure readout shows " +
-      "the resulting year length.",
-  },
-  {
-    title: "Naming Days, Months, and Eras",
-    body:
-      "Switch to the Identity tab to name your weekdays and months (one per line). " +
-      "Set a year display mode: plain numeric, named eras, or pre/post-calendar " +
-      "eras like BCE/CE. Add era rules to mark ages of your world's history.",
-  },
-  {
-    title: "Leap Rules",
-    body:
-      "In the Rules tab, open the Leap Years section. Add rules that insert or " +
-      "remove days on cycle years. Use the Suggest button to auto-generate rules " +
-      "that minimize calendar drift from the true orbital year.",
-  },
-  {
-    title: "Holidays and Festivals",
-    body:
-      "Still in the Rules tab, add holidays by date, weekday, or moon phase. " +
-      "Holidays can recur weekly, monthly, or yearly. Festivals are multi-day " +
-      "events. Use categories and colour tags to organise them on the grid.",
-  },
-  {
-    title: "Exporting Your Calendar",
-    body:
-      "Open the Output tab in the drawer. Export a single month as PDF, download " +
-      "an ICS file for real calendar apps, or use JSON import/export to save and " +
-      "share your full calendar configuration.",
-  },
-];
+const {
+  defaultState,
+  deriveMoonSynodicDays,
+  derivePlanetPeriodDays,
+  normalizeSingleProfile,
+  persistState,
+  readState,
+} = createCalendarStateStoreBindings({
+  getSelectedMoon,
+  getSelectedPlanet,
+  getStarOverrides,
+  listMoons,
+  listPlanets,
+  updateWorld,
+});
 
 const N = (v, f = 0) => {
   const n = Number(v);
@@ -454,1217 +361,274 @@ const esc = (s) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-function splitNames(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw !== "string") return [];
-  return raw
-    .split(/\r?\n/g)
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-function namesText(arr) {
-  return (Array.isArray(arr) ? arr : [])
-    .map((x) => String(x || "").trim())
-    .filter(Boolean)
-    .join("\n");
+function tupleOptions(entries) {
+  return (Array.isArray(entries) ? entries : []).map(([value, label]) => ({ value, label }));
 }
 
-function splitMonthLengths(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw !== "string") return [];
-  return raw.split(/\r?\n/g).map((x) => {
-    const trimmed = x.trim();
-    if (!trimmed) return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
+function indexedLabelOptions(labels) {
+  return (Array.isArray(labels) ? labels : []).map((label, index) => ({ value: index, label }));
+}
+
+function bodyOptions(items) {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    value: item?.id || "",
+    label: item?.name || item?.inputs?.name || item?.id || "",
+  }));
+}
+
+function moonSlotOptions(moons) {
+  return (Array.isArray(moons) ? moons : []).map((moon, index) => ({
+    value: index,
+    label: moon?.name || "",
+    dataset: { moonId: moon?.id || "" },
+  }));
+}
+
+function holidayReferenceOptions(holidays) {
+  return [
+    { value: "", label: "Select holiday" },
+    ...(Array.isArray(holidays) ? holidays : []).map((holiday) => ({
+      value: holiday?.id || "",
+      label: holiday?.name || "",
+    })),
+  ];
+}
+
+function replaceWeekendDayOptions(node, dayNames, selectedIndexes) {
+  const selected = new Set(Array.isArray(selectedIndexes) ? selectedIndexes : []);
+  return replaceChildren(
+    node,
+    (Array.isArray(dayNames) ? dayNames : []).map((dayName, index) =>
+      createElement("label", { className: "calendar-holiday-attr" }, [
+        createElement("input", {
+          attrs: { type: "checkbox" },
+          dataset: { calWeekendDay: index },
+          checked: selected.has(index),
+        }),
+        dayName,
+      ]),
+    ),
+  );
+}
+
+function tipIconNode(text) {
+  if (!text) return null;
+  return createElement("span", {
+    className: "tip-icon",
+    attrs: { tabindex: "0", role: "note", "aria-label": "Info" },
+    dataset: { tip: text },
+    text: "i",
   });
 }
-function monthLengthOverridesText(arr) {
-  if (!Array.isArray(arr) || !arr.length) return "";
-  return arr
-    .map((v) =>
-      v != null && Number.isFinite(Number(v)) && Number(v) >= 1
-        ? String(Math.round(Number(v)))
-        : "",
-    )
-    .join("\n");
+
+function hintNode(text) {
+  return createElement("div", { className: "hint", text });
 }
 
-function clonePlain(v) {
-  return JSON.parse(JSON.stringify(v));
+function interleaveNodes(items, separator = ", ") {
+  const filtered = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (!filtered.length) return ["None"];
+  return filtered.flatMap((item, index) => (index ? [separator, item] : [item]));
 }
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+function actionButton(label, dataset, className = "small") {
+  return createElement("button", { className, attrs: { type: "button" }, dataset, text: label });
 }
 
-function normalizeIsoDate(raw) {
-  const txt = String(raw || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(txt)) return txt;
-  return todayIsoDate();
+function calendarItemRow({ nameChildren, hint, actions = [], isEditing = false }) {
+  return createElement("div", { className: `calendar-item-row${isEditing ? " is-editing" : ""}` }, [
+    createElement("div", { className: "calendar-item-row__main" }, [
+      createElement(
+        "div",
+        { className: "calendar-item-row__name" },
+        Array.isArray(nameChildren) ? nameChildren : [nameChildren],
+      ),
+      hintNode(hint),
+    ]),
+    createElement("div", { className: "calendar-item-row__actions" }, actions),
+  ]);
 }
 
-function normalizeAstronomySettings(raw) {
-  const r = raw && typeof raw === "object" ? raw : {};
-  return {
-    enabled: !!r.enabled,
-    seasons: hasOwn(r, "seasons") ? !!r.seasons : true,
-    seasonBands: hasOwn(r, "seasonBands") ? !!r.seasonBands : true,
-    eclipses: hasOwn(r, "eclipses") ? !!r.eclipses : true,
-  };
+function moonIconNode(moonState, idx) {
+  return createElement("span", {
+    className: `calendar-moon-icon ${phaseClass(moonState?.phase?.phaseShort)} ${moonColorClass(idx)}`,
+    attrs: { "aria-hidden": "true" },
+  });
 }
 
-function normalizeIcsIncludes(raw) {
-  const r = raw && typeof raw === "object" ? raw : {};
-  return {
-    holidays: hasOwn(r, "holidays") ? !!r.holidays : true,
-    festivals: hasOwn(r, "festivals") ? !!r.festivals : true,
-    markers: hasOwn(r, "markers") ? !!r.markers : true,
-  };
-}
-
-function normalizeWeekendRule(raw) {
-  const value = String(raw || "").trim();
-  return HOLIDAY_WEEKEND_RULES.some(([v]) => v === value) ? value : "none";
-}
-
-function normalizeWeekendDayIndexes(raw, daysPerWeek = 7) {
-  const safeDaysPerWeek = Math.max(1, I(daysPerWeek, 7));
-  const parsed = parseIntList(raw ?? [], 0, Math.max(0, safeDaysPerWeek - 1))
-    .filter((idx) => idx >= 0 && idx < safeDaysPerWeek)
-    .sort((a, b) => a - b);
-  if (parsed.length) return parsed;
-  if (safeDaysPerWeek === 1) return [0];
-  if (safeDaysPerWeek === 2) return [1];
-  return [Math.max(0, safeDaysPerWeek - 2), safeDaysPerWeek - 1];
-}
-
-function inferWeekendRuleFromHolidays(rawHolidays, monthsPerYear = 12) {
-  const holidays = normHolidayRules(rawHolidays, Math.max(1, I(monthsPerYear, 12)));
-  const hit = holidays.find(
-    (holiday) => normalizeWeekendRule(holiday?.observance?.weekendRule) !== "none",
-  );
-  return normalizeWeekendRule(hit?.observance?.weekendRule);
-}
-
-function parseIntList(raw, min = 1, max = 1000000) {
-  if (Array.isArray(raw)) {
-    const seen = new Set();
-    const out = [];
-    for (const v of raw) {
-      const n = clampI(v, min, max);
-      if (!Number.isFinite(n)) continue;
-      if (seen.has(n)) continue;
-      seen.add(n);
-      out.push(n);
-    }
-    return out.sort((a, b) => a - b);
-  }
-  const txt = String(raw || "").trim();
-  if (!txt) return [];
-  const seen = new Set();
-  const out = [];
-  for (const tok of txt.split(/[\s,;|]+/g)) {
-    if (!tok) continue;
-    const n = Number(tok);
-    if (!Number.isFinite(n)) continue;
-    const v = clampI(n, min, max);
-    if (seen.has(v)) continue;
-    seen.add(v);
-    out.push(v);
-  }
-  return out.sort((a, b) => a - b);
-}
-
-function intListText(arr) {
-  return (Array.isArray(arr) ? arr : [])
-    .map((n) => String(I(n, 0)))
-    .filter(Boolean)
-    .join(", ");
-}
-
-function parseStringList(raw, { maxItems = 50 } = {}) {
-  if (Array.isArray(raw)) {
-    const out = [];
-    const seen = new Set();
-    for (const value of raw) {
-      const txt = String(value || "").trim();
-      if (!txt || seen.has(txt)) continue;
-      seen.add(txt);
-      out.push(txt);
-      if (out.length >= maxItems) break;
-    }
-    return out;
-  }
-  const txt = String(raw || "").trim();
-  if (!txt) return [];
-  const out = [];
-  const seen = new Set();
-  for (const token of txt.split(/[\s,;|]+/g)) {
-    const value = String(token || "").trim();
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    out.push(value);
-    if (out.length >= maxItems) break;
-  }
-  return out;
-}
-
-function normalizeHolidayCategory(value) {
-  const key = String(value || "")
-    .trim()
-    .toLowerCase();
-  return HOLIDAY_CATEGORY_SET.has(key) ? key : "civic";
-}
-
-function normalizeHolidayColorTag(value) {
-  const key = String(value || "")
-    .trim()
-    .toLowerCase();
-  return HOLIDAY_COLOR_TAG_SET.has(key) ? key : "gold";
-}
-
-function normalizeHolidayCategoryFilters(raw) {
-  const source = raw && typeof raw === "object" ? raw : {};
-  const out = {};
-  for (const [value] of HOLIDAY_CATEGORIES) {
-    out[value] = hasOwn(source, value) ? !!source[value] : true;
-  }
-  return out;
-}
-
-function holidayCategoryLabel(value) {
-  return HOLIDAY_CATEGORY_LABELS[normalizeHolidayCategory(value)] || "Civic";
-}
-
-function holidayColorClass(value) {
-  return `holiday-tag-${normalizeHolidayColorTag(value)}`;
-}
-
-function holidayCategoryOptionsHtml() {
-  return HOLIDAY_CATEGORIES.map(
-    ([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`,
-  ).join("");
-}
-
-function holidayColorOptionsHtml() {
-  return HOLIDAY_COLOR_TAGS.map(
-    ([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`,
-  ).join("");
-}
-
-function holidayFilterControlsHtml() {
-  return HOLIDAY_CATEGORIES.map(
-    ([value, label]) =>
-      `<label class="calendar-holiday-filter"><input type="checkbox" data-cal-holiday-filter="${esc(value)}" />${esc(label)}</label>`,
-  ).join("");
-}
-
-function normEraRules(rawList) {
-  const list = Array.isArray(rawList) ? rawList : [];
-  const out = list
-    .map((raw, idx) => {
-      const e = raw && typeof raw === "object" ? raw : {};
-      return {
-        id: String(e.id || `era-${idx + 1}`),
-        name: String(e.name || "").trim(),
-        startYear: Math.max(1, I(e.startYear ?? e.year ?? 1, 1)),
-      };
-    })
-    .filter((e) => e.name)
-    .sort((a, b) => a.startYear - b.startYear || a.name.localeCompare(b.name));
-  return out;
-}
-
-function formatPreCalendarYear(year, ui) {
-  const safeYear = Math.max(1, I(year, 1));
-  const startYear = Math.max(1, I(ui?.preCalendarStartYear ?? 1, 1));
-  const postLabel = String(ui?.postEraLabel || "CE").trim() || "CE";
-  const preLabel = String(ui?.preEraLabel || "BCE").trim() || "BCE";
-  const useYearZero = !!ui?.preCalendarUseYearZero;
-  const adjustedYear = safeYear + I(ui?.yearOffset ?? 0, 0);
-
-  // Delta is the distance from the configured post-era boundary year.
-  const delta = adjustedYear - startYear;
-  if (delta >= 0) return `${delta + (useYearZero ? 0 : 1)} ${postLabel}`;
-  return `${Math.abs(delta)} ${preLabel}`;
-}
-
-function formatDisplayedYear(year, ui) {
-  const safeYear = Math.max(1, I(year, 1));
-  const displayYear = safeYear + I(ui?.yearOffset ?? 0, 0);
-  const prefix = String(ui?.yearPrefix || "").trim();
-  const suffix = String(ui?.yearSuffix || "").trim();
-  const baseLabelCore = `${displayYear}`;
-  const baseLabel =
-    `${prefix ? `${prefix} ` : ""}${baseLabelCore}${suffix ? ` ${suffix}` : ""}`.trim();
-
-  if (String(ui?.yearDisplayMode || "numeric") === "pre-calendar") {
-    return formatPreCalendarYear(safeYear, ui);
-  }
-
-  if (String(ui?.yearDisplayMode || "numeric") !== "era") return baseLabel;
-  const eras = normEraRules(ui?.eras);
-  const matching = eras.filter((e) => e.startYear <= safeYear);
-  const active = matching[matching.length - 1];
-  if (!active) return baseLabel;
-  const eraYear = safeYear - active.startYear + 1;
-  if (!prefix && !suffix && I(ui?.yearOffset ?? 0, 0) === 0) {
-    return `${active.name} ${eraYear}`;
-  }
-  return `${active.name} ${eraYear} (${baseLabel})`;
-}
-
-function utcStampCompact() {
-  const d = new Date();
-  const yyyy = String(d.getUTCFullYear());
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mi = String(d.getUTCMinutes()).padStart(2, "0");
-  const ss = String(d.getUTCSeconds()).padStart(2, "0");
-  return `${yyyy}${mm}${dd}-${hh}${mi}${ss}Z`;
-}
-
-function downloadJsonFile(filename, text, contentType = "application/json") {
-  const blob = new Blob([text], { type: contentType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-async function copyTextToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function createCalendarExportEnvelope(state) {
-  let calendarPayload = {
-    inputs: { ...state.inputs },
-    ui: { ...state.ui },
-  };
-  if (Array.isArray(state?._allProfiles) && state._allProfiles.length) {
-    const profiles = state._allProfiles.map((p, idx) => ({
-      id: String(p?.id || `cal-${idx + 1}`),
-      name: String(p?.name || p?.ui?.calendarName || `Calendar ${idx + 1}`),
-      inputs: clonePlain(p?.inputs || {}),
-      ui: clonePlain(p?.ui || {}),
-    }));
-    calendarPayload = {
-      activeProfileId: String(state.profileId || profiles[0]?.id || "cal-1"),
-      profiles,
-    };
-  }
-  return {
-    tool: "WorldSmith Web",
-    type: "calendar",
-    calendarSchemaVersion: 2,
-    exportedUtc: new Date().toISOString(),
-    calendar: calendarPayload,
-  };
-}
-
-function readCalendarCandidate(parsed) {
-  if (!parsed || typeof parsed !== "object") return null;
-  if (parsed.calendar && typeof parsed.calendar === "object") return parsed.calendar;
-  if (parsed.world && parsed.world.calendar && typeof parsed.world.calendar === "object") {
-    return parsed.world.calendar;
-  }
-  if (parsed.inputs || parsed.ui || parsed.specialDays || parsed.holidays || parsed.leapRules) {
-    return parsed;
-  }
-  return null;
-}
-
-function phaseClass(short) {
-  return `phase-${String(short || "n").toLowerCase()}`;
-}
-function moonColorClass(idx) {
-  return MOON_COLORS[clampI(idx, 0, MOON_COLORS.length - 1)] || MOON_COLORS[0];
-}
-function moonIcon(moonState, idx) {
-  return `<span class="calendar-moon-icon ${phaseClass(moonState?.phase?.phaseShort)} ${moonColorClass(idx)}" aria-hidden="true"></span>`;
-}
-function astroIconClass(markerKey) {
-  return ASTRO_ICON_CLASS_BY_KEY[String(markerKey || "")] || "calendar-astro-icon--generic";
-}
-function astroIcon(marker) {
+function astroIconNode(marker) {
   const moonSourceIndex = Number.isFinite(Number(marker?.sourceMoonIndex))
     ? clampI(Number(marker.sourceMoonIndex), 0, MOON_COLORS.length - 1)
     : null;
-  const moonSourceDot =
-    moonSourceIndex == null
-      ? ""
-      : `<span class="calendar-astro-source ${moonColorClass(moonSourceIndex)}" aria-hidden="true"></span>`;
-  return `<span class="calendar-astro-marker" aria-hidden="true"><span class="calendar-astro-icon ${astroIconClass(marker?.key)}"></span>${moonSourceDot}</span>`;
-}
-function astronomyMarkerAggregateKey(marker) {
-  const key = String(marker?.key || "marker");
-  const moonId = String(marker?.sourceMoonId || "").trim();
-  return moonId ? `${key}::${moonId}` : key;
-}
-function astronomyMarkerLabel(marker) {
-  const base = String(marker?.name || "").trim() || "Astronomy marker";
-  const moonName = String(marker?.sourceMoonName || marker?.sourceLabel || "").trim();
-  if (moonName) {
-    return `${base} (${moonName})`;
-  }
-  return base;
-}
-
-function findById(list, id) {
-  return (list || []).find((x) => String(x?.id) === String(id || "")) || null;
-}
-function moonsForPlanet(moons, planetId) {
-  return (moons || [])
-    .filter((m) => String(m?.planetId || "") === String(planetId || ""))
-    .sort(
-      (a, b) => N(a?.inputs?.semiMajorAxisKm, Infinity) - N(b?.inputs?.semiMajorAxisKm, Infinity),
-    );
-}
-function uniqIds(arr) {
-  const seen = new Set();
-  const out = [];
-  for (const v of arr || []) {
-    const id = String(v || "").trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out;
-}
-
-function derivePlanetPeriodDays(world, planet) {
-  if (!planet?.inputs) return 365.2422;
-  const sov = getStarOverrides(world?.star);
-  const m = calcPlanetExact({
-    starMassMsol: N(world?.star?.massMsol, 1),
-    starAgeGyr: N(world?.star?.ageGyr, 4.5),
-    starRadiusRsolOverride: sov.r,
-    starLuminosityLsolOverride: sov.l,
-    starTempKOverride: sov.t,
-    starEvolutionMode: sov.ev,
-    planet: planet.inputs,
-  });
-  return Math.max(0.1, N(m?.derived?.orbitalPeriodEarthDays, 365.2422));
-}
-
-function deriveMoonSynodicDays(world, planet, moon) {
-  if (!planet?.inputs || !moon?.inputs) return 29.5306;
-  const sovM = getStarOverrides(world?.star);
-  const m = calcMoon({
-    starMassMsol: N(world?.star?.massMsol, 1),
-    starAgeGyr: N(world?.star?.ageGyr, 4.5),
-    starRadiusRsolOverride: sovM.r,
-    starLuminosityLsolOverride: sovM.l,
-    starTempKOverride: sovM.t,
-    starEvolutionMode: sovM.ev,
-    planet: planet.inputs,
-    moon: moon.inputs,
-  });
-  return Math.max(0.1, N(m?.orbit?.orbitalPeriodSynodicDays, 29.5306));
-}
-
-function defaultState(world) {
-  const planets = listPlanets(world);
-  const moons = listMoons(world);
-  const p = getSelectedPlanet(world) || planets[0] || null;
-  const pm = moonsForPlanet(moons, p?.id);
-  const selMoon = getSelectedMoon(world);
-  const primaryMoonId = pm.find((m) => m.id === selMoon?.id)?.id || pm[0]?.id || "";
-  return {
-    inputs: {
-      sourcePlanetId: p?.id || "",
-      primaryMoonId,
-      extraMoonIds: ["", "", ""],
-      monthsPerYear: null,
-      daysPerMonth: null,
-      daysPerWeek: null,
-    },
-    ui: {
-      calendarName: "Calendar",
-      basis: "lunisolar",
-      year: 1,
-      monthIndex: 0,
-      selectedDay: 1,
-      startDayOfYear: 0,
-      weekStartsOn: 0,
-      moonEpochOffsetDays: 0,
-      dayNames: [],
-      weekNames: [],
-      monthNames: [],
-      monthLengthOverridesEnabled: false,
-      monthLengthOverrides: [],
-      yearDisplayMode: "numeric",
-      yearOffset: 0,
-      yearPrefix: "",
-      yearSuffix: "",
-      preCalendarStartYear: 1,
-      postEraLabel: "CE",
-      preEraLabel: "BCE",
-      preCalendarUseYearZero: false,
-      eras: [],
-      astronomy: {
-        enabled: false,
-        seasons: true,
-        seasonBands: true,
-        eclipses: true,
-      },
-      exportAnchorDate: todayIsoDate(),
-      icsIncludes: {
-        holidays: true,
-        festivals: true,
-        markers: true,
-      },
-      leapRules: [],
-      holidays: [],
-      holidayAdvanced: false,
-      festivalRules: [],
-      holidayCategoryFilters: normalizeHolidayCategoryFilters({}),
-      workWeekendRule: "none",
-      weekendDayIndexes: [5, 6],
-      workCycles: [],
-      jumpAbsoluteDay: 0,
-      jumpYear: 1,
-      jumpMonthIndex: 0,
-      derivedRoundEnabled: false,
-      derivedDecimalPlaces: 6,
-      jumpDayOfMonth: 1,
-      collapsedSections: {
-        designer: true,
-        data: true,
-        output: true,
-        special: true,
-        festival: true,
-        leap: true,
-        cycles: true,
-      },
-      drawerOpen: true,
-      drawerSection: "structure",
-      rulesTab: "holidays",
-    },
-  };
-}
-
-function normalizeSingleProfile(world, rawProfile) {
-  const d = defaultState(world);
-  const raw = rawProfile && typeof rawProfile === "object" ? rawProfile : {};
-  const ri = raw.inputs && typeof raw.inputs === "object" ? raw.inputs : raw;
-  const ru = raw.ui && typeof raw.ui === "object" ? raw.ui : raw;
-  const profile = {
-    inputs: {
-      ...d.inputs,
-      sourcePlanetId: String(ri.sourcePlanetId || d.inputs.sourcePlanetId || ""),
-      primaryMoonId: String(ri.primaryMoonId || ri.sourceMoonId || d.inputs.primaryMoonId || ""),
-      extraMoonIds: uniqIds(ri.extraMoonIds || ri.additionalMoonIds || d.inputs.extraMoonIds).slice(
-        0,
-        3,
-      ),
-      monthsPerYear: ri.monthsPerYear == null ? null : clampI(ri.monthsPerYear, 1, 240),
-      daysPerMonth: ri.daysPerMonth == null ? null : clampI(ri.daysPerMonth, 1, 500),
-      daysPerWeek: ri.daysPerWeek == null ? null : clampI(ri.daysPerWeek, 1, 30),
-    },
-    ui: {
-      ...d.ui,
-      calendarName: String(ru.calendarName || d.ui.calendarName),
-      basis: ["solar", "lunar", "lunisolar"].includes(ru.basis) ? ru.basis : d.ui.basis,
-      year: Math.max(1, clampI(ru.year ?? 1, 1, 1000000)),
-      monthIndex: Math.max(0, clampI(ru.monthIndex ?? 0, 0, 1000)),
-      selectedDay: Math.max(1, clampI(ru.selectedDay ?? 1, 1, 1000)),
-      startDayOfYear: Math.max(0, clampI(ru.startDayOfYear ?? 0, 0, 1000)),
-      weekStartsOn: Math.max(0, clampI(ru.weekStartsOn ?? 0, 0, 1000)),
-      moonEpochOffsetDays: N(ru.moonEpochOffsetDays, 0),
-      dayNames: splitNames(ru.dayNames),
-      weekNames: splitNames(ru.weekNames),
-      monthNames: splitNames(ru.monthNames),
-      monthLengthOverridesEnabled: !!(
-        ru.monthLengthOverridesEnabled ?? d.ui.monthLengthOverridesEnabled
-      ),
-      monthLengthOverrides: splitMonthLengths(ru.monthLengthOverrides),
-      yearDisplayMode: ["numeric", "era", "pre-calendar"].includes(String(ru.yearDisplayMode || ""))
-        ? String(ru.yearDisplayMode)
-        : d.ui.yearDisplayMode,
-      yearOffset: I(ru.yearOffset ?? d.ui.yearOffset, 0),
-      yearPrefix: String((ru.yearPrefix ?? d.ui.yearPrefix) || ""),
-      yearSuffix: String((ru.yearSuffix ?? d.ui.yearSuffix) || ""),
-      preCalendarStartYear: Math.max(1, I(ru.preCalendarStartYear ?? d.ui.preCalendarStartYear, 1)),
-      postEraLabel: String((ru.postEraLabel ?? d.ui.postEraLabel) || "CE"),
-      preEraLabel: String((ru.preEraLabel ?? d.ui.preEraLabel) || "BCE"),
-      preCalendarUseYearZero: !!(ru.preCalendarUseYearZero ?? d.ui.preCalendarUseYearZero),
-      eras: normEraRules(ru.eras),
-      astronomy: normalizeAstronomySettings(ru.astronomy),
-      exportAnchorDate: normalizeIsoDate(ru.exportAnchorDate),
-      icsIncludes: normalizeIcsIncludes(ru.icsIncludes),
-      leapRules: Array.isArray(ru.leapRules) ? ru.leapRules : [],
-      holidays: Array.isArray(ru.holidays)
-        ? ru.holidays
-        : Array.isArray(ru.specialDays)
-          ? ru.specialDays
-          : [],
-      holidayAdvanced: !!(ru.holidayAdvanced ?? d.ui.holidayAdvanced),
-      festivalRules: Array.isArray(ru.festivalRules)
-        ? ru.festivalRules
-        : Array.isArray(ru.intercalaryDays)
-          ? ru.intercalaryDays
-          : [],
-      workWeekendRule: normalizeWeekendRule(
-        ru.workWeekendRule ??
-          inferWeekendRuleFromHolidays(
-            Array.isArray(ru.holidays)
-              ? ru.holidays
-              : Array.isArray(ru.specialDays)
-                ? ru.specialDays
-                : [],
-            ri.monthsPerYear ?? d.inputs.monthsPerYear ?? 12,
-          ),
-      ),
-      weekendDayIndexes: normalizeWeekendDayIndexes(
-        ru.weekendDayIndexes ?? ru.weekendDays ?? d.ui.weekendDayIndexes,
-        7,
-      ),
-      workCycles: Array.isArray(ru.workCycles) ? ru.workCycles : [],
-      holidayCategoryFilters: normalizeHolidayCategoryFilters(ru.holidayCategoryFilters),
-      jumpAbsoluteDay: Math.max(0, I(ru.jumpAbsoluteDay ?? 0, 0)),
-      jumpYear: Math.max(1, I(ru.jumpYear ?? 1, 1)),
-      jumpMonthIndex: Math.max(0, I(ru.jumpMonthIndex ?? 0, 0)),
-      derivedRoundEnabled: !!(ru.derivedRoundEnabled ?? d.ui.derivedRoundEnabled),
-      derivedDecimalPlaces: clampI(ru.derivedDecimalPlaces ?? d.ui.derivedDecimalPlaces, 0, 6),
-      jumpDayOfMonth: Math.max(1, I(ru.jumpDayOfMonth ?? 1, 1)),
-      collapsedSections: {
-        designer:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "designer")
-            ? !!ru.collapsedSections.designer
-            : true,
-        data:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "data")
-            ? !!ru.collapsedSections.data
-            : true,
-        output:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "output")
-            ? !!ru.collapsedSections.output
-            : true,
-        special:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "special")
-            ? !!ru.collapsedSections.special
-            : true,
-        festival:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "festival")
-            ? !!ru.collapsedSections.festival
-            : true,
-        leap:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "leap")
-            ? !!ru.collapsedSections.leap
-            : true,
-        cycles:
-          ru?.collapsedSections && hasOwn(ru.collapsedSections, "cycles")
-            ? !!ru.collapsedSections.cycles
-            : true,
-      },
-      drawerOpen: !!(ru.drawerOpen ?? d.ui.drawerOpen),
-      drawerSection: ["structure", "identity", "rules", "output"].includes(ru.drawerSection)
-        ? ru.drawerSection
-        : d.ui.drawerSection,
-      rulesTab: ["holidays", "festivals", "leap", "cycles"].includes(ru.rulesTab)
-        ? ru.rulesTab
-        : d.ui.rulesTab,
-    },
-  };
-  while (profile.inputs.extraMoonIds.length < 3) profile.inputs.extraMoonIds.push("");
-  return profile;
-}
-
-function readState(world) {
-  const raw = world?.calendar && typeof world.calendar === "object" ? world.calendar : {};
-  const rawProfiles = Array.isArray(raw.profiles) ? raw.profiles : [];
-
-  if (rawProfiles.length) {
-    const ids = new Set();
-    const profiles = rawProfiles
-      .map((entry, idx) => {
-        const normalized = normalizeSingleProfile(world, entry);
-        let id = String(entry?.id || `cal-${idx + 1}`).trim() || `cal-${idx + 1}`;
-        while (ids.has(id)) id = `${id}-${idx + 1}`;
-        ids.add(id);
-        const name =
-          String(entry?.name || normalized.ui.calendarName || `Calendar ${idx + 1}`).trim() ||
-          `Calendar ${idx + 1}`;
-        normalized.ui.calendarName = String(normalized.ui.calendarName || name);
-        return { id, name, ...normalized };
-      })
-      .filter((p) => p.id);
-    if (!profiles.length) {
-      const fallback = normalizeSingleProfile(world, {});
-      fallback.ui.calendarName = "Civil Calendar";
-      return {
-        ...fallback,
-        profileId: "cal-1",
-        profileName: "Civil Calendar",
-        profiles: [{ id: "cal-1", name: "Civil Calendar" }],
-        _allProfiles: [{ id: "cal-1", name: "Civil Calendar", ...fallback }],
-      };
-    }
-    const activeId = String(raw.activeProfileId || profiles[0].id);
-    const active = profiles.find((p) => p.id === activeId) || profiles[0];
-    return {
-      ...active,
-      profileId: active.id,
-      profileName: active.name,
-      profiles: profiles.map((p) => ({ id: p.id, name: p.name })),
-      _allProfiles: profiles,
-    };
-  }
-
-  const legacy = normalizeSingleProfile(world, raw);
-  const legacyId = "cal-1";
-  const legacyName = String(legacy.ui.calendarName || "Civil Calendar").trim() || "Civil Calendar";
-  legacy.ui.calendarName = legacyName;
-  return {
-    ...legacy,
-    profileId: legacyId,
-    profileName: legacyName,
-    profiles: [{ id: legacyId, name: legacyName }],
-    _allProfiles: [{ id: legacyId, name: legacyName, ...legacy }],
-  };
-}
-
-function persistState(state) {
-  if (Array.isArray(state?._allProfiles) && state._allProfiles.length) {
-    const activeId = String(state.profileId || state._allProfiles[0]?.id || "cal-1");
-    const activeName =
-      String(state.ui?.calendarName || state.profileName || "Calendar").trim() || "Calendar";
-    const snapshot = {
-      id: activeId,
-      name: activeName,
-      inputs: clonePlain(state.inputs),
-      ui: clonePlain(state.ui),
-    };
-    const profiles = (state._allProfiles || [])
-      .map((p, idx) => {
-        const id = String(p?.id || `cal-${idx + 1}`).trim() || `cal-${idx + 1}`;
-        const name =
-          String(p?.name || p?.ui?.calendarName || `Calendar ${idx + 1}`).trim() ||
-          `Calendar ${idx + 1}`;
-        return {
-          id,
-          name,
-          inputs: clonePlain(p?.inputs || {}),
-          ui: clonePlain(p?.ui || {}),
-        };
-      })
-      .filter((p) => p.id);
-    const idx = profiles.findIndex((p) => p.id === activeId);
-    if (idx >= 0) profiles[idx] = snapshot;
-    else profiles.push(snapshot);
-    state._allProfiles = profiles;
-    state.profiles = profiles.map((p) => ({ id: p.id, name: p.name }));
-    state.profileName = activeName;
-    updateWorld({ calendar: { activeProfileId: activeId, profiles } });
-    return;
-  }
-  updateWorld({ calendar: { inputs: { ...state.inputs }, ui: { ...state.ui } } });
-}
-
-function normHolidayRule(raw, idx, monthsPerYear) {
-  const h = raw && typeof raw === "object" ? raw : {};
-  let attrs = { useDate: true, useWeekday: false, useMoonPhase: false };
-  if (h.type === "nth_weekday") attrs = { useDate: false, useWeekday: true, useMoonPhase: false };
-  if (h.type === "moon_phase") attrs = { useDate: false, useWeekday: false, useMoonPhase: true };
-  if (h.attrs && typeof h.attrs === "object") {
-    attrs = {
-      useDate: !!h.attrs.useDate,
-      useWeekday: !!h.attrs.useWeekday,
-      useMoonPhase: !!h.attrs.useMoonPhase,
-    };
-  }
-  const maxMonth = Math.max(0, I(monthsPerYear, 12) - 1);
-  const relativeRaw = h.relative && typeof h.relative === "object" ? h.relative : {};
-  const relativeType = HOLIDAY_RELATIVE_TYPES.some(
-    ([value]) => value === String(relativeRaw.type || ""),
-  )
-    ? String(relativeRaw.type)
-    : "none";
-  const relativeEnabled = !!relativeRaw.enabled && relativeType !== "none";
-  const relativeMoonPhase = PHASES.some(([value]) => value === String(relativeRaw.moonPhase || ""))
-    ? String(relativeRaw.moonPhase)
-    : "F";
-  const relative = {
-    enabled: relativeEnabled,
-    type: relativeType,
-    offsetDays: clampI(relativeRaw.offsetDays ?? relativeRaw.daysOffset ?? 0, -2000, 2000),
-    moonSlot: clampI(relativeRaw.moonSlot ?? 0, 0, 3),
-    moonId: String(relativeRaw.moonId || ""),
-    moonPhase: relativeMoonPhase,
-    markerKey: String(relativeRaw.markerKey || "").trim(),
-    holidayId: String(relativeRaw.holidayId || "").trim(),
-  };
-  const fallbackAnchorType = relativeEnabled
-    ? relativeType === "moon-phase"
-      ? "moon-phase"
-      : relativeType === "astronomy-marker"
-        ? "astronomy-marker"
-        : relativeType === "holiday"
-          ? "holiday"
-          : "fixed-date"
-    : attrs.useWeekday && !attrs.useDate && !attrs.useMoonPhase
-      ? "nth-weekday"
-      : attrs.useMoonPhase && !attrs.useDate && !attrs.useWeekday
-        ? "moon-phase"
-        : "fixed-date";
-  const anchorRaw = h.anchor && typeof h.anchor === "object" ? h.anchor : {};
-  const anchorType = HOLIDAY_ANCHOR_TYPES.some(([value]) => value === String(anchorRaw.type || ""))
-    ? String(anchorRaw.type)
-    : fallbackAnchorType;
-  const anchor = {
-    type: anchorType,
-    algorithmKey: HOLIDAY_ALGORITHMS.some(
-      ([value]) => value === String(anchorRaw.algorithmKey || ""),
-    )
-      ? String(anchorRaw.algorithmKey)
-      : "none",
-    moonSlot: clampI(anchorRaw.moonSlot ?? h.moonSlot ?? relative.moonSlot ?? 0, 0, 3),
-    moonId: String(anchorRaw.moonId ?? h.moonId ?? relative.moonId ?? ""),
-    moonPhase: PHASES.some(([value]) => value === String(anchorRaw.moonPhase || ""))
-      ? String(anchorRaw.moonPhase)
-      : PHASES.some(([value]) => value === String(h.moonPhase || ""))
-        ? String(h.moonPhase)
-        : relativeMoonPhase,
-    markerKey: String(anchorRaw.markerKey ?? relative.markerKey ?? "").trim(),
-    holidayId: String(anchorRaw.holidayId ?? relative.holidayId ?? "").trim(),
-  };
-  const observanceRaw = h.observance && typeof h.observance === "object" ? h.observance : {};
-  const observance = {
-    weekendRule: HOLIDAY_WEEKEND_RULES.some(
-      ([value]) => value === String(observanceRaw.weekendRule || ""),
-    )
-      ? String(observanceRaw.weekendRule)
-      : "none",
-    holidayConflictRule: HOLIDAY_CONFLICT_RULES.some(
-      ([value]) => value === String(observanceRaw.holidayConflictRule || ""),
-    )
-      ? String(observanceRaw.holidayConflictRule)
-      : String(h.mergeMode || "") === "override"
-        ? "override"
-        : "merge",
-    maxShiftDays: clampI(observanceRaw.maxShiftDays ?? 7, 0, 180),
-    stayInMonth: !!observanceRaw.stayInMonth,
-  };
-  const conflictScopeRaw =
-    h.conflictScope && typeof h.conflictScope === "object" ? h.conflictScope : {};
-  const conflictScope = {
-    appliesAgainst: HOLIDAY_CONFLICT_SCOPES.some(
-      ([value]) => value === String(conflictScopeRaw.appliesAgainst || ""),
-    )
-      ? String(conflictScopeRaw.appliesAgainst)
-      : "all",
-    categories: parseStringList(conflictScopeRaw.categories ?? []),
-    holidayIds: parseStringList(conflictScopeRaw.holidayIds ?? []),
-  };
-  const offsetDays = clampI(h.offsetDays ?? relative.offsetDays ?? 0, -2000, 2000);
-  if (!relative.enabled && !attrs.useDate && !attrs.useWeekday && !attrs.useMoonPhase)
-    attrs.useDate = true;
-  return {
-    id: String(h.id || `holiday-${idx + 1}`),
-    name: String(h.name || "").trim(),
-    category: normalizeHolidayCategory(h.category || h.typeCategory || h.group),
-    colorTag: normalizeHolidayColorTag(h.colorTag || h.colourTag || h.color || h.colour),
-    recurrence: RECURRENCES.some(([v]) => v === h.recurrence) ? h.recurrence : "yearly",
-    startMonth: clampI(h.startMonth ?? h.monthIndex ?? 0, 0, maxMonth),
-    year: Math.max(1, I(h.year ?? h.startYear ?? 1, 1)),
-    attrs,
-    dayOfMonth: clampI(h.dayOfMonth ?? h.day ?? 1, 1, 400),
-    durationDays: Math.max(1, I(h.durationDays ?? h.lengthDays ?? 1, 1)),
-    priority: I(h.priority ?? 0, 0),
-    mergeMode: HOLIDAY_RESOLVE_MODES.some(([v]) => v === String(h.mergeMode || ""))
-      ? String(h.mergeMode)
-      : "merge",
-    exceptYears: parseIntList(h.exceptYears ?? h.skipYears ?? [], 1, 1000000),
-    exceptMonths: parseIntList(h.exceptMonths ?? h.skipMonths ?? [], 1, 240),
-    exceptDays: parseIntList(h.exceptDays ?? h.skipDays ?? [], 1, 500),
-    weekday: clampI(h.weekday ?? h.dayOfWeek ?? 0, 0, 30),
-    occurrence: OCCURRENCES.some(([v]) => v === String(h.occurrence))
-      ? String(h.occurrence)
-      : h.type === "nth_weekday"
-        ? String(Math.max(1, Math.min(4, I(h.weekIndex, 0) + 1)))
-        : "any",
-    moonSlot: clampI(h.moonSlot ?? 0, 0, 3),
-    moonId: String(h.moonId || ""),
-    moonPhase: PHASES.some(([v]) => v === h.moonPhase) ? h.moonPhase : h.phase || "F",
-    relative,
-    anchor,
-    offsetDays,
-    observance,
-    conflictScope,
-  };
-}
-
-function normHolidayRules(list, monthsPerYear) {
-  return (Array.isArray(list) ? list : [])
-    .map((h, idx) => normHolidayRule(h, idx, monthsPerYear))
-    .filter((h) => h.name);
-}
-
-function normFestivalRule(raw, idx, monthsPerYear) {
-  const f = raw && typeof raw === "object" ? raw : {};
-  const maxMonth = Math.max(0, I(monthsPerYear, 12) - 1);
-  return {
-    id: String(f.id || `festival-${idx + 1}`),
-    name: String(f.name || "").trim(),
-    category: normalizeHolidayCategory(f.category || f.typeCategory || f.group),
-    colorTag: normalizeHolidayColorTag(f.colorTag || f.colourTag || f.color || f.colour),
-    recurrence: RECURRENCES.some(([v]) => v === f.recurrence) ? f.recurrence : "yearly",
-    startMonth: clampI(f.startMonth ?? f.monthIndex ?? 0, 0, maxMonth),
-    year: Math.max(1, I(f.year ?? f.startYear ?? 1, 1)),
-    afterDay: clampI(f.afterDay ?? f.dayOfMonth ?? f.day ?? 0, 0, 500),
-    durationDays: Math.max(1, I(f.durationDays ?? f.lengthDays ?? 1, 1)),
-    outsideWeekFlow: !!(f.outsideWeekFlow ?? f.outsideWeek ?? f.intercalary),
-    exceptYears: parseIntList(f.exceptYears ?? f.skipYears ?? [], 1, 1000000),
-    exceptMonths: parseIntList(f.exceptMonths ?? f.skipMonths ?? [], 1, 240),
-    exceptDays: parseIntList(f.exceptDays ?? f.skipDays ?? [], 1, 500),
-  };
-}
-
-function normFestivalRules(list, monthsPerYear) {
-  return (Array.isArray(list) ? list : [])
-    .map((f, idx) => normFestivalRule(f, idx, monthsPerYear))
-    .filter((f) => f.name);
-}
-
-function sanitizeCycleShort(value, fallback) {
-  const raw = String(value ?? "")
-    .trim()
-    .toUpperCase();
-  if (!raw) return fallback;
-  return raw.slice(0, 3);
-}
-
-function normWorkCycleRule(raw, idx) {
-  const rule = raw && typeof raw === "object" ? raw : {};
-  const mode = WORK_CYCLE_MODES.some(([value]) => value === String(rule.mode || ""))
-    ? String(rule.mode)
-    : "duty";
-  const onDays = clampI(rule.onDays ?? 6, 1, 3650);
-  const offDays = clampI(rule.offDays ?? 1, 1, 3650);
-  const intervalDays = clampI(rule.intervalDays ?? 5, 1, 3650);
-  return {
-    id: String(rule.id || `cycle-${idx + 1}`),
-    name: String(rule.name || "").trim(),
-    mode,
-    startAbsoluteDay: Math.max(0, I(rule.startAbsoluteDay ?? 0, 0)),
-    onDays,
-    offDays,
-    intervalDays,
-    activeLabel: String(rule.activeLabel || "Work").trim() || "Work",
-    restLabel: String(rule.restLabel || "Rest").trim() || "Rest",
-    intervalLabel: String(rule.intervalLabel || "Marker").trim() || "Marker",
-    activeShort: sanitizeCycleShort(rule.activeShort, "W"),
-    restShort: sanitizeCycleShort(rule.restShort, "R"),
-    intervalShort: sanitizeCycleShort(rule.intervalShort, "M"),
-  };
-}
-
-function normWorkCycleRules(list) {
-  return (Array.isArray(list) ? list : [])
-    .map((rule, idx) => normWorkCycleRule(rule, idx))
-    .filter((rule) => rule.name);
-}
-
-function cycleRuleSummary(rule) {
-  if (!rule) return "";
-  if (rule.mode === "interval") {
-    return `Every ${rule.intervalDays} day(s) from day ${rule.startAbsoluteDay} | ${rule.intervalLabel} (${rule.intervalShort})`;
-  }
-  return `${rule.onDays} on / ${rule.offDays} off from day ${rule.startAbsoluteDay} | ${rule.activeLabel} (${rule.activeShort}) / ${rule.restLabel} (${rule.restShort})`;
-}
-
-function cycleKindClass(cycle) {
-  if (!cycle) return "calendar-cycle-marker--interval";
-  if (cycle.kind === "active") return "calendar-cycle-marker--active";
-  if (cycle.kind === "rest") return "calendar-cycle-marker--rest";
-  return "calendar-cycle-marker--interval";
-}
-
-function cycleMarkerTip(cycle) {
-  if (!cycle) return "Cycle marker";
-  if (cycle.kind === "interval") {
-    return `${cycle.ruleName}: ${cycle.label} (every ${cycle.intervalDays} days)`;
-  }
-  const dayInCycle = Math.max(1, I(cycle.dayInCycle, 1));
-  const cycleLength = Math.max(1, I(cycle.cycleLength, 1));
-  return `${cycle.ruleName}: ${cycle.label} (${dayInCycle}/${cycleLength})`;
-}
-
-function cycleIcon(cycle) {
-  const short = esc(
-    String(cycle?.short || "C")
-      .toUpperCase()
-      .slice(0, 3),
+  return createElement(
+    "span",
+    { className: "calendar-astro-marker", attrs: { "aria-hidden": "true" } },
+    [
+      createElement("span", {
+        className: `calendar-astro-icon ${astroIconClass(marker?.key)}`,
+        attrs: { "aria-hidden": "true" },
+      }),
+      moonSourceIndex == null
+        ? null
+        : createElement("span", {
+            className: `calendar-astro-source ${moonColorClass(moonSourceIndex)}`,
+            attrs: { "aria-hidden": "true" },
+          }),
+    ],
   );
-  return `<span class="calendar-cycle-marker ${cycleKindClass(cycle)}" data-tip="${esc(
-    cycleMarkerTip(cycle),
-  )}" aria-hidden="true">${short}</span>`;
 }
 
-function evaluateWorkCyclesForDay(workCycles, absoluteDay) {
-  const rules = Array.isArray(workCycles) ? workCycles : [];
-  const safeDay = Math.max(0, I(absoluteDay, 0));
-  const out = [];
-  for (let index = 0; index < rules.length; index++) {
-    const rule = rules[index];
-    if (!rule?.name) continue;
-    const startAbsoluteDay = Math.max(0, I(rule.startAbsoluteDay, 0));
-    const dayOffset = safeDay - startAbsoluteDay;
-    if (dayOffset < 0) continue;
-    if (rule.mode === "interval") {
-      const intervalDays = Math.max(1, I(rule.intervalDays, 1));
-      if (mod(dayOffset, intervalDays) !== 0) continue;
-      out.push({
-        ruleId: String(rule.id || ""),
-        ruleName: String(rule.name || ""),
-        ruleIndex: index,
-        kind: "interval",
-        label: String(rule.intervalLabel || "Marker"),
-        short: sanitizeCycleShort(rule.intervalShort, "M"),
-        intervalDays,
-      });
-      continue;
-    }
-    const onDays = Math.max(1, I(rule.onDays, 1));
-    const offDays = Math.max(1, I(rule.offDays, 1));
-    const span = onDays + offDays;
-    const cyclePosition = mod(dayOffset, span);
-    const isActive = cyclePosition < onDays;
-    out.push({
-      ruleId: String(rule.id || ""),
-      ruleName: String(rule.name || ""),
-      ruleIndex: index,
-      kind: isActive ? "active" : "rest",
-      label: isActive ? String(rule.activeLabel || "Work") : String(rule.restLabel || "Rest"),
-      short: isActive
-        ? sanitizeCycleShort(rule.activeShort, "W")
-        : sanitizeCycleShort(rule.restShort, "R"),
-      dayInCycle: cyclePosition + 1,
-      cycleLength: span,
-    });
-  }
-  return out;
+function cycleIconNode(cycle) {
+  const short = String(cycle?.short || "C")
+    .toUpperCase()
+    .slice(0, 3);
+  return createElement("span", {
+    className: `calendar-cycle-marker ${cycleKindClass(cycle)}`,
+    attrs: { "aria-hidden": "true" },
+    dataset: { tip: cycleMarkerTip(cycle) },
+    text: short,
+  });
 }
 
-function recursInMonth(holiday, year, monthIndex, monthsPerYear) {
-  if (holiday.recurrence === "one-off") {
-    return (
-      Math.max(1, I(year, 1)) === Math.max(1, I(holiday.year, 1)) &&
-      clampI(monthIndex, 0, monthsPerYear - 1) === clampI(holiday.startMonth, 0, monthsPerYear - 1)
+function selectedDayLine(label, children, className = "calendar-selected-day__line") {
+  return createElement("div", { className }, [
+    createElement("b", { text: `${label}:` }),
+    " ",
+    ...(Array.isArray(children) ? children : [children]),
+  ]);
+}
+
+function renderListContent(node, items, emptyText) {
+  return replaceChildren(node, items.length ? items : [hintNode(emptyText)]);
+}
+
+function renderTraceTable(headings, rows) {
+  return createElement("table", { className: "calendar-rule-trace__table" }, [
+    createElement(
+      "thead",
+      {},
+      createElement(
+        "tr",
+        {},
+        headings.map((heading) => createElement("th", { text: heading })),
+      ),
+    ),
+    createElement(
+      "tbody",
+      {},
+      rows.map((row) =>
+        createElement(
+          "tr",
+          { className: row.className },
+          row.cells.map((cell) =>
+            createElement(
+              "td",
+              {},
+              Array.isArray(cell) ? cell : [cell == null ? "" : String(cell)],
+            ),
+          ),
+        ),
+      ),
+    ),
+  ]);
+}
+
+function buildTraceNode(trace) {
+  if (!trace) return null;
+  const r = trace.raw;
+  const hs = trace.holidays;
+  const fs = trace.festivals;
+  const cs = trace.workCycles;
+  if (!hs.length && !fs.length && !cs.length) return null;
+
+  const rawChildren = [
+    createElement("b", { text: "Absolute day:" }),
+    ` ${r.absoluteDay} | `,
+    createElement("b", { text: "Weekday:" }),
+    ` ${r.weekdayName} (${r.weekdayIndex})${r.isWeekend ? " [weekend]" : ""}`,
+  ];
+  if (r.moonPhases.length) {
+    rawChildren.push(
+      createElement("br"),
+      createElement("b", { text: "Moon:" }),
+      ` ${r.moonPhases.map((m) => `${m.name} ${m.phaseShort} (${fmt(m.illumination, 1)}%)`).join("; ")}`,
     );
   }
-  const now =
-    (Math.max(1, I(year, 1)) - 1) * monthsPerYear + clampI(monthIndex, 0, monthsPerYear - 1);
-  const start = clampI(holiday.startMonth, 0, monthsPerYear - 1);
-  if (now < start) return false;
-  if (holiday.recurrence === "weekly") return true;
-  const interval = RECUR_MONTHS[holiday.recurrence] || 12;
-  return mod(now - start, interval) === 0;
-}
-
-function weekdayOccurrence(dayNumber, monthLength, monthStartWeekday, targetWeekday, daysPerWeek) {
-  let nth = 0;
-  for (let d = 1; d <= dayNumber; d++) {
-    if (mod(monthStartWeekday + d - 1, daysPerWeek) === targetWeekday) nth += 1;
-  }
-  let isLast = true;
-  for (let d = dayNumber + 1; d <= monthLength; d++) {
-    if (mod(monthStartWeekday + d - 1, daysPerWeek) === targetWeekday) {
-      isLast = false;
-      break;
-    }
-  }
-  return { nth, isLast };
-}
-
-function toLinearMonthOrdinal(year, monthIndex, monthsPerYear) {
-  const y = Math.max(1, I(year, 1));
-  const m = clampI(monthIndex, 0, Math.max(0, I(monthsPerYear, 12) - 1));
-  return (y - 1) * Math.max(1, I(monthsPerYear, 12)) + m;
-}
-
-function fromLinearMonthOrdinal(linearMonth, monthsPerYear) {
-  const mpy = Math.max(1, I(monthsPerYear, 12));
-  const value = Math.max(0, I(linearMonth, 0));
-  return {
-    year: Math.floor(value / mpy) + 1,
-    monthIndex: mod(value, mpy),
-  };
-}
-
-function uniqueSortedNumbers(values) {
-  const out = [];
-  const seen = new Set();
-  for (const value of values || []) {
-    const n = I(value, Number.NaN);
-    if (!Number.isFinite(n)) continue;
-    if (seen.has(n)) continue;
-    seen.add(n);
-    out.push(n);
-  }
-  return out.sort((a, b) => a - b);
-}
-
-function pickMoonStateForHoliday(holiday, moonStates, { relative = false } = {}) {
-  const states = Array.isArray(moonStates) ? moonStates : [];
-  if (!states.length) return null;
-  if (relative) {
-    const rel = holiday?.relative && typeof holiday.relative === "object" ? holiday.relative : null;
-    if (rel?.moonId) {
-      const found = states.find((moonState) => String(moonState?.id || "") === String(rel.moonId));
-      if (found) return found;
-    }
-    return states[clampI(rel?.moonSlot ?? 0, 0, states.length - 1)] || null;
-  }
-  if (holiday?.moonId) {
-    const found = states.find(
-      (moonState) => String(moonState?.id || "") === String(holiday.moonId),
-    );
-    if (found) return found;
-  }
-  return states[clampI(holiday?.moonSlot ?? 0, 0, states.length - 1)] || null;
-}
-
-function holidayRelativeKeyLabel(relative) {
-  const rel = relative && typeof relative === "object" ? relative : {};
-  if (!rel.enabled || rel.type === "none") return "";
-  if (rel.type === "moon-phase") return "moon phase";
-  if (rel.type === "astronomy-marker") {
-    return (
-      HOLIDAY_RELATIVE_MARKERS.find(([value]) => value === String(rel.markerKey || ""))?.[1] ||
-      "astronomy marker"
+  if (r.leapRulesActive.length) {
+    rawChildren.push(
+      createElement("br"),
+      createElement("b", { text: "Leap rules active:" }),
+      ` ${r.leapRulesActive
+        .map((l) => `${l.name} (month ${l.month}, ${l.delta > 0 ? "+" : ""}${l.delta}d)`)
+        .join("; ")}`,
     );
   }
-  if (rel.type === "holiday") return "another holiday";
-  return "relative trigger";
-}
 
-function analyzeHolidayRelativeIssues(holidays) {
-  const byId = new Map((holidays || []).map((holiday) => [String(holiday.id), holiday]));
-  const issueById = new Map();
-  const edges = new Map();
-
-  for (const holiday of holidays || []) {
-    const id = String(holiday.id || "");
-    if (!id) continue;
-
-    const anchor = holiday?.anchor && typeof holiday.anchor === "object" ? holiday.anchor : null;
-    const anchorType = String(anchor?.type || "");
-    if (anchorType && !HOLIDAY_ANCHOR_TYPES.some(([value]) => value === anchorType)) {
-      issueById.set(id, "Invalid holiday anchor type.");
-      continue;
-    }
-
-    if (anchorType === "moon-phase") {
-      if (!PHASES.some(([value]) => value === String(anchor?.moonPhase || ""))) {
-        issueById.set(id, "Anchor moon-phase is missing a valid phase.");
-      }
-    } else if (anchorType === "astronomy-marker") {
-      if (!HOLIDAY_RELATIVE_MARKERS.some(([value]) => value === String(anchor?.markerKey || ""))) {
-        issueById.set(id, "Anchor astronomy marker is missing or invalid.");
-      }
-    } else if (anchorType === "algorithmic") {
-      const algorithmKey = String(anchor?.algorithmKey || "");
-      if (
-        algorithmKey === "none" ||
-        !HOLIDAY_ALGORITHMS.some(([value]) => value === algorithmKey)
-      ) {
-        issueById.set(id, "Algorithmic anchor is missing a valid algorithm.");
-      }
-    } else if (anchorType === "holiday") {
-      const depId = String(anchor?.holidayId || "").trim();
-      if (!depId) {
-        issueById.set(id, "Anchor holiday is missing a linked holiday.");
-      } else if (depId === id) {
-        issueById.set(id, "Anchor holiday cannot reference itself.");
-      } else if (!byId.has(depId)) {
-        issueById.set(id, "Anchor holiday references a missing holiday.");
-      } else {
-        if (!edges.has(id)) edges.set(id, []);
-        edges.get(id).push(depId);
-      }
-    }
-
-    const rel = holiday?.relative && typeof holiday.relative === "object" ? holiday.relative : null;
-    if (!rel?.enabled || rel.type === "none") continue;
-    if (!HOLIDAY_RELATIVE_TYPES.some(([value]) => value === String(rel.type || ""))) {
-      issueById.set(id, "Invalid relative trigger type.");
-      continue;
-    }
-    if (rel.type === "moon-phase") {
-      if (!PHASES.some(([value]) => value === String(rel.moonPhase || ""))) {
-        issueById.set(id, "Relative moon-phase trigger is missing a valid phase.");
-      }
-      continue;
-    }
-    if (rel.type === "astronomy-marker") {
-      if (!HOLIDAY_RELATIVE_MARKERS.some(([value]) => value === String(rel.markerKey || ""))) {
-        issueById.set(id, "Relative astronomy trigger is missing a valid marker.");
-      }
-      continue;
-    }
-    if (rel.type === "holiday") {
-      const depId = String(rel.holidayId || "").trim();
-      if (!depId) {
-        issueById.set(id, "Relative holiday trigger is missing a linked holiday.");
-        continue;
-      }
-      if (depId === id) {
-        issueById.set(id, "Relative holiday trigger cannot reference itself.");
-        continue;
-      }
-      if (!byId.has(depId)) {
-        issueById.set(id, "Relative holiday trigger references a missing holiday.");
-        continue;
-      }
-      if (!edges.has(id)) edges.set(id, []);
-      edges.get(id).push(depId);
-    }
+  const sections = [];
+  if (hs.length) {
+    sections.push(
+      createElement("div", { className: "calendar-rule-trace__section" }, [
+        createElement("b", { text: "Holidays" }),
+        ` (${hs.length} rules)`,
+        renderTraceTable(
+          ["", "Rule", "Anchor", "Pri", "Reason"],
+          hs.map((holiday) => ({
+            className: holiday.matched
+              ? "calendar-rule-trace__row--matched"
+              : "calendar-rule-trace__row--missed",
+            cells: [
+              holiday.matched ? "\u2705" : "\u2014",
+              holiday.name,
+              holiday.anchorType,
+              String(holiday.priority),
+              holiday.reason,
+            ],
+          })),
+        ),
+      ]),
+    );
+  }
+  if (fs.length) {
+    sections.push(
+      createElement("div", { className: "calendar-rule-trace__section" }, [
+        createElement("b", { text: "Festivals" }),
+        ` (${fs.length} rules)`,
+        renderTraceTable(
+          ["", "Rule", "Reason"],
+          fs.map((festival) => ({
+            className: festival.matched
+              ? "calendar-rule-trace__row--matched"
+              : "calendar-rule-trace__row--missed",
+            cells: [festival.matched ? "\u2705" : "\u2014", festival.name, festival.reason],
+          })),
+        ),
+      ]),
+    );
+  }
+  if (cs.length) {
+    sections.push(
+      createElement("div", { className: "calendar-rule-trace__section" }, [
+        createElement("b", { text: "Work Cycles" }),
+        ` (${cs.length} rules)`,
+        renderTraceTable(
+          ["", "Rule", "Mode", "Reason"],
+          cs.map((cycle) => ({
+            className: cycle.matched
+              ? "calendar-rule-trace__row--matched"
+              : "calendar-rule-trace__row--missed",
+            cells: [cycle.matched ? "\u2705" : "\u2014", cycle.name, cycle.mode, cycle.reason],
+          })),
+        ),
+      ]),
+    );
   }
 
-  const visitState = new Map();
-  const path = [];
-  const markCycle = (startId) => {
-    const startIndex = path.indexOf(startId);
-    const cycleIds = startIndex >= 0 ? path.slice(startIndex) : [startId];
-    for (const id of cycleIds) {
-      issueById.set(id, "Circular relative/anchor dependency detected.");
-    }
-  };
-
-  const dfs = (id) => {
-    const state = visitState.get(id) || 0;
-    if (state === 1) {
-      markCycle(id);
-      return;
-    }
-    if (state === 2) return;
-    visitState.set(id, 1);
-    path.push(id);
-    for (const depId of edges.get(id) || []) {
-      dfs(depId);
-    }
-    path.pop();
-    visitState.set(id, 2);
-  };
-
-  for (const id of edges.keys()) {
-    dfs(id);
-  }
-
-  return issueById;
+  return createElement("details", { className: "calendar-rule-trace" }, [
+    createElement("summary", { text: "Rule trace" }),
+    createElement("div", { className: "calendar-rule-trace__raw" }, rawChildren),
+    sections,
+    actionButton("Copy to clipboard", {}, "calendar-rule-trace__copy small"),
+  ]);
 }
 
 function dayMatchesHolidayBaseAttrs(holiday, dayCtx) {
@@ -2875,70 +1839,6 @@ function traceToPlainText(trace) {
   return lines.join("\n");
 }
 
-function buildTraceHtml(trace) {
-  if (!trace) return "";
-  const r = trace.raw;
-  const hs = trace.holidays;
-  const fs = trace.festivals;
-  const cs = trace.workCycles;
-  const hasContent = hs.length || fs.length || cs.length;
-  if (!hasContent) return "";
-
-  let html = `<details class="calendar-rule-trace"><summary>Rule trace</summary>`;
-  html += `<div class="calendar-rule-trace__raw">`;
-  html += `<b>Absolute day:</b> ${r.absoluteDay} | <b>Weekday:</b> ${esc(r.weekdayName)} (${r.weekdayIndex})${r.isWeekend ? " [weekend]" : ""}`;
-  if (r.moonPhases.length) {
-    html += `<br><b>Moon:</b> ${r.moonPhases.map((m) => `${esc(m.name)} ${esc(m.phaseShort)} (${fmt(m.illumination, 1)}%)`).join("; ")}`;
-  }
-  if (r.leapRulesActive.length) {
-    html += `<br><b>Leap rules active:</b> ${r.leapRulesActive.map((l) => `${esc(l.name)} (month ${l.month}, ${l.delta > 0 ? "+" : ""}${l.delta}d)`).join("; ")}`;
-  }
-  html += `</div>`;
-
-  if (hs.length) {
-    html += `<div class="calendar-rule-trace__section"><b>Holidays</b> (${hs.length} rules)`;
-    html += `<table class="calendar-rule-trace__table"><thead><tr><th></th><th>Rule</th><th>Anchor</th><th>Pri</th><th>Reason</th></tr></thead><tbody>`;
-    for (const h of hs) {
-      const cls = h.matched
-        ? "calendar-rule-trace__row--matched"
-        : "calendar-rule-trace__row--missed";
-      const mark = h.matched ? "\u2705" : "\u2014";
-      html += `<tr class="${cls}"><td>${mark}</td><td>${esc(h.name)}</td><td>${esc(h.anchorType)}</td><td>${h.priority}</td><td>${esc(h.reason)}</td></tr>`;
-    }
-    html += `</tbody></table></div>`;
-  }
-
-  if (fs.length) {
-    html += `<div class="calendar-rule-trace__section"><b>Festivals</b> (${fs.length} rules)`;
-    html += `<table class="calendar-rule-trace__table"><thead><tr><th></th><th>Rule</th><th>Reason</th></tr></thead><tbody>`;
-    for (const f of fs) {
-      const cls = f.matched
-        ? "calendar-rule-trace__row--matched"
-        : "calendar-rule-trace__row--missed";
-      const mark = f.matched ? "\u2705" : "\u2014";
-      html += `<tr class="${cls}"><td>${mark}</td><td>${esc(f.name)}</td><td>${esc(f.reason)}</td></tr>`;
-    }
-    html += `</tbody></table></div>`;
-  }
-
-  if (cs.length) {
-    html += `<div class="calendar-rule-trace__section"><b>Work Cycles</b> (${cs.length} rules)`;
-    html += `<table class="calendar-rule-trace__table"><thead><tr><th></th><th>Rule</th><th>Mode</th><th>Reason</th></tr></thead><tbody>`;
-    for (const c of cs) {
-      const cls = c.matched
-        ? "calendar-rule-trace__row--matched"
-        : "calendar-rule-trace__row--missed";
-      const mark = c.matched ? "\u2705" : "\u2014";
-      html += `<tr class="${cls}"><td>${mark}</td><td>${esc(c.name)}</td><td>${esc(c.mode)}</td><td>${esc(c.reason)}</td></tr>`;
-    }
-    html += `</tbody></table></div>`;
-  }
-
-  html += `<button type="button" class="calendar-rule-trace__copy small">Copy to clipboard</button>`;
-  html += `</details>`;
-  return html;
-}
-
 function buildContext(world, state) {
   const planets = listPlanets(world);
   const allMoons = listMoons(world);
@@ -3365,132 +2265,250 @@ function recommendLeapRuleFromOrbit(ctx) {
 }
 
 function detailedGrid(model, selectedDay) {
-  const head =
-    `<th class="calendar-week-col">Week</th>` +
-    model.headers.map((h) => `<th>${esc(h)}</th>`).join("");
-  const body = model.rows
-    .map((row) => {
-      const tds = row.cells
-        .map((cell) => {
-          if (!cell) return `<td class="calendar-cell--empty"></td>`;
-          if (cell.kind === "festival") {
-            const label = esc(cell.festival?.name || "Festival");
-            const seq =
-              I(cell.festival?.segmentCount, 1) > 1
-                ? ` ${I(cell.festival?.segment, 1)}/${I(cell.festival?.segmentCount, 1)}`
-                : "";
-            const marker = cell.festival?.outsideWeekFlow ? "Outside" : "Festival";
-            return `<td><div class="calendar-day-btn calendar-day-btn--festival" data-tip="${esc(`${label}${seq} (${marker})`)}"><span class="calendar-day-btn__num">F</span><span class="calendar-day-btn__phase">${label}${seq}</span></div></td>`;
-          }
-          const cls = ["calendar-day-btn"];
-          if (cell.dayNumber === selectedDay) cls.push("is-selected");
-          if (cell.holidays.length) cls.push("has-holiday");
-          if (cell.holidays.length) cls.push(holidayColorClass(cell.holidays[0]?.colorTag));
-          if ((cell.markers || []).length) cls.push("has-astronomy");
-          if ((cell.cycles || []).length) cls.push("has-cycle");
-          if (cell.moonStates[0]?.phase?.phaseShort === "F") cls.push("is-full-moon");
-          if (cell.moonStates[0]?.phase?.phaseShort === "N") cls.push("is-new-moon");
-          const icons = cell.moonStates.map((m, i) => moonIcon(m, i)).join("");
-          const markers = Array.isArray(cell.markers) ? cell.markers : [];
-          const cycles = Array.isArray(cell.cycles) ? cell.cycles : [];
-          const markerNames = markers.map((m) => astronomyMarkerLabel(m)).join(", ");
-          const astroIcons = markers.length
-            ? `<span class="calendar-day-btn__astro-icons" data-tip="${esc(`Astronomy: ${markerNames}`)}">${markers.map((marker) => astroIcon(marker)).join("")}</span>`
-            : "";
-          const cycleNames = cycles.map((cycle) => cycleMarkerTip(cycle)).join(", ");
-          const cycleIcons = cycles.length
-            ? `<span class="calendar-day-btn__cycle-icons" data-tip="${esc(`Cycles: ${cycleNames}`)}">${cycles.map((cycle) => cycleIcon(cycle)).join("")}</span>`
-            : "";
-          const holidayDetails = Array.isArray(cell.holidayDetails) ? cell.holidayDetails : [];
-          const hasContinuationFromPrev = holidayDetails.some(
-            (detail) => !!detail.continuesFromPrev,
-          );
-          const hasContinuationToNext = holidayDetails.some((detail) => !!detail.continuesToNext);
-          const holidayMarkerText = cell.holidays.length
-            ? `${hasContinuationFromPrev ? "←" : ""}H${cell.holidays.length > 1 ? cell.holidays.length : ""}${hasContinuationToNext ? "→" : ""}`
-            : "";
-          const holidayTip = cell.holidays.length
-            ? `Holidays: ${holidayDetails
-                .map((detail) => {
-                  const holiday = detail.holiday || {};
-                  const continuation = [
-                    detail.continuesFromPrev ? "continues from previous day" : "",
-                    detail.continuesToNext ? "continues to next day" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(", ");
-                  return `${holiday.name} (${holidayCategoryLabel(holiday.category)})${
-                    continuation ? ` [${continuation}]` : ""
-                  }`;
-                })
-                .join("; ")}`
-            : "";
-          const h = cell.holidays.length
-            ? `<span class="calendar-day-btn__holiday" data-tip="${esc(holidayTip)}">${esc(holidayMarkerText)}</span>`
-            : `<span class="calendar-day-btn__holiday is-empty">&nbsp;</span>`;
-          return `<td><button type="button" class="${cls.join(" ")}" data-cal-day="${cell.dayNumber}"><span class="calendar-day-btn__num">${cell.dayNumber}</span><span class="calendar-day-btn__moons">${icons}${astroIcons}${cycleIcons}</span>${h}</button></td>`;
-        })
-        .join("");
-      return `<tr><th class="calendar-week-col">${esc(row.weekName)}</th>${tds}</tr>`;
-    })
-    .join("");
+  const head = [
+    createElement("th", { className: "calendar-week-col", text: "Week" }),
+    ...(model.headers || []).map((header) => createElement("th", { text: header })),
+  ];
+  const body = (model.rows || []).map((row) =>
+    createElement("tr", {}, [
+      createElement("th", { className: "calendar-week-col", text: row.weekName }),
+      ...(row.cells || []).map((cell) => {
+        if (!cell) return createElement("td", { className: "calendar-cell--empty" });
+        if (cell.kind === "festival") {
+          const label = cell.festival?.name || "Festival";
+          const seq =
+            I(cell.festival?.segmentCount, 1) > 1
+              ? ` ${I(cell.festival?.segment, 1)}/${I(cell.festival?.segmentCount, 1)}`
+              : "";
+          const marker = cell.festival?.outsideWeekFlow ? "Outside" : "Festival";
+          return createElement("td", {}, [
+            createElement(
+              "div",
+              {
+                className: "calendar-day-btn calendar-day-btn--festival",
+                dataset: { tip: `${label}${seq} (${marker})` },
+              },
+              [
+                createElement("span", { className: "calendar-day-btn__num", text: "F" }),
+                createElement("span", {
+                  className: "calendar-day-btn__phase",
+                  text: `${label}${seq}`,
+                }),
+              ],
+            ),
+          ]);
+        }
+        const classNames = ["calendar-day-btn"];
+        if (cell.dayNumber === selectedDay) classNames.push("is-selected");
+        if (cell.holidays.length) classNames.push("has-holiday");
+        if (cell.holidays.length) classNames.push(holidayColorClass(cell.holidays[0]?.colorTag));
+        if ((cell.markers || []).length) classNames.push("has-astronomy");
+        if ((cell.cycles || []).length) classNames.push("has-cycle");
+        if (cell.moonStates[0]?.phase?.phaseShort === "F") classNames.push("is-full-moon");
+        if (cell.moonStates[0]?.phase?.phaseShort === "N") classNames.push("is-new-moon");
+        const markers = Array.isArray(cell.markers) ? cell.markers : [];
+        const cycles = Array.isArray(cell.cycles) ? cell.cycles : [];
+        const markerNames = markers.map((marker) => astronomyMarkerLabel(marker)).join(", ");
+        const cycleNames = cycles.map((cycle) => cycleMarkerTip(cycle)).join(", ");
+        const holidayDetails = Array.isArray(cell.holidayDetails) ? cell.holidayDetails : [];
+        const hasContinuationFromPrev = holidayDetails.some((detail) => !!detail.continuesFromPrev);
+        const hasContinuationToNext = holidayDetails.some((detail) => !!detail.continuesToNext);
+        const holidayMarkerText = cell.holidays.length
+          ? `${hasContinuationFromPrev ? "\u2190" : ""}H${
+              cell.holidays.length > 1 ? cell.holidays.length : ""
+            }${hasContinuationToNext ? "\u2192" : ""}`
+          : "";
+        const holidayTip = cell.holidays.length
+          ? `Holidays: ${holidayDetails
+              .map((detail) => {
+                const holiday = detail.holiday || {};
+                const continuation = [
+                  detail.continuesFromPrev ? "continues from previous day" : "",
+                  detail.continuesToNext ? "continues to next day" : "",
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+                return `${holiday.name} (${holidayCategoryLabel(holiday.category)})${
+                  continuation ? ` [${continuation}]` : ""
+                }`;
+              })
+              .join("; ")}`
+          : "";
+        return createElement("td", {}, [
+          createElement(
+            "button",
+            {
+              className: classNames.join(" "),
+              attrs: { type: "button" },
+              dataset: { calDay: cell.dayNumber },
+            },
+            [
+              createElement("span", {
+                className: "calendar-day-btn__num",
+                text: String(cell.dayNumber),
+              }),
+              createElement("span", { className: "calendar-day-btn__moons" }, [
+                ...(cell.moonStates || []).map((moonState, index) =>
+                  moonIconNode(moonState, index),
+                ),
+                markers.length
+                  ? createElement(
+                      "span",
+                      {
+                        className: "calendar-day-btn__astro-icons",
+                        dataset: { tip: `Astronomy: ${markerNames}` },
+                      },
+                      markers.map((marker) => astroIconNode(marker)),
+                    )
+                  : null,
+                cycles.length
+                  ? createElement(
+                      "span",
+                      {
+                        className: "calendar-day-btn__cycle-icons",
+                        dataset: { tip: `Cycles: ${cycleNames}` },
+                      },
+                      cycles.map((cycle) => cycleIconNode(cycle)),
+                    )
+                  : null,
+              ]),
+              cell.holidays.length
+                ? createElement("span", {
+                    className: "calendar-day-btn__holiday",
+                    dataset: { tip: holidayTip },
+                    text: holidayMarkerText,
+                  })
+                : createElement("span", {
+                    className: "calendar-day-btn__holiday is-empty",
+                    text: "\u00a0",
+                  }),
+            ],
+          ),
+        ]);
+      }),
+    ]),
+  );
   return { head, body };
 }
 
 function miniGrid(model, selectedDay) {
-  const head = model.headers.map((h) => `<th>${esc(h)}</th>`).join("");
-  const body = model.rows
-    .map((row) => {
-      const cells = row.cells
-        .map((cell) => {
-          if (!cell) return `<td class="calendar-mini-cell is-empty"></td>`;
-          if (cell.kind === "festival") {
-            const label = esc(cell.festival?.name || "Festival");
-            const seq =
-              I(cell.festival?.segmentCount, 1) > 1
-                ? ` ${I(cell.festival?.segment, 1)}/${I(cell.festival?.segmentCount, 1)}`
-                : "";
-            return `<td class="calendar-mini-cell"><div class="calendar-mini-day is-festival" data-tip="${esc(`${label}${seq}`)}"><span class="calendar-mini-day__num">F</span><span class="calendar-mini-day__holiday">${label}</span></div></td>`;
-          }
-          const cls = ["calendar-mini-day"];
-          if (cell.dayNumber === selectedDay) cls.push("is-selected");
-          if (cell.holidays.length) cls.push("has-holiday");
-          if (cell.holidays.length) cls.push(holidayColorClass(cell.holidays[0]?.colorTag));
-          if ((cell.markers || []).length) cls.push("has-astronomy");
-          if ((cell.cycles || []).length) cls.push("has-cycle");
-          const holidayCount = cell.holidays.length;
-          const markerCount = (cell.markers || []).length;
-          const cycleCount = (cell.cycles || []).length;
-          const holidayNames = holidayCount ? cell.holidays.map((h) => h.name).join(", ") : "";
-          const markerNames = markerCount
-            ? cell.markers.map((m) => astronomyMarkerLabel(m)).join(", ")
-            : "";
-          const cycleNames = cycleCount
-            ? cell.cycles.map((cycle) => cycleMarkerTip(cycle)).join(", ")
-            : "";
-          const holidayDetails = Array.isArray(cell.holidayDetails) ? cell.holidayDetails : [];
-          const hasContinuationFromPrev = holidayDetails.some(
-            (detail) => !!detail.continuesFromPrev,
-          );
-          const hasContinuationToNext = holidayDetails.some((detail) => !!detail.continuesToNext);
-          const holidayMarkerPrefix = hasContinuationFromPrev ? "←" : "";
-          const holidayMarkerSuffix = hasContinuationToNext ? "→" : "";
-          let holidayMark = `<span class="calendar-mini-day__holiday is-empty" aria-hidden="true">&nbsp;</span>`;
-          if (holidayCount && markerCount) {
-            holidayMark = `<span class="calendar-mini-day__holiday" data-tip="${esc(`Holidays: ${holidayNames}; Astronomy: ${markerNames}; Cycles: ${cycleNames || "None"}; ${TIPS["Holiday continuation"]}`)}">${holidayMarkerPrefix}H${holidayCount > 1 ? holidayCount : ""}${holidayMarkerSuffix}/A${markerCount > 1 ? markerCount : ""}${cycleCount ? `/C${cycleCount > 1 ? cycleCount : ""}` : ""}</span>`;
-          } else if (holidayCount) {
-            holidayMark = `<span class="calendar-mini-day__holiday" data-tip="${esc(`Holiday${holidayCount > 1 ? "s" : ""}: ${holidayNames}; Cycles: ${cycleNames || "None"}; ${TIPS["Holiday continuation"]}`)}">${holidayMarkerPrefix}H${holidayCount > 1 ? holidayCount : ""}${holidayMarkerSuffix}${cycleCount ? `/C${cycleCount > 1 ? cycleCount : ""}` : ""}</span>`;
-          } else if (markerCount) {
-            holidayMark = `<span class="calendar-mini-day__holiday calendar-mini-day__holiday--astro" data-tip="${esc(`Astronomy: ${markerNames}; Cycles: ${cycleNames || "None"}`)}">A${markerCount > 1 ? markerCount : ""}${cycleCount ? `/C${cycleCount > 1 ? cycleCount : ""}` : ""}</span>`;
-          } else if (cycleCount) {
-            holidayMark = `<span class="calendar-mini-day__holiday calendar-mini-day__holiday--cycle" data-tip="${esc(`Cycles: ${cycleNames}`)}">C${cycleCount > 1 ? cycleCount : ""}</span>`;
-          }
-          return `<td class="calendar-mini-cell"><button type="button" class="${cls.join(" ")}" data-cal-mini-day="${cell.dayNumber}"><span class="calendar-mini-day__num">${cell.dayNumber}</span>${holidayMark}</button></td>`;
-        })
-        .join("");
-      return `<tr>${cells}</tr>`;
-    })
-    .join("");
+  const head = (model.headers || []).map((header) => createElement("th", { text: header }));
+  const body = (model.rows || []).map((row) =>
+    createElement(
+      "tr",
+      {},
+      (row.cells || []).map((cell) => {
+        if (!cell) return createElement("td", { className: "calendar-mini-cell is-empty" });
+        if (cell.kind === "festival") {
+          const label = cell.festival?.name || "Festival";
+          const seq =
+            I(cell.festival?.segmentCount, 1) > 1
+              ? ` ${I(cell.festival?.segment, 1)}/${I(cell.festival?.segmentCount, 1)}`
+              : "";
+          return createElement("td", { className: "calendar-mini-cell" }, [
+            createElement(
+              "div",
+              {
+                className: "calendar-mini-day is-festival",
+                dataset: { tip: `${label}${seq}` },
+              },
+              [
+                createElement("span", { className: "calendar-mini-day__num", text: "F" }),
+                createElement("span", {
+                  className: "calendar-mini-day__holiday",
+                  text: label,
+                }),
+              ],
+            ),
+          ]);
+        }
+        const classNames = ["calendar-mini-day"];
+        if (cell.dayNumber === selectedDay) classNames.push("is-selected");
+        if (cell.holidays.length) classNames.push("has-holiday");
+        if (cell.holidays.length) classNames.push(holidayColorClass(cell.holidays[0]?.colorTag));
+        if ((cell.markers || []).length) classNames.push("has-astronomy");
+        if ((cell.cycles || []).length) classNames.push("has-cycle");
+        const holidayCount = cell.holidays.length;
+        const markerCount = (cell.markers || []).length;
+        const cycleCount = (cell.cycles || []).length;
+        const holidayNames = holidayCount
+          ? cell.holidays.map((holiday) => holiday.name).join(", ")
+          : "";
+        const markerNames = markerCount
+          ? cell.markers.map((marker) => astronomyMarkerLabel(marker)).join(", ")
+          : "";
+        const cycleNames = cycleCount
+          ? cell.cycles.map((cycle) => cycleMarkerTip(cycle)).join(", ")
+          : "";
+        const holidayDetails = Array.isArray(cell.holidayDetails) ? cell.holidayDetails : [];
+        const hasContinuationFromPrev = holidayDetails.some((detail) => !!detail.continuesFromPrev);
+        const hasContinuationToNext = holidayDetails.some((detail) => !!detail.continuesToNext);
+        const holidayMarkerPrefix = hasContinuationFromPrev ? "\u2190" : "";
+        const holidayMarkerSuffix = hasContinuationToNext ? "\u2192" : "";
+        let holidayMark = createElement("span", {
+          className: "calendar-mini-day__holiday is-empty",
+          attrs: { "aria-hidden": "true" },
+          text: "\u00a0",
+        });
+        if (holidayCount && markerCount) {
+          holidayMark = createElement("span", {
+            className: "calendar-mini-day__holiday",
+            dataset: {
+              tip: `Holidays: ${holidayNames}; Astronomy: ${markerNames}; Cycles: ${
+                cycleNames || "None"
+              }; ${TIPS["Holiday continuation"]}`,
+            },
+            text: `${holidayMarkerPrefix}H${holidayCount > 1 ? holidayCount : ""}${holidayMarkerSuffix}/A${
+              markerCount > 1 ? markerCount : ""
+            }${cycleCount ? `/C${cycleCount > 1 ? cycleCount : ""}` : ""}`,
+          });
+        } else if (holidayCount) {
+          holidayMark = createElement("span", {
+            className: "calendar-mini-day__holiday",
+            dataset: {
+              tip: `Holiday${holidayCount > 1 ? "s" : ""}: ${holidayNames}; Cycles: ${
+                cycleNames || "None"
+              }; ${TIPS["Holiday continuation"]}`,
+            },
+            text: `${holidayMarkerPrefix}H${holidayCount > 1 ? holidayCount : ""}${holidayMarkerSuffix}${
+              cycleCount ? `/C${cycleCount > 1 ? cycleCount : ""}` : ""
+            }`,
+          });
+        } else if (markerCount) {
+          holidayMark = createElement("span", {
+            className: "calendar-mini-day__holiday calendar-mini-day__holiday--astro",
+            dataset: { tip: `Astronomy: ${markerNames}; Cycles: ${cycleNames || "None"}` },
+            text: `A${markerCount > 1 ? markerCount : ""}${
+              cycleCount ? `/C${cycleCount > 1 ? cycleCount : ""}` : ""
+            }`,
+          });
+        } else if (cycleCount) {
+          holidayMark = createElement("span", {
+            className: "calendar-mini-day__holiday calendar-mini-day__holiday--cycle",
+            dataset: { tip: `Cycles: ${cycleNames}` },
+            text: `C${cycleCount > 1 ? cycleCount : ""}`,
+          });
+        }
+        return createElement("td", { className: "calendar-mini-cell" }, [
+          createElement(
+            "button",
+            {
+              className: classNames.join(" "),
+              attrs: { type: "button" },
+              dataset: { calMiniDay: cell.dayNumber },
+            },
+            [
+              createElement("span", {
+                className: "calendar-mini-day__num",
+                text: String(cell.dayNumber),
+              }),
+              holidayMark,
+            ],
+          ),
+        ]);
+      }),
+    ),
+  );
   return { head, body };
 }
 
@@ -3510,9 +2528,9 @@ function buildSeasonRangesForYear(yearLengthInput) {
   });
 }
 
-function buildSeasonBandHtml(model, astronomySettings) {
+function buildSeasonBandContent(model, astronomySettings) {
   const settings = normalizeAstronomySettings(astronomySettings);
-  if (!settings.enabled || !settings.seasons || !settings.seasonBands) return "";
+  if (!settings.enabled || !settings.seasons || !settings.seasonBands) return [];
   const monthLength = Math.max(1, I(model?.monthLength, 1));
   const yearLength = Math.max(1, I(model?.yearLength, monthLength));
   const monthStartDay = Math.max(1, I(model?.daysBeforeMonth, 0) + 1);
@@ -3524,22 +2542,42 @@ function buildSeasonBandHtml(model, astronomySettings) {
     .map((range) => {
       const overlapStart = Math.max(monthStartDay, range.startDay);
       const overlapEnd = Math.min(monthEndDay, range.endDay);
-      if (overlapEnd < overlapStart) return "";
+      if (overlapEnd < overlapStart) return null;
       const left = ((overlapStart - monthStartDay) / monthLength) * 100;
       const width = ((overlapEnd - overlapStart + 1) / monthLength) * 100;
-      return `<span class="calendar-season-band__segment season-${range.seasonIndex}" style="left:${toPercent(left)};width:${toPercent(width)}" data-tip="${esc(`${range.name}: days ${overlapStart}-${overlapEnd} in this month`)}"></span>`;
+      return createElement("span", {
+        className: `calendar-season-band__segment season-${range.seasonIndex}`,
+        attrs: { style: `left:${toPercent(left)};width:${toPercent(width)}` },
+        dataset: { tip: `${range.name}: days ${overlapStart}-${overlapEnd} in this month` },
+      });
     })
-    .join("");
+    .filter(Boolean);
 
   const ticks = ranges
     .filter((range) => range.startDay >= monthStartDay && range.startDay <= monthEndDay)
     .map((range) => {
       const left = ((range.startDay - monthStartDay + 0.5) / monthLength) * 100;
-      return `<span class="calendar-season-band__tick season-${range.seasonIndex}" style="left:${toPercent(left)}" data-tip="${esc(`${range.name} begins on day ${range.startDay} of the year`)}"><span class="calendar-season-band__tick-label">${esc(range.short)}</span></span>`;
-    })
-    .join("");
+      return createElement(
+        "span",
+        {
+          className: `calendar-season-band__tick season-${range.seasonIndex}`,
+          attrs: { style: `left:${toPercent(left)}` },
+          dataset: { tip: `${range.name} begins on day ${range.startDay} of the year` },
+        },
+        createElement("span", {
+          className: "calendar-season-band__tick-label",
+          text: range.short,
+        }),
+      );
+    });
 
-  return `<div class="calendar-season-band__meta">Season band | Year days ${monthStartDay}-${monthEndDay} of ${yearLength}</div><div class="calendar-season-band__track">${segments}${ticks}</div>`;
+  return [
+    createElement("div", {
+      className: "calendar-season-band__meta",
+      text: `Season band | Year days ${monthStartDay}-${monthEndDay} of ${yearLength}`,
+    }),
+    createElement("div", { className: "calendar-season-band__track" }, [...segments, ...ticks]),
+  ];
 }
 
 function sliderField(id, label, unit, hint, min, max, step, tip) {
@@ -3993,55 +3031,22 @@ export function initCalendarPage(mountEl) {
     detailBody: $("#calDetailBody"),
   };
 
-  for (const [v, l] of RECURRENCES)
-    els.holidayRecurrence.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  for (const [v, l] of RECURRENCES) {
-    els.festivalRecurrence.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of OCCURRENCES)
-    els.holidayOccurrence.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  for (const [v, l] of PHASES)
-    els.holidayMoonPhase.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  for (const [v, l] of HOLIDAY_RELATIVE_TYPES) {
-    els.holidayRelativeType.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of PHASES) {
-    els.holidayRelativeMoonPhase.insertAdjacentHTML(
-      "beforeend",
-      `<option value="${v}">${l}</option>`,
-    );
-  }
-  for (const [v, l] of HOLIDAY_ANCHOR_TYPES) {
-    els.holidayAnchorType.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of HOLIDAY_ALGORITHMS) {
-    els.holidayAlgorithm.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of PHASES) {
-    els.holidayAnchorMoonPhase.insertAdjacentHTML(
-      "beforeend",
-      `<option value="${v}">${l}</option>`,
-    );
-  }
-  for (const [v, l] of HOLIDAY_RELATIVE_MARKERS) {
-    els.holidayRelativeMarker.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-    els.holidayAnchorMarker.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of HOLIDAY_RESOLVE_MODES) {
-    els.holidayMergeMode.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of HOLIDAY_WEEKEND_RULES) {
-    els.cycleWeekendRule.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of HOLIDAY_CONFLICT_RULES) {
-    els.holidayConflictRule.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of HOLIDAY_CONFLICT_SCOPES) {
-    els.holidayConflictScope.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
-  for (const [v, l] of WORK_CYCLE_MODES) {
-    els.cycleMode.insertAdjacentHTML("beforeend", `<option value="${v}">${l}</option>`);
-  }
+  replaceSelectOptions(els.holidayRecurrence, tupleOptions(RECURRENCES));
+  replaceSelectOptions(els.festivalRecurrence, tupleOptions(RECURRENCES));
+  replaceSelectOptions(els.holidayOccurrence, tupleOptions(OCCURRENCES));
+  replaceSelectOptions(els.holidayMoonPhase, tupleOptions(PHASES));
+  replaceSelectOptions(els.holidayRelativeType, tupleOptions(HOLIDAY_RELATIVE_TYPES));
+  replaceSelectOptions(els.holidayRelativeMoonPhase, tupleOptions(PHASES));
+  replaceSelectOptions(els.holidayAnchorType, tupleOptions(HOLIDAY_ANCHOR_TYPES));
+  replaceSelectOptions(els.holidayAlgorithm, tupleOptions(HOLIDAY_ALGORITHMS));
+  replaceSelectOptions(els.holidayAnchorMoonPhase, tupleOptions(PHASES));
+  replaceSelectOptions(els.holidayRelativeMarker, tupleOptions(HOLIDAY_RELATIVE_MARKERS));
+  replaceSelectOptions(els.holidayAnchorMarker, tupleOptions(HOLIDAY_RELATIVE_MARKERS));
+  replaceSelectOptions(els.holidayMergeMode, tupleOptions(HOLIDAY_RESOLVE_MODES));
+  replaceSelectOptions(els.cycleWeekendRule, tupleOptions(HOLIDAY_WEEKEND_RULES));
+  replaceSelectOptions(els.holidayConflictRule, tupleOptions(HOLIDAY_CONFLICT_RULES));
+  replaceSelectOptions(els.holidayConflictScope, tupleOptions(HOLIDAY_CONFLICT_SCOPES));
+  replaceSelectOptions(els.cycleMode, tupleOptions(WORK_CYCLE_MODES));
 
   const binders = [
     bindPair(wrap, "calDerivedDecimalPlaces", 0, 6, 1),
@@ -4505,7 +3510,7 @@ export function initCalendarPage(mountEl) {
   }
 
   function currentCalendarJsonText() {
-    return JSON.stringify(createCalendarExportEnvelope(state), null, 2);
+    return JSON.stringify(createCalendarExportEnvelope(state, clonePlain), null, 2);
   }
 
   function loadCurrentJsonToTextarea() {
@@ -4698,28 +3703,17 @@ export function initCalendarPage(mountEl) {
       state.ui.holidayCategoryFilters,
     );
 
-    const profileOpts = state.profiles
-      .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`)
-      .join("");
-    els.profileSelect.innerHTML = profileOpts;
+    replaceSelectOptions(els.profileSelect, bodyOptions(state.profiles));
     els.profileSelect.value = state.profileId;
     els.profileDelete.disabled = state.profiles.length <= 1;
 
-    els.sourcePlanet.innerHTML = ctx.planets
-      .map((p) => `<option value="${esc(p.id)}">${esc(p.name || p.inputs?.name || p.id)}</option>`)
-      .join("");
+    replaceSelectOptions(els.sourcePlanet, bodyOptions(ctx.planets));
     els.sourcePlanet.value = ctx.sourcePlanetId;
-    const moonOpts =
-      `<option value="">None</option>` +
-      ctx.planetMoons
-        .map(
-          (m) => `<option value="${esc(m.id)}">${esc(m.name || m.inputs?.name || m.id)}</option>`,
-        )
-        .join("");
-    els.primaryMoon.innerHTML = moonOpts;
-    els.extraMoon1.innerHTML = moonOpts;
-    els.extraMoon2.innerHTML = moonOpts;
-    els.extraMoon3.innerHTML = moonOpts;
+    const moonOptions = [{ value: "", label: "None" }, ...bodyOptions(ctx.planetMoons)];
+    replaceSelectOptions(els.primaryMoon, moonOptions);
+    replaceSelectOptions(els.extraMoon1, moonOptions);
+    replaceSelectOptions(els.extraMoon2, moonOptions);
+    replaceSelectOptions(els.extraMoon3, moonOptions);
     els.primaryMoon.value = state.inputs.primaryMoonId || "";
     els.extraMoon1.value = state.inputs.extraMoonIds[0] || "";
     els.extraMoon2.value = state.inputs.extraMoonIds[1] || "";
@@ -4838,20 +3832,12 @@ export function initCalendarPage(mountEl) {
       if (!input) continue;
       input.checked = !!state.ui.holidayCategoryFilters?.[category];
     }
-    els.month.innerHTML = ctx.monthNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
+    replaceSelectOptions(els.month, indexedLabelOptions(ctx.monthNames));
     els.month.value = String(state.ui.monthIndex);
-    els.jumpMonth.innerHTML = ctx.monthNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
+    replaceSelectOptions(els.jumpMonth, indexedLabelOptions(ctx.monthNames));
     state.ui.jumpMonthIndex = clampI(state.ui.jumpMonthIndex, 0, ctx.metrics.monthsPerYear - 1);
-    els.startDay.innerHTML = ctx.dayNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
-    els.weekStart.innerHTML = ctx.dayNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
+    replaceSelectOptions(els.startDay, indexedLabelOptions(ctx.dayNames));
+    replaceSelectOptions(els.weekStart, indexedLabelOptions(ctx.dayNames));
     els.startDay.value = String(state.ui.startDayOfYear);
     els.weekStart.value = String(state.ui.weekStartsOn);
     els.moonEpoch.value = String(N(state.ui.moonEpochOffsetDays, 0));
@@ -4871,71 +3857,83 @@ export function initCalendarPage(mountEl) {
     }
 
     state.ui.eras = normEraRules(state.ui.eras);
-    els.eraList.innerHTML = state.ui.eras.length
-      ? state.ui.eras
-          .map(
-            (era) =>
-              `<div class="calendar-item-row"><div class="calendar-item-row__main"><div class="calendar-item-row__name">${esc(era.name)}</div><div class="hint">Starts in Year ${era.startYear}</div></div><div class="calendar-item-row__actions"><button class="small danger" type="button" data-cal-era-del="${esc(era.id)}">Delete</button></div></div>`,
-          )
-          .join("")
-      : `<div class="hint">No eras configured.</div>`;
+    renderListContent(
+      els.eraList,
+      state.ui.eras.map((era) =>
+        calendarItemRow({
+          nameChildren: era.name,
+          hint: `Starts in Year ${era.startYear}`,
+          actions: [actionButton("Delete", { calEraDel: era.id }, "small danger")],
+        }),
+      ),
+      "No eras configured.",
+    );
 
-    els.holidayStartMonth.innerHTML = ctx.monthNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
-    els.festivalStartMonth.innerHTML = ctx.monthNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
-    els.holidayWeekday.innerHTML = ctx.dayNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
-    els.holidayMoonSlot.innerHTML = ctx.moonDefs
-      .map((m, i) => `<option value="${i}" data-moon-id="${esc(m.id)}">${esc(m.name)}</option>`)
-      .join("");
-    els.holidayRelativeMoonSlot.innerHTML = ctx.moonDefs
-      .map((m, i) => `<option value="${i}" data-moon-id="${esc(m.id)}">${esc(m.name)}</option>`)
-      .join("");
-    els.holidayAnchorMoonSlot.innerHTML = ctx.moonDefs
-      .map((m, i) => `<option value="${i}" data-moon-id="${esc(m.id)}">${esc(m.name)}</option>`)
-      .join("");
-    const holidayOptions = (ctx.holidays || [])
-      .map((h) => `<option value="${esc(h.id)}">${esc(h.name)}</option>`)
-      .join("");
-    els.holidayRelativeHoliday.innerHTML = `<option value="">Select holiday</option>${holidayOptions}`;
-    els.holidayAnchorHoliday.innerHTML = `<option value="">Select holiday</option>${holidayOptions}`;
+    replaceSelectOptions(els.holidayStartMonth, indexedLabelOptions(ctx.monthNames));
+    replaceSelectOptions(els.festivalStartMonth, indexedLabelOptions(ctx.monthNames));
+    replaceSelectOptions(els.holidayWeekday, indexedLabelOptions(ctx.dayNames));
+    const moonSlotSelectOptions = moonSlotOptions(ctx.moonDefs);
+    replaceSelectOptions(els.holidayMoonSlot, moonSlotSelectOptions);
+    replaceSelectOptions(els.holidayRelativeMoonSlot, moonSlotSelectOptions);
+    replaceSelectOptions(els.holidayAnchorMoonSlot, moonSlotSelectOptions);
+    const holidaySelectOptions = holidayReferenceOptions(ctx.holidays || []);
+    replaceSelectOptions(els.holidayRelativeHoliday, holidaySelectOptions);
+    replaceSelectOptions(els.holidayAnchorHoliday, holidaySelectOptions);
     els.holidayAdvancedToggle.checked = !!state.ui.holidayAdvanced;
 
     const holidays = normHolidayRules(state.ui.holidays, ctx.metrics.monthsPerYear);
     const festivals = normFestivalRules(state.ui.festivalRules, ctx.metrics.monthsPerYear);
-    els.holidayList.innerHTML = holidays.length
-      ? holidays
-          .map(
-            (h) =>
-              `<div class="calendar-item-row ${runtime.editingHolidayId === h.id ? "is-editing" : ""}"><div class="calendar-item-row__main"><div class="calendar-item-row__name">${esc(h.name)} <span class="calendar-holiday-chip ${holidayColorClass(h.colorTag)}">${esc(holidayCategoryLabel(h.category))}</span></div><div class="hint">${esc(holidaySummary(h, ctx))}</div></div><div class="calendar-item-row__actions"><button class="small" data-cal-holiday-edit="${esc(h.id)}" type="button">Edit</button><button class="small danger" data-cal-holiday-del="${esc(h.id)}" type="button">Delete</button></div></div>`,
-          )
-          .join("")
-      : `<div class="hint">No holidays configured.</div>`;
-    els.festivalList.innerHTML = festivals.length
-      ? festivals
-          .map(
-            (f) =>
-              `<div class="calendar-item-row ${runtime.editingFestivalId === f.id ? "is-editing" : ""}"><div class="calendar-item-row__main"><div class="calendar-item-row__name">${esc(f.name)}</div><div class="hint">${esc(festivalSummary(f, ctx))}</div></div><div class="calendar-item-row__actions"><button class="small" data-cal-festival-edit="${esc(f.id)}" type="button">Edit</button><button class="small danger" data-cal-festival-del="${esc(f.id)}" type="button">Delete</button></div></div>`,
-          )
-          .join("")
-      : `<div class="hint">No festival rules configured.</div>`;
+    renderListContent(
+      els.holidayList,
+      holidays.map((holiday) =>
+        calendarItemRow({
+          isEditing: runtime.editingHolidayId === holiday.id,
+          nameChildren: [
+            holiday.name,
+            " ",
+            createElement("span", {
+              className: `calendar-holiday-chip ${holidayColorClass(holiday.colorTag)}`,
+              text: holidayCategoryLabel(holiday.category),
+            }),
+          ],
+          hint: holidaySummary(holiday, ctx),
+          actions: [
+            actionButton("Edit", { calHolidayEdit: holiday.id }),
+            actionButton("Delete", { calHolidayDel: holiday.id }, "small danger"),
+          ],
+        }),
+      ),
+      "No holidays configured.",
+    );
+    renderListContent(
+      els.festivalList,
+      festivals.map((festival) =>
+        calendarItemRow({
+          isEditing: runtime.editingFestivalId === festival.id,
+          nameChildren: festival.name,
+          hint: festivalSummary(festival, ctx),
+          actions: [
+            actionButton("Edit", { calFestivalEdit: festival.id }),
+            actionButton("Delete", { calFestivalDel: festival.id }, "small danger"),
+          ],
+        }),
+      ),
+      "No festival rules configured.",
+    );
 
-    els.leapMonth.innerHTML = ctx.monthNames
-      .map((n, i) => `<option value="${i}">${esc(n)}</option>`)
-      .join("");
+    replaceSelectOptions(els.leapMonth, indexedLabelOptions(ctx.monthNames));
     const leaps = normalizeLeapRules(state.ui.leapRules, ctx.metrics.monthsPerYear);
-    els.leapList.innerHTML = leaps.length
-      ? leaps
-          .map(
-            (r) =>
-              `<div class="calendar-item-row"><div class="calendar-item-row__main"><div class="calendar-item-row__name">${esc(r.name)}</div><div class="hint">Every ${r.cycleYears} years from Year ${r.offsetYear}</div></div><div class="calendar-item-row__actions"><button class="small danger" data-cal-leap-del="${esc(r.id)}" type="button">Delete</button></div></div>`,
-          )
-          .join("")
-      : `<div class="hint">No leap rules configured.</div>`;
+    renderListContent(
+      els.leapList,
+      leaps.map((rule) =>
+        calendarItemRow({
+          nameChildren: rule.name,
+          hint: `Every ${rule.cycleYears} years from Year ${rule.offsetYear}`,
+          actions: [actionButton("Delete", { calLeapDel: rule.id }, "small danger")],
+        }),
+      ),
+      "No leap rules configured.",
+    );
 
     const workCycles = normWorkCycleRules(state.ui.workCycles);
     state.ui.workWeekendRule = normalizeWeekendRule(state.ui.workWeekendRule);
@@ -4944,20 +3942,22 @@ export function initCalendarPage(mountEl) {
       ctx.metrics.daysPerWeek,
     );
     els.cycleWeekendRule.value = state.ui.workWeekendRule;
-    els.weekendDays.innerHTML = ctx.dayNames
-      .map((dayName, idx) => {
-        const checked = state.ui.weekendDayIndexes.includes(idx) ? " checked" : "";
-        return `<label class="calendar-holiday-attr"><input type="checkbox" data-cal-weekend-day="${idx}"${checked} />${esc(dayName)}</label>`;
-      })
-      .join("");
-    els.cycleList.innerHTML = workCycles.length
-      ? workCycles
-          .map(
-            (rule) =>
-              `<div class="calendar-item-row ${runtime.editingCycleId === rule.id ? "is-editing" : ""}"><div class="calendar-item-row__main"><div class="calendar-item-row__name">${esc(rule.name)}</div><div class="hint">${esc(cycleRuleSummary(rule))}</div></div><div class="calendar-item-row__actions"><button class="small" data-cal-cycle-edit="${esc(rule.id)}" type="button">Edit</button><button class="small danger" data-cal-cycle-del="${esc(rule.id)}" type="button">Delete</button></div></div>`,
-          )
-          .join("")
-      : `<div class="hint">No cycle rules configured.</div>`;
+    replaceWeekendDayOptions(els.weekendDays, ctx.dayNames, state.ui.weekendDayIndexes);
+    renderListContent(
+      els.cycleList,
+      workCycles.map((rule) =>
+        calendarItemRow({
+          isEditing: runtime.editingCycleId === rule.id,
+          nameChildren: rule.name,
+          hint: cycleRuleSummary(rule),
+          actions: [
+            actionButton("Edit", { calCycleEdit: rule.id }),
+            actionButton("Delete", { calCycleDel: rule.id }, "small danger"),
+          ],
+        }),
+      ),
+      "No cycle rules configured.",
+    );
 
     const model = applyHolidayFiltersToMonthModel(ctx.monthModel, state.ui.holidayCategoryFilters);
     const allDays = model.rows
@@ -4980,40 +3980,6 @@ export function initCalendarPage(mountEl) {
     const holidayDetailById = new Map(
       holidayDetails.map((detail) => [String(detail?.holiday?.id || ""), detail]),
     );
-    const holidaysHtml = selected?.holidays?.length
-      ? selected.holidays
-          .map((holiday) => {
-            const detail = holidayDetailById.get(String(holiday?.id || ""));
-            const continuation = detail
-              ? [
-                  detail.continuesFromPrev ? "continues from previous day" : "",
-                  detail.continuesToNext ? "continues to next day" : "",
-                ]
-                  .filter(Boolean)
-                  .join(", ")
-              : "";
-            return `<span class="calendar-selected-day__holiday-item ${holidayColorClass(holiday.colorTag)}"><span class="calendar-selected-day__holiday-mark" aria-hidden="true">H</span>${esc(holiday.name)} <span class="calendar-selected-day__holiday-cat">(${esc(holidayCategoryLabel(holiday.category))}${continuation ? ` | ${esc(continuation)}` : ""})</span></span>`;
-          })
-          .join(", ")
-      : "None";
-    const markersHtml = selected?.markers?.length
-      ? selected.markers
-          .map(
-            (marker) =>
-              `<span class="calendar-selected-day__astro-item">${astroIcon(marker)} ${esc(astronomyMarkerLabel(marker))}</span>`,
-          )
-          .join(", ")
-      : "None";
-    const cyclesHtml = selected?.cycles?.length
-      ? selected.cycles
-          .map(
-            (cycle) =>
-              `<span class="calendar-selected-day__cycle-item ${cycleKindClass(cycle)}">${cycleIcon(cycle)} <b>${esc(
-                cycle.ruleName || "Cycle",
-              )}</b>: ${esc(cycle.label || "Marker")}</span>`,
-          )
-          .join(", ")
-      : "None";
 
     const yearLabel = formatDisplayedYear(model.year, state.ui);
     const title = `${model.monthName} - ${yearLabel} (${model.monthLength} days)`;
@@ -5021,27 +3987,123 @@ export function initCalendarPage(mountEl) {
     els.detailMonthTitle.textContent = title;
 
     const calendarNameLabel = String(state.ui.calendarName || "Calendar").trim() || "Calendar";
-    const chips = `<div class="calendar-chip" data-tip="${esc(TIPS["Calendar name"] || "")}"><b>Calendar:</b> ${esc(calendarNameLabel)}</div><div class="calendar-chip" data-tip="${esc("Primary moon full-phase days this month.")}"><b>Full Moon:</b> ${esc(model.fullMoonDays.length ? model.fullMoonDays.join(", ") : "None")}</div><div class="calendar-chip" data-tip="${esc("Primary moon new-phase days this month.")}"><b>New Moon:</b> ${esc(model.newMoonDays.length ? model.newMoonDays.join(", ") : "None")}</div><div class="calendar-chip" data-tip="${esc("Moon used as the main lunar reference for this calendar.")}"><b>Primary moon:</b> ${esc(ctx.moonDefs[0]?.name || "Primary moon")}</div><div class="calendar-chip" data-tip="${esc("Total moons currently displayed in selected-day and detailed views.")}"><b>Moons shown:</b> ${ctx.moonDefs.length}</div><div class="calendar-chip" data-tip="${esc(TIPS["Festival days"] || "")}"><b>Festival days:</b> ${model.festivalsInMonth.reduce((a, e) => a + e[1], 0)}</div><div class="calendar-chip" data-tip="${esc(TIPS["Cycle list"] || "")}"><b>Cycle markers:</b> ${model.cyclesInMonth.reduce((a, e) => a + (e.count || 0), 0)}</div>`;
-    els.chipRow.innerHTML = chips;
-    els.detailChipRow.innerHTML = chips;
-    const seasonBandHtml = buildSeasonBandHtml(model, ctx.astronomySettings);
-    els.seasonBand.innerHTML = seasonBandHtml;
-    els.seasonBand.hidden = !seasonBandHtml;
-    els.detailSeasonBand.innerHTML = seasonBandHtml;
-    els.detailSeasonBand.hidden = !seasonBandHtml;
+    const chipNodes = [
+      {
+        label: "Calendar",
+        value: calendarNameLabel,
+        tip: TIPS["Calendar name"] || "",
+      },
+      {
+        label: "Full Moon",
+        value: model.fullMoonDays.length ? model.fullMoonDays.join(", ") : "None",
+        tip: "Primary moon full-phase days this month.",
+      },
+      {
+        label: "New Moon",
+        value: model.newMoonDays.length ? model.newMoonDays.join(", ") : "None",
+        tip: "Primary moon new-phase days this month.",
+      },
+      {
+        label: "Primary moon",
+        value: ctx.moonDefs[0]?.name || "Primary moon",
+        tip: "Moon used as the main lunar reference for this calendar.",
+      },
+      {
+        label: "Moons shown",
+        value: String(ctx.moonDefs.length),
+        tip: "Total moons currently displayed in selected-day and detailed views.",
+      },
+      {
+        label: "Festival days",
+        value: String(model.festivalsInMonth.reduce((a, e) => a + e[1], 0)),
+        tip: TIPS["Festival days"] || "",
+      },
+      {
+        label: "Cycle markers",
+        value: String(model.cyclesInMonth.reduce((a, e) => a + (e.count || 0), 0)),
+        tip: TIPS["Cycle list"] || "",
+      },
+    ].map((chip) =>
+      createElement("div", { className: "calendar-chip", dataset: { tip: chip.tip } }, [
+        createElement("b", { text: `${chip.label}:` }),
+        " ",
+        chip.value,
+      ]),
+    );
+    replaceChildren(els.chipRow, chipNodes);
+    replaceChildren(
+      els.detailChipRow,
+      [
+        {
+          label: "Calendar",
+          value: calendarNameLabel,
+          tip: TIPS["Calendar name"] || "",
+        },
+        {
+          label: "Full Moon",
+          value: model.fullMoonDays.length ? model.fullMoonDays.join(", ") : "None",
+          tip: "Primary moon full-phase days this month.",
+        },
+        {
+          label: "New Moon",
+          value: model.newMoonDays.length ? model.newMoonDays.join(", ") : "None",
+          tip: "Primary moon new-phase days this month.",
+        },
+        {
+          label: "Primary moon",
+          value: ctx.moonDefs[0]?.name || "Primary moon",
+          tip: "Moon used as the main lunar reference for this calendar.",
+        },
+        {
+          label: "Moons shown",
+          value: String(ctx.moonDefs.length),
+          tip: "Total moons currently displayed in selected-day and detailed views.",
+        },
+        {
+          label: "Festival days",
+          value: String(model.festivalsInMonth.reduce((a, e) => a + e[1], 0)),
+          tip: TIPS["Festival days"] || "",
+        },
+        {
+          label: "Cycle markers",
+          value: String(model.cyclesInMonth.reduce((a, e) => a + (e.count || 0), 0)),
+          tip: TIPS["Cycle list"] || "",
+        },
+      ].map((chip) =>
+        createElement("div", { className: "calendar-chip", dataset: { tip: chip.tip } }, [
+          createElement("b", { text: `${chip.label}:` }),
+          " ",
+          chip.value,
+        ]),
+      ),
+    );
+    const seasonBandContent = buildSeasonBandContent(model, ctx.astronomySettings);
+    replaceChildren(els.seasonBand, seasonBandContent);
+    els.seasonBand.hidden = !seasonBandContent.length;
+    replaceChildren(els.detailSeasonBand, buildSeasonBandContent(model, ctx.astronomySettings));
+    els.detailSeasonBand.hidden = !seasonBandContent.length;
 
-    const legend = `<div class="calendar-moon-legend__title">Moon key ${tipIcon(TIPS["Moon key"] || "")}</div><div class="calendar-moon-legend__items">${ctx.moonDefs.map((m, i) => `<span class="calendar-moon-legend__item">${moonIcon({ phase: { phaseShort: "F" } }, i)} ${esc(m.name)} (${fmt(m.synodicDays, 3)} d)</span>`).join("")}</div>`;
-    els.moonLegend.innerHTML = legend;
-    els.detailMoonLegend.innerHTML = legend;
+    const renderMoonLegend = (node) =>
+      replaceChildren(node, [
+        createElement("div", { className: "calendar-moon-legend__title" }, [
+          "Moon key ",
+          tipIconNode(TIPS["Moon key"] || ""),
+        ]),
+        createElement(
+          "div",
+          { className: "calendar-moon-legend__items" },
+          ctx.moonDefs.map((moonDef, index) =>
+            createElement("span", { className: "calendar-moon-legend__item" }, [
+              moonIconNode({ phase: { phaseShort: "F" } }, index),
+              " ",
+              `${moonDef.name} (${fmt(moonDef.synodicDays, 3)} d)`,
+            ]),
+          ),
+        ),
+      ]);
+    renderMoonLegend(els.moonLegend);
+    renderMoonLegend(els.detailMoonLegend);
 
-    const moonLines = selected
-      ? selected.moonStates
-          .map(
-            (m, i) =>
-              `<div class="calendar-selected-day__line calendar-selected-day__line--moon">${moonIcon(m, i)} <b>${esc(m.name)}</b>: ${esc(m.phase.phaseName)} (${fmt(m.phase.illuminationPct, 1)}%), age ${fmt(m.phase.ageDays, 0)} / ${fmt(m.synodicDays, 3)} days</div>`,
-          )
-          .join("")
-      : "";
     const trace = selected
       ? traceRulesForDay({
           cell: selected,
@@ -5055,99 +4117,197 @@ export function initCalendarPage(mountEl) {
           weekendDayIndexes: state.ui.weekendDayIndexes,
         })
       : null;
-    const traceHtml = buildTraceHtml(trace);
-    const selectedHtml = selected
-      ? `<div class="calendar-selected-day__title">Day ${selected.dayNumber}, ${esc(model.monthName)}, ${esc(yearLabel)} (Day ${selected.absoluteDay + 1})</div>${moonLines}<div class="calendar-selected-day__line"><b>Holidays:</b> ${holidaysHtml}</div><div class="calendar-selected-day__line"><b>Astronomy:</b> ${markersHtml}</div><div class="calendar-selected-day__line"><b>Cycles:</b> ${cyclesHtml}</div>${traceHtml}`
-      : `<div class="calendar-selected-day__title">No day selected</div>`;
-    els.selectedDay.innerHTML = selectedHtml;
-    els.detailSelectedDay.innerHTML = selectedHtml;
+    const renderSelectedDay = (node) => {
+      if (!selected) {
+        replaceChildren(
+          node,
+          createElement("div", {
+            className: "calendar-selected-day__title",
+            text: "No day selected",
+          }),
+        );
+        return;
+      }
+      const holidayItems = (selected.holidays || []).map((holiday) => {
+        const detail = holidayDetailById.get(String(holiday?.id || ""));
+        const continuation = detail
+          ? [
+              detail.continuesFromPrev ? "continues from previous day" : "",
+              detail.continuesToNext ? "continues to next day" : "",
+            ]
+              .filter(Boolean)
+              .join(", ")
+          : "";
+        return createElement(
+          "span",
+          {
+            className: `calendar-selected-day__holiday-item ${holidayColorClass(holiday.colorTag)}`,
+          },
+          [
+            createElement("span", {
+              className: "calendar-selected-day__holiday-mark",
+              attrs: { "aria-hidden": "true" },
+              text: "H",
+            }),
+            holiday.name,
+            " ",
+            createElement("span", {
+              className: "calendar-selected-day__holiday-cat",
+              text: `(${holidayCategoryLabel(holiday.category)}${continuation ? ` | ${continuation}` : ""})`,
+            }),
+          ],
+        );
+      });
+      const markerItems = (selected.markers || []).map((marker) =>
+        createElement("span", { className: "calendar-selected-day__astro-item" }, [
+          astroIconNode(marker),
+          " ",
+          astronomyMarkerLabel(marker),
+        ]),
+      );
+      const cycleItems = (selected.cycles || []).map((cycle) =>
+        createElement(
+          "span",
+          { className: `calendar-selected-day__cycle-item ${cycleKindClass(cycle)}` },
+          [
+            cycleIconNode(cycle),
+            " ",
+            createElement("b", { text: cycle.ruleName || "Cycle" }),
+            ": ",
+            cycle.label || "Marker",
+          ],
+        ),
+      );
+      const moonLines = (selected.moonStates || []).map((moonState, index) =>
+        createElement(
+          "div",
+          { className: "calendar-selected-day__line calendar-selected-day__line--moon" },
+          [
+            moonIconNode(moonState, index),
+            " ",
+            createElement("b", { text: moonState.name }),
+            `: ${moonState.phase.phaseName} (${fmt(moonState.phase.illuminationPct, 1)}%), age ${fmt(
+              moonState.phase.ageDays,
+              0,
+            )} / ${fmt(moonState.synodicDays, 3)} days`,
+          ],
+        ),
+      );
+      const traceNode = buildTraceNode(trace);
+      replaceChildren(node, [
+        createElement("div", {
+          className: "calendar-selected-day__title",
+          text: `Day ${selected.dayNumber}, ${model.monthName}, ${yearLabel} (Day ${selected.absoluteDay + 1})`,
+        }),
+        moonLines,
+        selectedDayLine("Holidays", interleaveNodes(holidayItems)),
+        selectedDayLine("Astronomy", interleaveNodes(markerItems)),
+        selectedDayLine("Cycles", interleaveNodes(cycleItems)),
+        traceNode,
+      ]);
+    };
+    renderSelectedDay(els.selectedDay);
+    renderSelectedDay(els.detailSelectedDay);
 
-    els.compactGrid.innerHTML = [
-      { label: "Basis", tip: TIPS.Basis || "", value: state.ui.basis },
-      {
-        label: "Days this month",
-        tip: "Number of days in the current month after leap adjustments.",
-        value: model.monthLength,
-      },
-      {
-        label: "Weeks shown",
-        tip: "Rows needed to display this month in the current week layout.",
-        value: model.rows.length,
-      },
-      {
-        label: "Holidays this month",
-        tip: "Total holiday matches in this month (multiple holidays can occur on one day).",
-        value: model.holidaysInMonth.reduce((a, e) => a + e[1], 0),
-      },
-      {
-        label: "Festivals this month",
-        tip: TIPS["Festival days"] || "",
-        value: model.festivalsInMonth.reduce((a, e) => a + e[1], 0),
-      },
-      {
-        label: "Astronomy markers",
-        tip: TIPS["Astronomy markers"] || "",
-        value: model.markersInMonth.reduce((a, e) => a + (e.count || 0), 0),
-      },
-      {
-        label: "Cycle markers",
-        tip: TIPS["Cycle list"] || "",
-        value: model.cyclesInMonth.reduce((a, e) => a + (e.count || 0), 0),
-      },
-    ]
-      .map(
-        (item) =>
-          `<div class="calendar-compact-card"><div class="calendar-compact-card__label">${esc(item.label)} ${tipIcon(item.tip || "")}</div><div class="calendar-compact-card__value">${esc(String(item.value))}</div></div>`,
-      )
-      .join("");
+    replaceChildren(
+      els.compactGrid,
+      [
+        { label: "Basis", tip: TIPS.Basis || "", value: state.ui.basis },
+        {
+          label: "Days this month",
+          tip: "Number of days in the current month after leap adjustments.",
+          value: model.monthLength,
+        },
+        {
+          label: "Weeks shown",
+          tip: "Rows needed to display this month in the current week layout.",
+          value: model.rows.length,
+        },
+        {
+          label: "Holidays this month",
+          tip: "Total holiday matches in this month (multiple holidays can occur on one day).",
+          value: model.holidaysInMonth.reduce((a, e) => a + e[1], 0),
+        },
+        {
+          label: "Festivals this month",
+          tip: TIPS["Festival days"] || "",
+          value: model.festivalsInMonth.reduce((a, e) => a + e[1], 0),
+        },
+        {
+          label: "Astronomy markers",
+          tip: TIPS["Astronomy markers"] || "",
+          value: model.markersInMonth.reduce((a, e) => a + (e.count || 0), 0),
+        },
+        {
+          label: "Cycle markers",
+          tip: TIPS["Cycle list"] || "",
+          value: model.cyclesInMonth.reduce((a, e) => a + (e.count || 0), 0),
+        },
+      ].map((item) =>
+        createElement("div", { className: "calendar-compact-card" }, [
+          createElement("div", { className: "calendar-compact-card__label" }, [
+            item.label,
+            " ",
+            tipIconNode(item.tip || ""),
+          ]),
+          createElement("div", {
+            className: "calendar-compact-card__value",
+            text: String(item.value),
+          }),
+        ]),
+      ),
+    );
 
     const holidayEvents = model.holidaysInMonth
       .slice(0, 6)
       .map(([hid, hits]) => {
         const h = holidays.find((x) => x.id === hid);
-        return h
-          ? `<li>${esc(h.name)} [${esc(holidayCategoryLabel(h.category))}] (${hits})</li>`
-          : "";
+        return h ? `${h.name} [${holidayCategoryLabel(h.category)}] (${hits})` : "";
       })
-      .filter(Boolean)
-      .join("");
+      .filter(Boolean);
     const festivalEvents = model.festivalsInMonth
       .slice(0, 6)
       .map(([fid, hits]) => {
-        const f = ctx.festivals.find((x) => x.id === fid);
-        return f ? `<li>${esc(f.name)} (${hits})</li>` : "";
+        const f = festivals.find((x) => x.id === fid);
+        return f ? `${f.name} (${hits})` : "";
       })
-      .filter(Boolean)
-      .join("");
+      .filter(Boolean);
     const markerEvents = model.markersInMonth
       .slice(0, 8)
-      .map((m) => `<li>${esc(astronomyMarkerLabel(m))} (${m.count})</li>`)
-      .join("");
+      .map((marker) => `${astronomyMarkerLabel(marker)} (${marker.count})`);
     const cycleEvents = model.cyclesInMonth
       .slice(0, 8)
-      .map((cycle) => `<li>Cycle: ${esc(cycle.ruleName || "Rule")} (${cycle.count})</li>`)
-      .join("");
-    const eventItems = [holidayEvents, festivalEvents, markerEvents, cycleEvents]
-      .filter(Boolean)
-      .join("");
-    els.compactEvents.innerHTML = `<div class="calendar-compact-events__label">Month events ${tipIcon(TIPS["Month events"] || "")}</div>${eventItems ? `<ul>${eventItems}</ul>` : `<div class="hint">No holiday or festival events this month.</div>`}${
+      .map((cycle) => `Cycle: ${cycle.ruleName || "Rule"} (${cycle.count})`);
+    const eventItems = [holidayEvents, festivalEvents, markerEvents, cycleEvents].flat();
+    replaceChildren(els.compactEvents, [
+      createElement("div", { className: "calendar-compact-events__label" }, [
+        "Month events ",
+        tipIconNode(TIPS["Month events"] || ""),
+      ]),
+      eventItems.length
+        ? createElement(
+            "ul",
+            {},
+            eventItems.map((item) => createElement("li", { text: item })),
+          )
+        : hintNode("No holiday or festival events this month."),
       model.outsideWeekFlowFestivals.length
-        ? `<div class="hint">Outside-week-flow festivals: ${esc(
-            model.outsideWeekFlowFestivals
-              .map((f) => `${f.name} (after day ${f.afterDay})`)
+        ? hintNode(
+            `Outside-week-flow festivals: ${model.outsideWeekFlowFestivals
+              .map((festival) => `${festival.name} (after day ${festival.afterDay})`)
               .slice(0, 4)
-              .join(", "),
-          )}</div>`
-        : ""
-    }`;
+              .join(", ")}`,
+          )
+        : null,
+    ]);
 
     const mini = miniGrid(model, selected?.dayNumber || state.ui.selectedDay);
-    els.miniHead.innerHTML = mini.head;
-    els.miniBody.innerHTML = mini.body;
+    replaceChildren(els.miniHead, mini.head);
+    replaceChildren(els.miniBody, mini.body);
 
     const detail = detailedGrid(model, selected?.dayNumber || state.ui.selectedDay);
-    els.detailHead.innerHTML = detail.head;
-    els.detailBody.innerHTML = detail.body;
+    replaceChildren(els.detailHead, detail.head);
+    replaceChildren(els.detailBody, detail.body);
 
     updateHolidayEnables();
     updateFestivalEnables();

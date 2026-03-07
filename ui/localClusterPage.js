@@ -3,13 +3,17 @@ import {
   LOCAL_CLUSTER_DEFAULTS,
   normalizeLocalClusterInputs,
 } from "../engine/localCluster.js";
-import { giantPlanetProbability } from "../engine/star.js";
 import { clamp, fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
-import { getClusterObjectVisual, normalizeClusterObjectKey } from "./clusterObjectVisuals.js";
+import { normalizeClusterObjectKey } from "./clusterObjectVisuals.js";
+import {
+  renderClusterContextMenuItems,
+  renderClusterKpis,
+  renderClusterObjectsBody,
+  renderClusterSystemsBody,
+} from "./localCluster/domRender.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { createTutorial } from "./tutorial.js";
-import { escapeHtml } from "./uiHelpers.js";
 import {
   getClusterAdjustments,
   getClusterInputs,
@@ -612,80 +616,15 @@ export function initLocalClusterPage(mountEl) {
       },
     ];
 
-    kpisEl.innerHTML = kpis
-      .map(
-        (item) => `
-      <div class="kpi-wrap">
-        <div class="kpi">
-          <div class="kpi__label">${escapeHtml(item.label)} ${tipIcon(item.tip || "")}</div>
-          <div class="kpi__value">${escapeHtml(item.value)}</div>
-          <div class="kpi__meta">${escapeHtml(item.meta)}</div>
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
-    objectsBodyEl.innerHTML = model.stellarRows
-      .map((row) => {
-        const key = normalizeClusterObjectKey(row.objectClassKey ?? row.spectralClass);
-        const visual = getClusterObjectVisual(key);
-        const adjustedCount = Math.max(0, row.count + (countDeltas[row.objectClassKey] || 0));
-        const canRemove = adjustedCount > 0;
-        return `
-        <tr>
-          <td>
-            <span class="cluster-object-cell">
-              <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-              <span>${escapeHtml(row.label)}</span>
-            </span>
-          </td>
-          <td>${escapeHtml(row.spectralClass)}</td>
-          <td class="cluster-adjust-cell">
-            <button class="cluster-adjust-btn" data-class="${escapeHtml(row.objectClassKey)}" data-action="add" title="Add ${escapeHtml(row.label)}">+</button>
-            <button class="cluster-adjust-btn" data-class="${escapeHtml(row.objectClassKey)}" data-action="remove" title="Remove ${escapeHtml(row.label)}"${canRemove ? "" : " disabled"}>&#8722;</button>
-          </td>
-          <td>${fmt(adjustedCount, 0)}</td>
-        </tr>
-      `;
-      })
-      .join("");
-
-    systemsBodyEl.innerHTML = finalSystems
-      .map((system) => {
-        const key = normalizeClusterObjectKey(system.objectClassKey, { isHome: system.isHome });
-        const visual = getClusterObjectVisual(key, { isHome: system.isHome });
-        const classLabel = formatSystemLabel(system);
-        const systemName = resolveSystemDisplayName(system, homeDefaultName);
-        return `
-        <tr data-system-id="${escapeHtml(system.id)}">
-          <td>
-            <span class="cluster-object-cell">
-              <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-              <span class="cluster-object-tag">${escapeHtml(classLabel)}</span>
-            </span>
-          </td>
-          <td>
-            <input
-              class="cluster-name-input"
-              type="text"
-              maxlength="80"
-              data-system-id="${escapeHtml(system.id)}"
-              value="${escapeHtml(systemName)}"
-              placeholder="${escapeHtml(system.name || "Star System")}"
-              aria-label="System name for ${escapeHtml(system.id)}"
-            />
-          </td>
-          <td>${fmt(system.x, 2)}</td>
-          <td>${fmt(system.y, 2)}</td>
-          <td>${fmt(system.z, 2)}</td>
-          <td>${formatLy(system.distanceLy, 2)}</td>
-          <td>${fmtFeH(system.metallicityFeH)}</td>
-          <td>${fmt(giantPlanetProbability(system.metallicityFeH) * 100, 1)}%</td>
-        </tr>
-      `;
-      })
-      .join("");
+    renderClusterKpis(kpisEl, kpis);
+    renderClusterObjectsBody(objectsBodyEl, model.stellarRows, countDeltas);
+    renderClusterSystemsBody(systemsBodyEl, finalSystems, {
+      homeDefaultName,
+      resolveSystemDisplayName,
+      formatSystemLabel,
+      formatLy,
+      fmtFeH,
+    });
   }
 
   function hasAdjustments() {
@@ -871,45 +810,14 @@ export function initLocalClusterPage(mountEl) {
     if (!system) return;
 
     const components = system.components || [{ objectClassKey: system.objectClassKey }];
-    const count = components.length;
     const classLabel = formatSystemLabel(system);
     contextTitleEl.textContent = classLabel + " system";
 
-    let html = "";
-
-    // Add companion options (max 4 components = quadruple)
-    if (count < 4) {
-      html += '<div class="cluster-context-menu__sep"></div>';
-      for (const cls of COMPANION_CLASSES) {
-        const visual = getClusterObjectVisual(normalizeClusterObjectKey(cls.key));
-        html += `<div class="cluster-context-menu__item" data-action="add-companion" data-system-id="${escapeHtml(systemId)}" data-class="${escapeHtml(cls.key)}">
-          <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-          Add ${escapeHtml(cls.label)}
-        </div>`;
-      }
-    }
-
-    // Remove companion options (only non-primary components)
-    if (count > 1) {
-      html += '<div class="cluster-context-menu__sep"></div>';
-      for (let i = 1; i < components.length; i++) {
-        const comp = components[i];
-        const compKey = normalizeClusterObjectKey(comp.objectClassKey);
-        const visual = getClusterObjectVisual(compKey);
-        const label = compKey === "LTY" ? "L/T/Y" : compKey;
-        html += `<div class="cluster-context-menu__item danger" data-action="remove-companion" data-system-id="${escapeHtml(systemId)}" data-comp-index="${i}">
-          <img class="cluster-object-icon" src="${visual.icon}" alt="" aria-hidden="true" />
-          Remove ${escapeHtml(label)} companion
-        </div>`;
-      }
-    }
-
-    if (!html) {
-      html =
-        '<div class="cluster-context-menu__item" style="opacity:0.5;cursor:default">No actions available</div>';
-    }
-
-    contextItemsEl.innerHTML = html;
+    renderClusterContextMenuItems(contextItemsEl, {
+      systemId,
+      components,
+      companionClasses: COMPANION_CLASSES,
+    });
 
     // Position clamped to viewport
     const menuW = 220;

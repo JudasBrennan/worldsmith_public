@@ -8,6 +8,7 @@ import { calcPlanetExact } from "../engine/planet.js";
 import { fmt } from "../engine/utils.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { createTutorial } from "./tutorial.js";
+import { replaceSelectOptions } from "./domHelpers.js";
 import { escapeHtml } from "./uiHelpers.js";
 import {
   getSelectedPlanet,
@@ -1248,14 +1249,7 @@ export function initTectonicsPage(containerEl) {
 
               <div class="form-row">
                 <div><div class="label">Planet</div></div>
-                <select id="tecPlanetSelect">
-                  ${planets
-                    .map(
-                      (p) =>
-                        `<option value="${escapeHtml(p.id)}" ${p.id === selectedPlanet?.id ? "selected" : ""}>${escapeHtml(p.name || p.inputs?.name || p.id)}</option>`,
-                    )
-                    .join("")}
-                </select>
+                <select id="tecPlanetSelect"></select>
               </div>
 
               <div class="kpi-grid">
@@ -1515,6 +1509,17 @@ export function initTectonicsPage(containerEl) {
       </div>`;
 
     attachTooltips(containerEl);
+    const planetSelect = containerEl.querySelector("#tecPlanetSelect");
+    if (planetSelect) {
+      replaceSelectOptions(
+        planetSelect,
+        planets.map((planet) => ({
+          value: planet.id,
+          label: planet.name || planet.inputs?.name || planet.id,
+          selected: planet.id === selectedPlanet?.id,
+        })),
+      );
+    }
     drawOutputCanvases(containerEl, model, activeProfile, arcDist);
   }
 

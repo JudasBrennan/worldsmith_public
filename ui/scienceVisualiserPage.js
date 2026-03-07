@@ -3,6 +3,7 @@ import {
   SCIENCE_GRAPH_NODES,
   SCIENCE_GRAPH_SECTIONS,
 } from "./scienceGraphData.js";
+import { createElement, replaceChildren } from "./domHelpers.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
 import { escapeHtml } from "./uiHelpers.js";
 
@@ -337,38 +338,56 @@ function buildEvidenceFilterMarkup(enabledEvidence) {
     .join("");
 }
 
-function buildKpiMarkup(model) {
+function tipIconNode(text) {
+  if (!text) return null;
+  return createElement("span", {
+    className: "tip-icon",
+    attrs: { tabindex: "0", role: "note", "aria-label": "Info" },
+    dataset: { tip: text },
+    text: "i",
+  });
+}
+
+function emptyVizNode(text, className = "science-viz__empty") {
+  return createElement("div", { className, text });
+}
+
+function renderScienceVizKpis(container, model) {
   const selectionLabel = model.selectedNode ? model.selectedNode.label : "No focus";
-  return `
-    <div class="kpi-wrap">
-      <div class="kpi">
-        <div class="kpi__label">Visible Nodes</div>
-        <div class="kpi__value">${model.visibleNodes.length}</div>
-        <div class="kpi__meta">${model.visibleSectionIds.size} sections in view</div>
-      </div>
-    </div>
-    <div class="kpi-wrap">
-      <div class="kpi">
-        <div class="kpi__label">Visible Links</div>
-        <div class="kpi__value">${model.visibleEdges.length}</div>
-        <div class="kpi__meta">${model.runtimeEdgeCount} runtime-backed</div>
-      </div>
-    </div>
-    <div class="kpi-wrap">
-      <div class="kpi">
-        <div class="kpi__label">Upstream</div>
-        <div class="kpi__value">${model.upstreamNodeIds.length}</div>
-        <div class="kpi__meta">Direct inputs to ${escapeHtml(selectionLabel)}</div>
-      </div>
-    </div>
-    <div class="kpi-wrap">
-      <div class="kpi">
-        <div class="kpi__label">Downstream</div>
-        <div class="kpi__value">${model.downstreamNodeIds.length}</div>
-        <div class="kpi__meta">Direct outputs from ${escapeHtml(selectionLabel)}</div>
-      </div>
-    </div>
-  `;
+  replaceChildren(
+    container,
+    [
+      {
+        label: "Visible Nodes",
+        value: model.visibleNodes.length,
+        meta: `${model.visibleSectionIds.size} sections in view`,
+      },
+      {
+        label: "Visible Links",
+        value: model.visibleEdges.length,
+        meta: `${model.runtimeEdgeCount} runtime-backed`,
+      },
+      {
+        label: "Upstream",
+        value: model.upstreamNodeIds.length,
+        meta: `Direct inputs to ${selectionLabel}`,
+      },
+      {
+        label: "Downstream",
+        value: model.downstreamNodeIds.length,
+        meta: `Direct outputs from ${selectionLabel}`,
+      },
+    ].map((item) =>
+      createElement("div", { className: "kpi-wrap" }, [
+        createElement("div", { className: "kpi" }, [
+          createElement("div", { className: "kpi__label", text: item.label }),
+          createElement("div", { className: "kpi__value", text: item.value }),
+          createElement("div", { className: "kpi__meta", text: item.meta }),
+        ]),
+      ]),
+    ),
+  );
+  return container;
 }
 
 function buildSummaryText(state, model) {
@@ -384,29 +403,42 @@ function buildSummaryText(state, model) {
   return `Atlas view across ${model.visibleSectionIds.size} sections, with ${model.visibleNodes.length} concepts and ${model.visibleEdges.length} links visible.`;
 }
 
-function buildSearchResultMarkup(searchResults, selectedNodeId, query) {
+function renderScienceVizSearchResults(container, searchResults, selectedNodeId, query) {
   if (!normalizeText(query)) {
-    return `<div class="science-viz__empty">Try "metallicity", "CMF", "surface temperature", or "tectonics".</div>`;
+    replaceChildren(
+      container,
+      emptyVizNode('Try "metallicity", "CMF", "surface temperature", or "tectonics".'),
+    );
+    return container;
   }
 
   if (!searchResults.length) {
-    return `<div class="science-viz__empty">No matching concepts in the enabled sections.</div>`;
+    replaceChildren(container, emptyVizNode("No matching concepts in the enabled sections."));
+    return container;
   }
 
-  return searchResults
-    .map((node) => {
+  replaceChildren(
+    container,
+    searchResults.map((node) => {
       const section = SECTION_BY_ID.get(node.sectionId);
-      return `
-        <button
-          type="button"
-          class="science-viz__result ${node.id === selectedNodeId ? "is-active" : ""}"
-          data-select-node="${escapeHtml(node.id)}"
-        >
-          <span class="science-viz__result-title">${escapeHtml(node.label)}</span>
-          <span class="science-viz__result-meta">${escapeHtml(section?.label || "")}</span>
-        </button>`;
-    })
-    .join("");
+      return createElement(
+        "button",
+        {
+          className: `science-viz__result ${node.id === selectedNodeId ? "is-active" : ""}`.trim(),
+          attrs: { type: "button" },
+          dataset: { selectNode: node.id },
+        },
+        [
+          createElement("span", { className: "science-viz__result-title", text: node.label }),
+          createElement("span", {
+            className: "science-viz__result-meta",
+            text: section?.label || "",
+          }),
+        ],
+      );
+    }),
+  );
+  return container;
 }
 
 function buildGraphMarkup(state, model) {
@@ -535,71 +567,104 @@ function buildGraphMarkup(state, model) {
   `;
 }
 
-function buildRelatedListMarkup(nodeIds) {
+function buildRelatedListNodes(nodeIds) {
   if (!nodeIds.length) {
-    return `<div class="science-viz__empty">None in the current filter.</div>`;
+    return [emptyVizNode("None in the current filter.")];
   }
 
-  return nodeIds
-    .map((nodeId) => {
-      const node = NODE_BY_ID.get(nodeId);
-      return `
-        <button type="button" class="science-viz__chip" data-select-node="${escapeHtml(nodeId)}">
-          ${escapeHtml(node?.label || nodeId)}
-        </button>`;
-    })
-    .join("");
+  return nodeIds.map((nodeId) => {
+    const node = NODE_BY_ID.get(nodeId);
+    return createElement(
+      "button",
+      {
+        className: "science-viz__chip",
+        attrs: { type: "button" },
+        dataset: { selectNode: nodeId },
+        text: node?.label || nodeId,
+      },
+      [],
+    );
+  });
 }
 
-function buildInspectorMarkup(model) {
+function renderScienceVizInspector(container, model) {
   const node = model.selectedNode;
   if (!node) {
-    return `<div class="science-viz__empty">Choose a visible concept to inspect its dependencies.</div>`;
+    replaceChildren(
+      container,
+      emptyVizNode("Choose a visible concept to inspect its dependencies."),
+    );
+    return container;
   }
 
   const section = SECTION_BY_ID.get(node.sectionId);
-  const docsMarkup = (node.docs || [])
-    .map(
-      (doc) => `
-        <a class="science-viz__link-chip" href="${escapeHtml(doc.href)}">${escapeHtml(doc.label)}</a>`,
-    )
-    .join("");
-  const refsMarkup = (node.engineRefs || [])
-    .map((ref) => `<code class="science-viz__code-chip">${escapeHtml(ref)}</code>`)
-    .join("");
-  const tagsMarkup = (node.tags || [])
-    .map((tag) => `<span class="science-viz__tag">${escapeHtml(tag)}</span>`)
-    .join("");
-
-  return `
-    <div class="science-viz__inspector">
-      <div class="science-viz__inspector-head">
-        <div>
-          <div class="science-viz__eyebrow">${escapeHtml(section?.label || "Unknown section")}</div>
-          <h3 class="science-viz__inspector-title">${escapeHtml(node.label)}</h3>
-        </div>
-        <div class="badge">${escapeHtml(KIND_LABELS[node.kind])}</div>
-      </div>
-      <p class="science-viz__summary">${escapeHtml(node.summary)}</p>
-      ${node.formula ? `<div class="science-viz__formula">${escapeHtml(node.formula)}</div>` : ""}
-      <div class="science-viz__inspector-grid">
-        <div>
-          <div class="science-viz__label">Depends On</div>
-          <div class="science-viz__chip-row">${buildRelatedListMarkup(model.upstreamNodeIds)}</div>
-        </div>
-        <div>
-          <div class="science-viz__label">Feeds Into</div>
-          <div class="science-viz__chip-row">${buildRelatedListMarkup(model.downstreamNodeIds)}</div>
-        </div>
-      </div>
-      <div class="science-viz__label">Engine Sources</div>
-      <div class="science-viz__code-row">${refsMarkup || `<div class="science-viz__empty">No runtime source listed.</div>`}</div>
-      <div class="science-viz__label">Reference Pages</div>
-      <div class="science-viz__chip-row">${docsMarkup || `<div class="science-viz__empty">No documentation links listed.</div>`}</div>
-      <div class="science-viz__label">Tags</div>
-      <div class="science-viz__tag-row">${tagsMarkup || `<div class="science-viz__empty">No tags.</div>`}</div>
-    </div>
-  `;
+  replaceChildren(container, [
+    createElement("div", { className: "science-viz__inspector" }, [
+      createElement("div", { className: "science-viz__inspector-head" }, [
+        createElement("div", {}, [
+          createElement("div", {
+            className: "science-viz__eyebrow",
+            text: section?.label || "Unknown section",
+          }),
+          createElement("h3", { className: "science-viz__inspector-title", text: node.label }),
+        ]),
+        createElement("div", { className: "badge", text: KIND_LABELS[node.kind] }),
+      ]),
+      createElement("p", { className: "science-viz__summary", text: node.summary }),
+      node.formula
+        ? createElement("div", { className: "science-viz__formula", text: node.formula })
+        : null,
+      createElement("div", { className: "science-viz__inspector-grid" }, [
+        createElement("div", {}, [
+          createElement("div", { className: "science-viz__label", text: "Depends On" }),
+          createElement("div", { className: "science-viz__chip-row" }, [
+            buildRelatedListNodes(model.upstreamNodeIds),
+          ]),
+        ]),
+        createElement("div", {}, [
+          createElement("div", { className: "science-viz__label", text: "Feeds Into" }),
+          createElement("div", { className: "science-viz__chip-row" }, [
+            buildRelatedListNodes(model.downstreamNodeIds),
+          ]),
+        ]),
+      ]),
+      createElement("div", { className: "science-viz__label", text: "Engine Sources" }),
+      createElement(
+        "div",
+        { className: "science-viz__code-row" },
+        (node.engineRefs || []).length
+          ? (node.engineRefs || []).map((ref) =>
+              createElement("code", { className: "science-viz__code-chip", text: ref }),
+            )
+          : emptyVizNode("No runtime source listed."),
+      ),
+      createElement("div", { className: "science-viz__label", text: "Reference Pages" }),
+      createElement(
+        "div",
+        { className: "science-viz__chip-row" },
+        (node.docs || []).length
+          ? (node.docs || []).map((doc) =>
+              createElement("a", {
+                className: "science-viz__link-chip",
+                attrs: { href: doc.href },
+                text: doc.label,
+              }),
+            )
+          : emptyVizNode("No documentation links listed."),
+      ),
+      createElement("div", { className: "science-viz__label", text: "Tags" }),
+      createElement(
+        "div",
+        { className: "science-viz__tag-row" },
+        (node.tags || []).length
+          ? (node.tags || []).map((tag) =>
+              createElement("span", { className: "science-viz__tag", text: tag }),
+            )
+          : emptyVizNode("No tags."),
+      ),
+    ]),
+  ]);
+  return container;
 }
 
 export function initScienceVisualiserPage(mountEl) {
@@ -737,9 +802,11 @@ export function initScienceVisualiserPage(mountEl) {
     state.controlsOpen = !!open;
     if (refs.controlsDropdown) refs.controlsDropdown.hidden = !state.controlsOpen;
     if (refs.controlsButton) {
-      refs.controlsButton.innerHTML =
-        `${tipIcon(TIP_LABEL["Explore"])} Explore ` +
-        (state.controlsOpen ? "&#x25B4;" : "&#x25BE;");
+      replaceChildren(refs.controlsButton, [
+        tipIconNode(TIP_LABEL["Explore"]),
+        " Explore ",
+        state.controlsOpen ? "\u25b4" : "\u25be",
+      ]);
     }
   }
 
@@ -752,16 +819,16 @@ export function initScienceVisualiserPage(mountEl) {
     if (refs.modeBadge) refs.modeBadge.textContent = VIEW_LABELS[state.viewMode];
     if (refs.hopDepth) refs.hopDepth.disabled = state.viewMode !== "trace";
     if (refs.summary) refs.summary.textContent = buildSummaryText(state, model);
-    if (refs.searchResults) {
-      refs.searchResults.innerHTML = buildSearchResultMarkup(
+    if (refs.searchResults)
+      renderScienceVizSearchResults(
+        refs.searchResults,
         model.searchResults,
         model.selectedNodeId,
         state.search,
       );
-    }
-    if (refs.kpis) refs.kpis.innerHTML = buildKpiMarkup(model);
+    if (refs.kpis) renderScienceVizKpis(refs.kpis, model);
     if (refs.graph) refs.graph.innerHTML = buildGraphMarkup(state, model);
-    if (refs.inspector) refs.inspector.innerHTML = buildInspectorMarkup(model);
+    if (refs.inspector) renderScienceVizInspector(refs.inspector, model);
     attachTooltips(wrap);
   }
 

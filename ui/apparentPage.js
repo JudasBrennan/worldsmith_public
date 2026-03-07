@@ -1,27 +1,19 @@
-import {
-  calcApparentModel,
-  convertGasGiantRadiusRjToKm,
-  convertPlanetRadiusEarthToKm,
-  bondToGeometricAlbedo,
-  classifyBodyType,
-  SOL_REFERENCES,
-} from "../engine/apparent.js";
-import { calcMoonExact } from "../engine/moon.js";
-import { calcPlanetExact } from "../engine/planet.js";
-import { calcStar } from "../engine/star.js";
+import { calcApparentModel, SOL_REFERENCES } from "../engine/apparent.js";
+import { buildApparentSnapshotInputs, SNAPSHOT_MODE_BUDGETS } from "../engine/worldAdapters.js";
+import { buildWorldSnapshot } from "../engine/worldSnapshot.js";
 import { fmt } from "../engine/utils.js";
 import { bindNumberAndSlider } from "./bind.js";
-import { attachTooltips, tipIcon } from "./tooltip.js";
-import { escapeHtml } from "./uiHelpers.js";
-import { drawSkyCanvasNative, disposeSkyCanvasNative } from "./apparentSkyNativeThree.js";
 import {
-  getSelectedPlanet,
-  getStarOverrides,
-  listMoons,
-  listPlanets,
-  listSystemGasGiants,
-  loadWorld,
-} from "./store.js";
+  renderApparentBodyRows,
+  renderApparentHomeSelector,
+  renderApparentKpis,
+  renderApparentMoonRows,
+  renderApparentSolRefRows,
+  renderApparentStarRows,
+} from "./apparent/domRender.js";
+import { attachTooltips, tipIcon } from "./tooltip.js";
+import { drawSkyCanvasNative, disposeSkyCanvasNative } from "./apparentSkyNativeThree.js";
+import { getSelectedPlanet, loadWorld } from "./store.js";
 import { createTutorial } from "./tutorial.js";
 
 const TIP_LABEL = {
@@ -89,120 +81,6 @@ const TIP_LABEL = {
     "Moons are assigned on the Moons page.",
 };
 
-function gasGiantAlbedo(style) {
-  switch (String(style || "").toLowerCase()) {
-    case "jupiter":
-      return 0.538;
-    case "saturn":
-      return 0.499;
-    case "ice":
-      return 0.45;
-    case "hot":
-      return 0.4;
-    default:
-      return 0.45;
-  }
-}
-
-function moonRadiusFromInputs(inputs) {
-  const massMoon = Number(inputs?.massMoon);
-  const density = Number(inputs?.densityGcm3);
-  if (!Number.isFinite(massMoon) || !Number.isFinite(density) || massMoon <= 0 || density <= 0) {
-    return 1;
-  }
-  return Math.pow(massMoon / (density / 3.34), 1 / 3);
-}
-
-function buildApparentSamples(world, homePlanetId, state) {
-  const starMassMsol = Number(world?.star?.massMsol) || 1;
-  const starAgeGyr = Number(world?.star?.ageGyr) || 4.6;
-  const sov = getStarOverrides(world?.star);
-
-  const planets = listPlanets(world)
-    .map((planet) => {
-      const model = calcPlanetExact({
-        starMassMsol,
-        starAgeGyr,
-        starRadiusRsolOverride: sov.r,
-        starLuminosityLsolOverride: sov.l,
-        starTempKOverride: sov.t,
-        starEvolutionMode: sov.ev,
-        planet: planet.inputs || {},
-      });
-
-      const radiusKm = Number(model?.derived?.radiusKm) || convertPlanetRadiusEarthToKm(1);
-      const hasAtmosphere = Number(planet.inputs?.pressureAtm) > 0.01;
-      const bodyType = classifyBodyType(radiusKm, hasAtmosphere);
-      const bondAlbedo = Number(planet.inputs?.albedoBond) || 0.3;
-
-      return {
-        id: `planet:${planet.id}`,
-        kind: "planet",
-        name: planet.name || planet.inputs?.name || planet.id,
-        classLabel: "Planet",
-        orbitAu: Number(planet.inputs?.semiMajorAxisAu) || 1,
-        radiusKm,
-        geometricAlbedo: bondToGeometricAlbedo(bondAlbedo, bodyType),
-        hasAtmosphere,
-        skyDayHex: model?.derived?.skyColourDayHex || null,
-        skyDayEdgeHex: model?.derived?.skyColourDayEdgeHex || null,
-        skyHorizonHex: model?.derived?.skyColourHorizonHex || null,
-        _derived: model?.derived || null,
-        _planetInputs: planet.inputs || null,
-      };
-    })
-    .filter((item) => Number.isFinite(item.orbitAu) && item.orbitAu > 0);
-
-  const gasGiants = listSystemGasGiants(world)
-    .map((giant) => ({
-      id: `gas:${giant.id}`,
-      kind: "gas",
-      name: giant.name || giant.id,
-      classLabel: "Gas giant",
-      orbitAu: Number(giant.au),
-      radiusKm: convertGasGiantRadiusRjToKm(giant.radiusRj),
-      geometricAlbedo: gasGiantAlbedo(giant.style),
-      hasAtmosphere: true,
-      _styleId: giant.style || "jupiter",
-    }))
-    .filter((item) => Number.isFinite(item.orbitAu) && item.orbitAu > 0);
-
-  const allBodies = [...planets, ...gasGiants].sort((a, b) => a.orbitAu - b.orbitAu);
-
-  const selectedHomePlanet = planets.find((body) => body.id === `planet:${homePlanetId}`) || null;
-  const homeOrbitAu = selectedHomePlanet?.orbitAu || 1;
-
-  const orbitSamples = allBodies.map((body) => ({
-    id: body.id,
-    name: body.name,
-    orbitAu: body.orbitAu,
-  }));
-
-  const bodySamples = allBodies
-    .filter((body) => body.id !== selectedHomePlanet?.id)
-    .map((body) => {
-      const key = body.id;
-      const currentDistanceAu = Number(state.distanceByBodyId[key]);
-      return {
-        ...body,
-        currentDistanceAu: Number.isFinite(currentDistanceAu) ? currentDistanceAu : undefined,
-      };
-    });
-
-  return {
-    starMassMsol,
-    homeOrbitAu,
-    selectedHomePlanet,
-    planets,
-    allBodies,
-    orbitSamples,
-    bodySamples,
-    homeSkyDayHex: selectedHomePlanet?.skyDayHex || null,
-    homeSkyDayEdgeHex: selectedHomePlanet?.skyDayEdgeHex || null,
-    homeSkyHorizonHex: selectedHomePlanet?.skyHorizonHex || null,
-  };
-}
-
 function numWithSlider(id, label, unit, min, max, step, tip) {
   const unitHtml = unit ? ` <span class="unit">${unit}</span>` : "";
   return `
@@ -252,10 +130,13 @@ const TUTORIAL_STEPS = [
 
 export function initApparentPage(mountEl) {
   const world = loadWorld();
+  const initialSnapshot = buildWorldSnapshot(world, {
+    mode: SNAPSHOT_MODE_BUDGETS.apparentSelectors,
+  });
   const selectedPlanet = getSelectedPlanet(world);
 
   const state = {
-    homePlanetId: selectedPlanet?.id || listPlanets(world)[0]?.id || "",
+    homePlanetId: selectedPlanet?.id || Object.keys(initialSnapshot.planetsById || {})[0] || "",
     moonPhaseDeg: 0,
     distanceByBodyId: {},
     skyMode: "night",
@@ -450,64 +331,20 @@ export function initApparentPage(mountEl) {
   }
 
   function refreshSelectors() {
-    const latest = loadWorld();
-    const planets = listPlanets(latest);
-
-    if (!planets.length) {
-      homeSelectEl.innerHTML = `<option value="">No planets</option>`;
-      state.homePlanetId = "";
-    } else {
-      if (!planets.some((planet) => planet.id === state.homePlanetId)) {
-        state.homePlanetId = planets[0].id;
-      }
-      homeSelectEl.innerHTML = planets
-        .map((planet) => {
-          const selected = planet.id === state.homePlanetId ? " selected" : "";
-          return `<option value="${escapeHtml(planet.id)}"${selected}>${escapeHtml(planet.name || planet.inputs?.name || planet.id)}</option>`;
-        })
-        .join("");
-    }
+    const snapshot = buildWorldSnapshot(loadWorld(), {
+      mode: SNAPSHOT_MODE_BUDGETS.apparentSelectors,
+    });
+    const planets = Object.values(snapshot.planetsById || {});
+    state.homePlanetId = renderApparentHomeSelector(homeSelectEl, planets, state.homePlanetId);
   }
 
   function render() {
     const latest = loadWorld();
-    const sample = buildApparentSamples(latest, state.homePlanetId, state);
-
-    const allMoons = listMoons(latest);
-    const homeMoons = allMoons.filter((m) => m.planetId === state.homePlanetId);
-
-    // Moon store field is Bond albedo; apparent engine needs geometric albedo.
-    // Phase integral q ≈ 0.9 for regolith-covered rocky bodies (opposition surge).
-    const MOON_Q = 0.9;
-    const sov = getStarOverrides(latest?.star);
-    const starAgeGyr = Number(latest?.star?.ageGyr) || 4.6;
-    const homePlanetInputs = latest?.planets?.byId?.[state.homePlanetId]?.inputs;
-    const moonSamples = homeMoons.map((moon) => {
-      let moonCalc = null;
-      if (homePlanetInputs) {
-        try {
-          moonCalc = calcMoonExact({
-            starMassMsol: sample.starMassMsol,
-            starAgeGyr,
-            starRadiusRsolOverride: sov.r,
-            starLuminosityLsolOverride: sov.l,
-            starTempKOverride: sov.t,
-            starEvolutionMode: sov.ev,
-            planet: homePlanetInputs,
-            moon: { ...moon.inputs },
-          });
-        } catch {
-          moonCalc = null;
-        }
-      }
-      return {
-        name: moon.name || moon.inputs?.name || moon.id,
-        semiMajorAxisKm: Number(moon.inputs?.semiMajorAxisKm) || 384748,
-        radiusMoon: moonRadiusFromInputs(moon.inputs),
-        geometricAlbedo: (Number(moon.inputs?.albedo) || 0.11) / MOON_Q,
-        phaseDeg: state.moonPhaseDeg,
-        moonCalc,
-      };
+    const snapshot = buildWorldSnapshot(latest, { mode: SNAPSHOT_MODE_BUDGETS.apparentPage });
+    const sample = buildApparentSnapshotInputs(snapshot, {
+      homePlanetId: state.homePlanetId,
+      distanceByBodyId: state.distanceByBodyId,
+      moonPhaseDeg: state.moonPhaseDeg,
     });
 
     const model = calcApparentModel({
@@ -515,12 +352,12 @@ export function initApparentPage(mountEl) {
       homeOrbitAu: sample.homeOrbitAu,
       orbitSamples: sample.orbitSamples.filter((row) => row.id !== `planet:${state.homePlanetId}`),
       bodySamples: sample.bodySamples,
-      moonSamples,
+      moonSamples: sample.moonSamples,
     });
 
     // Re-attach moonCalc from original samples (stripped by engine normalizer)
     model.moons.forEach((m, i) => {
-      if (moonSamples[i]?.moonCalc) m.moonCalc = moonSamples[i].moonCalc;
+      if (sample.moonSamples[i]?.moonCalc) m.moonCalc = sample.moonSamples[i].moonCalc;
     });
 
     // Re-attach visual metadata stripped by engine normalizer
@@ -542,137 +379,58 @@ export function initApparentPage(mountEl) {
       .filter((m) => Number.isFinite(m.apparentMagnitude))
       .sort((a, b) => a.apparentMagnitude - b.apparentMagnitude)[0];
 
-    kpisEl.innerHTML = [
-      {
-        label: "Star absolute magnitude",
-        value: fmt(model.star.absoluteMagnitude, 3),
-        meta: "M",
-      },
-      {
-        label: "Home orbit",
-        value: fmt(sample.homeOrbitAu, 3),
-        meta: "AU",
-      },
-      {
-        label: "Home star magnitude",
-        value: fmt(model.starByOrbit[0]?.magnitude, 3),
-        meta: "at home",
-      },
-      {
-        label: "Brightest object",
-        value: brightestBody ? escapeHtml(brightestBody.name) : "-",
-        meta: brightestBody ? `${fmt(brightestBody.apparentMagnitude, 2)} mag` : "-",
-      },
-      {
-        label: "Brightest moon",
-        value: brightestMoon ? escapeHtml(brightestMoon.name) : "-",
-        meta: brightestMoon
-          ? `${fmt(brightestMoon.apparentMagnitude, 2)} mag`
-          : model.moons.length
-            ? "All invisible at this phase"
-            : "No moons",
-      },
-      {
-        label: "Moon count",
-        value: String(model.moons.length),
-        meta: "assigned to home world",
-      },
-    ]
-      .map(
-        (item) => `
-      <div class="kpi-wrap">
-        <div class="kpi">
-          <div class="kpi__label">${item.label} ${tipIcon(TIP_LABEL[item.label] || "")}</div>
-          <div class="kpi__value">${item.value}</div>
-          <div class="kpi__meta">${item.meta}</div>
-        </div>
-      </div>
-    `,
-      )
-      .join("");
+    renderApparentKpis(
+      kpisEl,
+      [
+        {
+          label: "Star absolute magnitude",
+          value: fmt(model.star.absoluteMagnitude, 3),
+          meta: "M",
+        },
+        {
+          label: "Home orbit",
+          value: fmt(sample.homeOrbitAu, 3),
+          meta: "AU",
+        },
+        {
+          label: "Home star magnitude",
+          value: fmt(model.starByOrbit[0]?.magnitude, 3),
+          meta: "at home",
+        },
+        {
+          label: "Brightest object",
+          value: brightestBody ? brightestBody.name : "-",
+          meta: brightestBody ? `${fmt(brightestBody.apparentMagnitude, 2)} mag` : "-",
+        },
+        {
+          label: "Brightest moon",
+          value: brightestMoon ? brightestMoon.name : "-",
+          meta: brightestMoon
+            ? `${fmt(brightestMoon.apparentMagnitude, 2)} mag`
+            : model.moons.length
+              ? "All invisible at this phase"
+              : "No moons",
+        },
+        {
+          label: "Moon count",
+          value: String(model.moons.length),
+          meta: "assigned to home world",
+        },
+      ],
+      TIP_LABEL,
+    );
 
-    starRowsEl.innerHTML = model.starByOrbit
-      .map(
-        (row) => `
-      <tr>
-        <td>${escapeHtml(row.name)}</td>
-        <td>${fmt(row.orbitAu, 4)}</td>
-        <td>${fmt(row.magnitude, 4)}</td>
-        <td>${fmt(row.brightnessRelativeToEarthSun, 6)}</td>
-        <td>${fmt(row.apparentSizeRelativeToEarthSun, 6)}</td>
-        <td>${row.angularDiameterLabel}</td>
-      </tr>
-    `,
-      )
-      .join("");
+    renderApparentStarRows(starRowsEl, model.starByOrbit);
 
-    bodyRowsEl.innerHTML = model.bodiesFromHome
-      .map((row) => {
-        state.distanceByBodyId[row.id] = row.currentDistanceAu;
-
-        return `
-          <tr>
-            <td>${escapeHtml(row.name)}</td>
-            <td>${escapeHtml(row.bodyTypeLabel || row.classLabel)}</td>
-            <td>
-              <input
-                type="number"
-                min="${row.minDistanceAu}"
-                max="${row.maxDistanceAu}"
-                step="0.001"
-                value="${row.currentDistanceAu}"
-                data-distance-id="${escapeHtml(row.id)}"
-                class="cluster-name-input"
-                title="min ${fmt(row.minDistanceAu, 3)} AU, max ${fmt(row.maxDistanceAu, 3)} AU"
-              />
-            </td>
-            <td>${fmt(row.phaseAngleDeg, 2)}</td>
-            <td>${Number.isFinite(row.apparentMagnitude) ? fmt(row.apparentMagnitude, 2) : "NA"}</td>
-            <td>${row.angularDiameterLabel}</td>
-            <td>${escapeHtml(row.observable)}</td>
-            <td>${escapeHtml(row.visibility)}</td>
-          </tr>
-        `;
-      })
-      .join("");
-
-    moonRowsEl.innerHTML = model.moons.length
-      ? model.moons
-          .map(
-            (m) => `
-        <tr>
-          <td>${escapeHtml(m.name)}</td>
-          <td>${fmt(m.absoluteMagnitude, 4)}</td>
-          <td>${Number.isFinite(m.apparentMagnitude) ? fmt(m.apparentMagnitude, 2) : "Invisible"}</td>
-          <td>${m.angularDiameterLabel}</td>
-          <td>${Number.isFinite(m.brightnessRelativeToFullMoon) ? fmt(m.brightnessRelativeToFullMoon, 4) : "NA"}</td>
-          <td>${fmt(m.apparentSizeRelativeToReference, 4)}</td>
-          <td>${escapeHtml(m.eclipseType)}</td>
-        </tr>
-      `,
-          )
-          .join("")
-      : `<tr><td colspan="7" style="text-align:center;color:var(--muted)">No moons assigned to home world</td></tr>`;
-
-    solRefRowsEl.innerHTML = SOL_REFERENCES.map((ref) => {
-      const angFmt =
-        ref.angDiamArcmin != null
-          ? `${ref.angDiamArcmin.toFixed(1)}\u2032`
-          : ref.angDiamArcsec != null
-            ? `${ref.angDiamArcsec}\u2033`
-            : "\u2014";
-      return `
-        <tr>
-          <td>${escapeHtml(ref.name)}</td>
-          <td>${fmt(ref.appMag, 2)}</td>
-          <td>${angFmt}</td>
-          <td>${escapeHtml(ref.note)}</td>
-        </tr>
-      `;
-    }).join("");
+    model.bodiesFromHome.forEach((row) => {
+      state.distanceByBodyId[row.id] = row.currentDistanceAu;
+    });
+    renderApparentBodyRows(bodyRowsEl, model.bodiesFromHome);
+    renderApparentMoonRows(moonRowsEl, model.moons);
+    renderApparentSolRefRows(solRefRowsEl, SOL_REFERENCES);
 
     // Sky canvas
-    const starModel = calcStar({ massMsol: sample.starMassMsol, ageGyr: 4.6 });
+    const starModel = sample.starModel;
     if (!state.homePlanetId) {
       // No home planet — show placeholder message on the canvas.
       const rect = skyWrapEl?.getBoundingClientRect?.();
@@ -702,11 +460,15 @@ export function initApparentPage(mountEl) {
       drawSkyCanvasNative(
         skyCanvasEl,
         model,
-        starModel.starColourHex,
+        starModel?.starColourHex,
         state.skyMode,
         state.moonPhaseDeg,
         skyPalette,
-        { starTempK: starModel.tempK, starMassMsol: sample.starMassMsol, starAgeGyr: 4.6 },
+        {
+          starTempK: starModel?.tempK,
+          starMassMsol: sample.starMassMsol,
+          starAgeGyr: sample.starAgeGyr,
+        },
       );
     }
   }

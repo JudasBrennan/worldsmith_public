@@ -5,10 +5,20 @@ import { createSolPresetEnvelope } from "./solPreset.js";
 import { createRealmspacePresetEnvelope } from "./realmspacePreset.js";
 import { createArrakisPresetEnvelope } from "./arrakisPreset.js";
 import { createTutorial } from "./tutorial.js";
-import { escapeHtml } from "./uiHelpers.js";
+import {
+  assertImportFileWithinLimit,
+  assertImportTextWithinLimit,
+  formatBytes,
+  getImportLimitLabel,
+  isLargeImport,
+  nextImportTurn,
+} from "./importSafety.js";
+import { createElement, replaceChildren } from "./domHelpers.js";
+import { buildImportPreviewSummary } from "../engine/worldAdapters.js";
 
 const { exportEnvelope, validateEnvelope, importWorld, createBackup, listBackups, restoreBackup } =
   store;
+const { normalizeWorld } = store;
 
 const TIP_LABEL = {
   Export:
@@ -33,6 +43,9 @@ const TIP_LABEL = {
   "Import JSON text": "Paste JSON here for validation and import.",
   "Export JSON text": "Read-only JSON export preview.",
 };
+
+const JSON_IMPORT_LIMIT_LABEL = getImportLimitLabel("json");
+const XLSX_IMPORT_LIMIT_LABEL = getImportLimitLabel("xlsx");
 function downloadText(filename, text) {
   const blob = new Blob([text], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -61,100 +74,18 @@ function setStatus(el, msg, kind = "info") {
   el.dataset.kind = normalizedKind;
 }
 
-function summariseWorld(w) {
-  const star = w.star || {};
-  const sys = w.system || {};
-  const planets = w.planets?.byId
-    ? Object.values(w.planets.byId)
-    : w.planet && typeof w.planet === "object"
-      ? [{ id: "legacy-p1", ...w.planet }]
-      : [];
-  const moons = w.moons?.byId
-    ? Object.values(w.moons.byId)
-    : w.moon && typeof w.moon === "object"
-      ? [{ id: "legacy-m1", ...w.moon }]
-      : [];
-  const assigned = planets.filter((p) => p.slotIndex != null).length;
-  const unassigned = planets.length - assigned;
+function textSizeBytes(text) {
+  return new Blob([String(text || "")]).size;
+}
 
-  const starMass = Number(star.massMsol ?? star.mass);
-  const starAge = Number(star.ageGyr ?? star.age);
-  const spec = star.spectralClass || star.class || "";
-
-  const gasList = Array.isArray(sys.gasGiants)
-    ? sys.gasGiants
-    : (sys.gasGiants?.order || []).map((id) => sys.gasGiants?.byId?.[id]).filter(Boolean);
-  const gasAuList = gasList
-    .map((g) => Number(g?.au ?? g?.semiMajorAxisAu))
-    .filter((au) => Number.isFinite(au) && au > 0);
-  const outermostGas = gasAuList.length ? Math.max(...gasAuList) : 0;
-
-  const legacyDebris = Number(sys.debrisDiskOuterAu ?? sys.debrisOuterAu);
-  const debrisList = Array.isArray(sys.debrisDisks)
-    ? sys.debrisDisks
-    : (sys.debrisDisks?.order || []).map((id) => sys.debrisDisks?.byId?.[id]).filter(Boolean);
-  const debrisRanges = debrisList
-    .map((d) => ({
-      name: d?.name || "Debris disk",
-      inner: Number(d?.innerAu ?? d?.inner),
-      outer: Number(d?.outerAu ?? d?.outer),
-    }))
-    .filter((d) => Number.isFinite(d.inner) && Number.isFinite(d.outer))
-    .map((d) => ({ ...d, inner: Math.min(d.inner, d.outer), outer: Math.max(d.inner, d.outer) }));
-  if (!debrisRanges.length && Number.isFinite(legacyDebris)) {
-    const legacyInner = Number(sys.debrisDiskInnerAu ?? sys.debrisInnerAu ?? legacyDebris);
-    if (Number.isFinite(legacyInner)) {
-      debrisRanges.push({
-        name: "Debris disk",
-        inner: Math.min(legacyInner, legacyDebris),
-        outer: Math.max(legacyInner, legacyDebris),
-      });
-    }
-  }
-
-  // Tectonics summary
-  const tec = w.tectonics && typeof w.tectonics === "object" ? w.tectonics : null;
-  const tecRanges = tec ? (Array.isArray(tec.mountainRanges) ? tec.mountainRanges.length : 0) : 0;
-  const tecVolcanoes = tec
-    ? Array.isArray(tec.shieldVolcanoes)
-      ? tec.shieldVolcanoes.length
-      : 0
-    : 0;
-  const tecRifts = tec ? (Array.isArray(tec.riftValleys) ? tec.riftValleys.length : 0) : 0;
-  const tecInactive = tec ? (Array.isArray(tec.inactiveRanges) ? tec.inactiveRanges.length : 0) : 0;
-
-  // Population summary
-  const pop = w.population && typeof w.population === "object" ? w.population : null;
-
-  // Climate summary
-  const clim = w.climate && typeof w.climate === "object" ? w.climate : null;
-
-  // Calendar summary
-  const cal = w.calendar && typeof w.calendar === "object" ? w.calendar : null;
-
-  return {
-    spec,
-    starMass: Number.isFinite(starMass) ? starMass : null,
-    starAge: Number.isFinite(starAge) ? starAge : null,
-    planets: planets.length,
-    moons: moons.length,
-    assigned,
-    unassigned,
-    gasCount: gasAuList.length || (Number.isFinite(outermostGas) ? 1 : 0),
-    gas: Number.isFinite(outermostGas) ? outermostGas : null,
-    debrisCount: debrisRanges.length,
-    debrisRanges,
-    hasTectonics: !!tec,
-    tecRanges,
-    tecVolcanoes,
-    tecRifts,
-    tecInactive,
-    hasPopulation: !!pop,
-    popTechEra: pop?.techEra || null,
-    hasClimate: !!clim,
-    climAltitude: clim ? Number(clim.altitudeM) || 0 : 0,
-    hasCalendar: !!cal,
-  };
+async function maybeWarnLargeImport(statusEl, bytes, label) {
+  if (!isLargeImport(bytes)) return;
+  setStatus(
+    statusEl,
+    `${label} (${formatBytes(bytes)}). Parsing happens on the main thread and may take a moment.`,
+    "info",
+  );
+  await nextImportTurn();
 }
 
 function clearAllSavedDataSafe() {
@@ -248,9 +179,9 @@ export function initImportExportPage(root) {
 
         <div class="panel">
           <div class="panel__header"><h2>Import & Backups</h2></div>
-          <div class="panel__body">
-            <div class="label">Backups ${tipIcon(TIP_LABEL["Backups"] || "")}</div>
-            <div class="hint">A backup is created automatically before applying an import. If something goes wrong, restore one here.</div>
+            <div class="panel__body">
+              <div class="label">Backups ${tipIcon(TIP_LABEL["Backups"] || "")}</div>
+              <div class="hint">A backup is created automatically before applying an import. If something goes wrong, restore one here.</div>
             <div style="height:10px"></div>
             <div id="backupList" class="io-backups"></div>
             <div style="height:14px"></div>
@@ -286,10 +217,11 @@ export function initImportExportPage(root) {
         <div class="panel__header"><h2>Notes</h2></div>
         <div class="panel__body">
           <ul class="bullets">
-            <li>WorldSmith Web stores your data in your browser (local storage), not in cookies.</li>
+            <li>WorldSmith Web stores your data in your browser storage (IndexedDB plus small browser settings keys), not in cookies.</li>
             <li>If you clear site data, use a different browser, or use a different device, your data will not follow you unless you export and import.</li>
             <li>Imported files are validated and migrated to the latest format automatically where possible.</li>
             <li>XLSX imports identify Star/System/Planet/Moon tabs by sheet structure, so tab order changes and duplicated tab copies are supported.</li>
+            <li>JSON imports above ${JSON_IMPORT_LIMIT_LABEL} and XLSX imports above ${XLSX_IMPORT_LIMIT_LABEL} are rejected to keep browser imports responsive.</li>
           </ul>
         </div>
       </div>
@@ -359,35 +291,50 @@ export function initImportExportPage(root) {
     if (!backupListEl) return;
     const items = listBackups();
     if (!items.length) {
-      backupListEl.innerHTML = '<div class="hint">No backups yet.</div>';
+      replaceChildren(
+        backupListEl,
+        createElement("div", { className: "hint", text: "No backups yet." }),
+      );
       return;
     }
-    backupListEl.innerHTML = items
-      .map((b) => {
+    replaceChildren(
+      backupListEl,
+      items.map((b) => {
         const when = (b.createdUtc || "").replace("T", " ").replace("Z", " UTC");
-        const safeWhen = escapeHtml(when);
-        const safeId = escapeHtml(b.id);
-        return `<div class="io-backup-row">
-        <div class="io-backup-meta">
-          <div class="io-backup-title">Backup</div>
-          <div class="io-backup-sub">${safeWhen}</div>
-        </div>
-        <div class="io-backup-actions">
-          <button type="button" data-restore="${safeId}">Restore</button>
-        </div>
-      </div>`;
-      })
-      .join("");
+        const restoreBtn = createElement("button", {
+          attrs: { type: "button" },
+          dataset: { restore: b.id },
+          text: "Restore",
+        });
+        return createElement("div", { className: "io-backup-row" }, [
+          createElement("div", { className: "io-backup-meta" }, [
+            createElement("div", { className: "io-backup-title", text: "Backup" }),
+            createElement("div", { className: "io-backup-sub", text: when }),
+          ]),
+          createElement("div", { className: "io-backup-actions" }, [restoreBtn]),
+        ]);
+      }),
+    );
   }
 
   function showImportPreview(world) {
-    pendingImport = { world, meta: summariseWorld(world) };
+    let normalisedWorld = null;
+    let meta = null;
+    try {
+      normalisedWorld = normalizeWorld(world);
+      meta = buildImportPreviewSummary(normalisedWorld, { rawWorld: world });
+    } catch (error) {
+      hideImportPreview();
+      setStatus(statusImport, `Could not build import preview: ${error?.message || error}`, "bad");
+      return false;
+    }
+
+    pendingImport = { world: normalisedWorld, meta };
     if (!importPreviewEl || !importActionsEl) return;
 
     const m = pendingImport.meta;
-    const safeSpec = escapeHtml(m.spec ? m.spec : "-");
-    const safeDebris = m.debrisCount
-      ? m.debrisRanges.map((d) => `${escapeHtml(d.name)}: ${d.inner}-${d.outer} AU`).join(" | ")
+    const debrisText = m.debrisCount
+      ? m.debrisRanges.map((d) => `${d.name}: ${d.inner}-${d.outer} AU`).join(" | ")
       : "-";
     importPreviewEl.style.display = "block";
     importActionsEl.style.display = "flex";
@@ -398,44 +345,48 @@ export function initImportExportPage(root) {
     if (m.tecVolcanoes) tecParts.push(`${m.tecVolcanoes} volcano(es)`);
     if (m.tecRifts) tecParts.push(`${m.tecRifts} rift(s)`);
 
-    importPreviewEl.innerHTML = `
-      <div class="io-preview-grid">
-        <div><strong>Star</strong></div>
-        <div>${safeSpec}${m.starMass != null ? ` | ${m.starMass} Msol` : ""}${m.starAge != null ? ` | ${m.starAge} Gyr` : ""}</div>
+    const grid = createElement("div", { className: "io-preview-grid" });
+    const addRow = (label, value) => {
+      grid.append(
+        createElement("div", {}, [createElement("strong", { text: label })]),
+        createElement("div", { text: value }),
+      );
+    };
 
-        <div><strong>Planets</strong></div>
-        <div>${m.planets} total (${m.assigned} assigned, ${m.unassigned} unassigned)</div>
+    addRow(
+      "Star",
+      `${m.spec ? m.spec : "-"}${m.starMass != null ? ` | ${m.starMass} Msol` : ""}${
+        m.starAge != null ? ` | ${m.starAge} Gyr` : ""
+      }`,
+    );
+    addRow("Planets", `${m.planets} total (${m.assigned} assigned, ${m.unassigned} unassigned)`);
+    addRow("Moons", `${m.moons} total`);
+    addRow("Gas giants", `${m.gasCount} total${m.gas != null ? ` (outermost ${m.gas} AU)` : ""}`);
+    addRow("Debris disks", debrisText);
+    addRow("Tectonics", m.hasTectonics ? tecParts.join(", ") || "defaults" : "-");
+    addRow("Population", m.hasPopulation ? m.popTechEra || "configured" : "-");
+    addRow(
+      "Climate",
+      m.hasClimate ? (m.climAltitude ? `altitude ${m.climAltitude} m` : "sea level") : "-",
+    );
+    addRow("Calendar", m.hasCalendar ? "included" : "-");
 
-        <div><strong>Moons</strong></div>
-        <div>${m.moons} total</div>
-
-        <div><strong>Gas giants</strong></div>
-        <div>${m.gasCount} total${m.gas != null ? ` (outermost ${m.gas} AU)` : ""}</div>
-
-        <div><strong>Debris disks</strong></div>
-        <div>${safeDebris}</div>
-
-        <div><strong>Tectonics</strong></div>
-        <div>${m.hasTectonics ? tecParts.join(", ") || "defaults" : "-"}</div>
-
-        <div><strong>Population</strong></div>
-        <div>${m.hasPopulation ? escapeHtml(m.popTechEra || "configured") : "-"}</div>
-
-        <div><strong>Climate</strong></div>
-        <div>${m.hasClimate ? (m.climAltitude ? `altitude ${m.climAltitude} m` : "sea level") : "-"}</div>
-
-        <div><strong>Calendar</strong></div>
-        <div>${m.hasCalendar ? "included" : "-"}</div>
-      </div>
-      <div class="hint" style="margin-top:8px">Import will replace your current saved world. A backup will be created automatically first.</div>
-    `;
+    replaceChildren(importPreviewEl, [
+      grid,
+      createElement("div", {
+        className: "hint",
+        attrs: { style: "margin-top:8px" },
+        text: "Import will replace your current saved world. A backup will be created automatically first.",
+      }),
+    ]);
+    return true;
   }
 
   function hideImportPreview() {
     pendingImport = null;
     if (importPreviewEl) importPreviewEl.style.display = "none";
     if (importActionsEl) importActionsEl.style.display = "none";
-    if (importPreviewEl) importPreviewEl.innerHTML = "";
+    if (importPreviewEl) replaceChildren(importPreviewEl);
   }
 
   async function parseImportText(text) {
@@ -444,6 +395,21 @@ export function initImportExportPage(root) {
       setStatus(statusImport, "No import JSON provided.", "bad");
       return null;
     }
+    try {
+      assertImportTextWithinLimit(trimmed, "Pasted JSON");
+    } catch (error) {
+      setStatus(
+        statusImport,
+        `${error?.message || error} Use file import for smaller chunks.`,
+        "bad",
+      );
+      return null;
+    }
+    await maybeWarnLargeImport(
+      statusImport,
+      textSizeBytes(trimmed),
+      "Validating large JSON import",
+    );
     try {
       return JSON.parse(trimmed);
     } catch (e) {
@@ -537,7 +503,7 @@ export function initImportExportPage(root) {
       return;
     }
 
-    showImportPreview(v.world);
+    if (!showImportPreview(v.world)) return;
     const shouldApply =
       typeof window?.confirm !== "function"
         ? true
@@ -577,7 +543,7 @@ export function initImportExportPage(root) {
       return;
     }
 
-    showImportPreview(v.world);
+    if (!showImportPreview(v.world)) return;
     const shouldApply =
       typeof window?.confirm !== "function"
         ? true
@@ -617,7 +583,7 @@ export function initImportExportPage(root) {
       return;
     }
 
-    showImportPreview(v.world);
+    if (!showImportPreview(v.world)) return;
     const shouldApply =
       typeof window?.confirm !== "function"
         ? true
@@ -646,7 +612,15 @@ export function initImportExportPage(root) {
     const f = fileInput.files?.[0];
     if (!f) return;
     try {
-      if (isXlsxFile(f)) {
+      const kind = isXlsxFile(f) ? "xlsx" : "json";
+      assertImportFileWithinLimit(f, kind);
+      await maybeWarnLargeImport(
+        statusImport,
+        f.size,
+        `Reading ${kind === "xlsx" ? "large XLSX workbook" : "large JSON import"}`,
+      );
+
+      if (kind === "xlsx") {
         const parsed = await importLegacyWorldsmithWorkbook(f);
         const v = validateEnvelope(parsed.world);
         if (!v.ok) {
@@ -665,7 +639,7 @@ export function initImportExportPage(root) {
           `XLSX parsed (star: ${parsed.summary.starSheet || "?"}, system: ${parsed.summary.systemSheet || "?"}). Imported ${parsed.summary.planetSheetsImported} planet tab(s) [${planetTabs}${planetTabsSuffix}] and ${parsed.summary.moonSheetsImported} moon tab(s) [${moonTabs}${moonTabsSuffix}]. Review and confirm.`,
           "ok",
         );
-        showImportPreview(v.world);
+        if (!showImportPreview(v.world)) return;
         return;
       }
 

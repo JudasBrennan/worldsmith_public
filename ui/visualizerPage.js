@@ -1,278 +1,83 @@
-﻿import {
-  GAS_GIANT_RADIUS_MAX_RJ,
-  GAS_GIANT_RADIUS_MIN_RJ,
-  loadWorld,
-  listPlanets,
-  listMoons,
-  listSystemGasGiants,
-  listSystemDebrisDisks,
-  getStarOverrides,
-} from "./store.js";
-import { calcSystem } from "../engine/system.js";
-import { calcStar, starColourHexFromTempK } from "../engine/star.js";
-import { calcPlanetExact } from "../engine/planet.js";
-import { calcMoonExact } from "../engine/moon.js";
-import { calcGasGiant } from "../engine/gasGiant.js";
-import {
-  FLARE_E0_ERG,
-  computeStellarActivityModel,
-  scheduleNextFlare,
-  scheduleNextCme,
-  maybeSpawnCME,
-  flareClassFromEnergy,
-  createSeededRng,
-} from "../engine/stellarActivity.js";
+﻿import { loadWorld } from "./store.js";
 import { calcLagrangePoints } from "../engine/lagrange.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
-import { captureCanvasGif, downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
-import { gasStylePalette } from "./gasGiantStyles.js";
-import { computeRockyVisualProfile } from "./rockyPlanetStyles.js";
+import { makeTimestampToken } from "./canvasExport.js";
 import { buildClusterSnapshot } from "./vizClusterRenderer.js";
-import { getClusterObjectVisual, normalizeClusterObjectKey } from "./clusterObjectVisuals.js";
+import { getClusterObjectVisual } from "./clusterObjectVisuals.js";
+import {
+  VISUALIZER_TIP_LABEL as TIP_LABEL,
+  VISUALIZER_TUTORIAL_STEPS as TUTORIAL_STEPS,
+} from "./visualizer/constants.js";
+import {
+  clusterClassLabel,
+  drawClusterCompanions,
+  drawClusterStarfield,
+  drawStarDot,
+} from "./visualizer/clusterOverlay.js";
+import {
+  computeAxisDirection as computeAxisDirectionForCamera,
+  computeSpinAngleRad as computeSpinAngleRadForState,
+  crossVec3,
+  normalizeAxialTiltDeg,
+  normalizeVec3,
+  orbitOffsetToScreen as orbitOffsetToScreenForCamera,
+  orbitPointToScreen as orbitPointToScreenForCamera,
+  parseHexColorNumber,
+  projectOrbitOffset as projectOrbitOffsetForCamera,
+  projectDirectionToScreen as projectDirectionToScreenForCamera,
+  solveKeplerEquation,
+} from "./visualizer/projectionMath.js";
+import {
+  applyInertia as applyCameraInertia,
+  applyResetEasing as applyCameraResetEasing,
+  applyZoomInterpolation as applyCameraZoomInterpolation,
+  computeGasGiantPlacement as computeSystemGasGiantPlacement,
+  computePlanetPlacement as computeSystemPlanetPlacement,
+  desiredFocusZoom as computeDesiredFocusZoom,
+  easeFocusZoom as applyCameraFocusZoom,
+  hitTestBody as hitTestBodyRegion,
+  hitTestLabelUi as hitTestLabelRegion,
+  killInertia as stopCameraInertia,
+  syncFocusPan as syncFocusedPan,
+} from "./visualizer/focusCamera.js";
+import { createNativeLabelLayer } from "./visualizer/nativeLabelLayer.js";
+import { createNativeSystemLayer } from "./visualizer/nativeSystemLayer.js";
+import {
+  getStarSurfaceSeed,
+  hexToRgba,
+  mixHex,
+  paintStarSurfaceTexture,
+} from "./visualizer/starSurface.js";
+import {
+  buildVisualizerSnapshot,
+  getFrameMetrics as getSnapshotFrameMetrics,
+  mapAuToPx as mapSnapshotAuToPx,
+} from "./visualizer/snapshotModel.js";
+import { createStarActivityRuntime, flareEnergyNorm } from "./visualizer/starActivityRuntime.js";
+import { createBodyMeshService, vizBodyCacheKey } from "./visualizer/bodyMeshService.js";
+import { bindVisualizerInputBindings } from "./visualizer/inputBindings.js";
 import { loadThreeCore } from "./threeBridge2d.js";
 import {
-  previewPbrMaterial,
-  createCanvasTexture,
-  generateCelestialTextureCanvasesLocal,
-  buildDescriptorSignature,
-  getCachedTextures,
-  cacheTextures,
-  makeFlatMapCanvas,
-  hasLayer,
-  shouldFlattenStyleMaps,
-  loadFromIDBToCache,
-} from "./celestialVisualPreview.js";
-import {
-  requestCelestialTextureBundle,
-  canvasFromMapPayload,
-  supportsCelestialTextureWorker,
-} from "./celestialTextureWorkerClient.js";
-import { composeCelestialDescriptor } from "./celestialComposer.js";
+  EARTH_PER_MSOL,
+  EARTH_RADIUS_KM,
+  JUPITER_RADIUS_KM,
+  MJUP_PER_MSOL,
+  MOON_LABEL_FADE,
+  MOON_LABEL_MIN_ZOOM,
+  PHYS_VIS_THRESHOLD_PX,
+  applyRepresentativeBodyRadiusConstraints,
+  computeDebrisParticleTarget,
+  dbg,
+  debrisKeepChance,
+  hashUnit,
+  physicalRadiusToPx,
+  representativeGasBaseRadiusPx,
+  representativeMoonR,
+  representativePlanetBaseRadiusPx,
+  sampleDebrisAu,
+} from "./visualizer/scaleMath.js";
 import { clamp } from "../engine/utils.js";
 import { createTutorial } from "./tutorial.js";
-
-function hashUnit(str) {
-  // deterministic 0..1 hash
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) / 4294967295;
-}
-
-function dbg(enabled, ...args) {
-  if (!enabled) return;
-  console.log("[viz]", ...args);
-}
-
-const SOL_RADIUS_KM = 696340;
-const JUPITER_RADIUS_KM = 71492;
-const EARTH_RADIUS_KM = 6371;
-const MOON_RADIUS_KM = 1737.4;
-const EARTH_PER_MSOL = 332946; // Earth masses per solar mass
-const MJUP_PER_MSOL = 1047.35; // Jupiter masses per solar mass
-
-// gasStylePalette and getStyleById imported from ./gasGiantStyles.js
-
-function gasGiantRadiusToPx(radiusRj, style) {
-  const radius = clamp(
-    Number.isFinite(radiusRj) ? radiusRj : 1,
-    GAS_GIANT_RADIUS_MIN_RJ,
-    GAS_GIANT_RADIUS_MAX_RJ,
-  );
-  const span = Math.max(0.001, GAS_GIANT_RADIUS_MAX_RJ - GAS_GIANT_RADIUS_MIN_RJ);
-  const t = (radius - GAS_GIANT_RADIUS_MIN_RJ) / span;
-  const baseSize = 8 + t * 12;
-  const palSize = gasStylePalette(style).size;
-  // Scale relative to the default palette size of 14
-  return baseSize * (palSize / 14);
-}
-
-function planetRadiusToPx(radiusEarth) {
-  const radius = Number.isFinite(radiusEarth) && radiusEarth > 0 ? radiusEarth : 1;
-  // Keep physical-radius proportionality while preserving readability at small sizes.
-  return clamp(radius * 5.5, 3.2, 16);
-}
-
-function representativePlanetBaseRadiusPx(node, bodyZoom = 1) {
-  const radiusEarth =
-    Number.isFinite(node?.radiusEarth) && node.radiusEarth > 0
-      ? node.radiusEarth
-      : Number.isFinite(node?.radiusKm) && node.radiusKm > 0
-        ? node.radiusKm / EARTH_RADIUS_KM
-        : 1;
-  return planetRadiusToPx(radiusEarth) * Math.max(0, Number(bodyZoom) || 1);
-}
-
-function representativeGasBaseRadiusPx(node, bodyZoom = 1) {
-  return gasGiantRadiusToPx(node?.radiusRj, node?.style) * Math.max(0, Number(bodyZoom) || 1);
-}
-
-function applyRepresentativeBodyRadiusConstraints(rawRadiusPx, metrics) {
-  const raw = Number(rawRadiusPx);
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  const scale = Number(metrics?.repBodyScale);
-  const minVisiblePx = Number(metrics?.repBodyMinPx);
-  const starCapPx = Number(metrics?.starR);
-  let r = raw * (Number.isFinite(scale) && scale > 0 ? scale : 1);
-  if (Number.isFinite(minVisiblePx) && minVisiblePx > 0) r = Math.max(minVisiblePx, r);
-  if (Number.isFinite(starCapPx) && starCapPx > 0) r = Math.min(starCapPx, r);
-  return r;
-}
-
-// Representative moon size: fraction of parent pixel radius, scaled by the
-// compressed physical size ratio so large moons (Earth's Moon) are visible
-// but tiny ones (Phobos) don't dwarf their parent.
-function representativeMoonR(moonKm, parentKm, parentPr) {
-  const mk = Number(moonKm);
-  const pk = Number(parentKm);
-  if (mk > 0 && pk > 0) {
-    const ratio = Math.pow(mk / pk, 0.4);
-    return Math.max(1.2, parentPr * clamp(ratio, 0.08, 0.3));
-  }
-  return Math.max(1.2, parentPr * 0.2);
-}
-
-function physicalRadiusToPx(bodyRadiusKm, starRadiusPx, starRadiusKm, minPx = 0.35, maxPx = 24) {
-  const bodyKm = Number(bodyRadiusKm);
-  const starKm = Number(starRadiusKm);
-  if (
-    !Number.isFinite(bodyKm) ||
-    bodyKm <= 0 ||
-    !Number.isFinite(starKm) ||
-    starKm <= 0 ||
-    !Number.isFinite(starRadiusPx) ||
-    starRadiusPx <= 0
-  ) {
-    return minPx;
-  }
-  return clamp((bodyKm / starKm) * starRadiusPx, minPx, maxPx);
-}
-
-// In 1:1 physical-scale mode bodies are often sub-pixel. Anything smaller than this
-// threshold is replaced by a position-indicator crosshair so the user can see WHERE
-// the body is without misrepresenting its size.
-const PHYS_VIS_THRESHOLD_PX = 1.5;
-// Moon labels fade in as the user zooms; full opacity at MIN_ZOOM + FADE range.
-const MOON_LABEL_MIN_ZOOM = 2.0;
-const MOON_LABEL_FADE = 0.8;
-const DEBRIS_PARTICLE_DENSITY = 0.007;
-const DEBRIS_PARTICLE_MIN = 180;
-const DEBRIS_PARTICLE_MAX = 900;
-
-function computeDebrisParticleTarget(innerPx, outerPx, innerAu, outerAu) {
-  const rIn = Math.max(0, Number(innerPx) || 0);
-  const rOut = Math.max(rIn + 0.001, Number(outerPx) || rIn + 0.001);
-  const areaPx2 = Math.PI * Math.max(0, rOut * rOut - rIn * rIn);
-  const widthAu = Math.max(0, (Number(outerAu) || 0) - (Number(innerAu) || 0));
-  const target = Math.round(areaPx2 * DEBRIS_PARTICLE_DENSITY + widthAu * 10 + 50);
-  return clamp(target, DEBRIS_PARTICLE_MIN, DEBRIS_PARTICLE_MAX);
-}
-
-function sampleDebrisAu(innerAu, outerAu, seedBase) {
-  const aIn = Math.max(0, Number(innerAu) || 0);
-  const aOut = Math.max(aIn + 0.001, Number(outerAu) || aIn + 0.001);
-  const width = aOut - aIn;
-  const tCore = (hashUnit(`${seedBase}:r1`) + hashUnit(`${seedBase}:r2`)) * 0.5;
-  const radialJitter = (hashUnit(`${seedBase}:rj`) - 0.5) * width * 0.08;
-  return clamp(aIn + width * tCore + radialJitter, aIn, aOut);
-}
-
-function debrisKeepChance(angleRad, seedBase) {
-  const phaseA = hashUnit(`${seedBase}:phaseA`) * Math.PI * 2;
-  const phaseB = hashUnit(`${seedBase}:phaseB`) * Math.PI * 2;
-  const clumpA = 0.58 + 0.26 * Math.sin(angleRad * 5.2 + phaseA);
-  const clumpB = 0.18 + 0.18 * Math.sin(angleRad * 11.4 + phaseB);
-  return clamp(clumpA + clumpB, 0.22, 0.98);
-}
-const TIP_LABEL = {
-  Labels: "Show or hide text labels for star, planets, moons, gas giants, and debris disks.",
-  "Label leader lines": "Show or hide connector lines from labels to the body they describe.",
-  Moons: "Show or hide moon markers around planets and gas giants.",
-  Orbits: "Show or hide orbital rings for planets, moons, gas giants, and the H2O frost line.",
-  "Logarithmic scale":
-    "Logarithmic AU spacing for orbital distances. When disabled, distances are shown on a linear scale.",
-  "Physical size scale":
-    "Representative keeps bodies easy to read. 1:1 scales body radii against the star radius while keeping the star's on-screen size fixed.",
-  "Habitable zone": "Show or hide the habitable-zone band (between HZ inner and HZ outer limits).",
-  "Debris disks": "Show or hide debris disk bands and asteroid field particles.",
-  "Eccentric orbits":
-    "When enabled, planet orbits are drawn as ellipses using each planet's saved eccentricity and longitude of periapsis. The planet also moves faster near periapsis and slower near apoapsis (Kepler's second law via the eccentric anomaly).\n\nWhen disabled (default), orbits are drawn as perfect circles — cleaner for typical near-circular worlds.",
-  "Pe / Ap markers":
-    "Show periapsis (closest approach) and apoapsis (farthest point) markers on eccentric orbits.",
-  "Hill spheres":
-    "Show the Hill sphere \u2014 the gravitational sphere of influence \u2014 around each planet and gas giant. Defines the maximum region where stable satellite orbits can exist.",
-  "Lagrange points":
-    "Show L1\u2013L5 equilibrium positions for each star\u2013body pair. L4 and L5 (leading and trailing Trojans, \u00b160\u00b0) are shown for all bodies; stable points appear in cyan, unstable ones (body exceeds the Gascheau mass limit \u03bc \u2248 0.0385) are dimmed in amber. Click a body to reveal all five points including L1/L2 (near the body) and L3 (opposite side of star).",
-  "Frost line":
-    "Show the H\u2082O frost line \u2014 the distance beyond which water ice can condense.",
-  Distances: "Show orbital distance (AU) alongside body name labels.",
-  "AU grid": "Draw faint concentric reference rings at round AU intervals for scale.",
-  Rotation:
-    "Show or hide spin markers on planets and moons (animated from each body's rotation period and axial tilt).",
-  "Axial tilt helpers":
-    "Show or hide projected spin-axis helper overlays on planets and moons (based on axial tilt).",
-  "Click zoom bodies":
-    "Click interaction for planets and gas giants. Single-click centres the body; double-click zooms to fit.",
-  "Click zoom star":
-    "Click interaction for the host star. Single-click centres; double-click zooms in.",
-  Debug: "Enable console debug logging for visualiser internals.",
-  Speed: "Animation speed in simulated Earth-days per second.",
-  Centre: "Resets camera orientation and zoom to the default centred view.",
-  Refresh: "Redraws the visualiser using the latest saved world data.",
-  Play: "Toggles orbital animation on or off.",
-  "Reset view": "Resets zoom and pan back to the default overview.",
-  Controls: "Toggle the controls panel for display options, animation, and scale settings.",
-  Fullscreen: "Enter browser fullscreen mode for an immersive view.",
-  "Download image": "Save a static PNG snapshot of the current canvas view.",
-  "Download GIF":
-    "Save a short animated GIF from the current canvas. This is available only while animation is playing.",
-  /* Cluster-mode labels */
-  "Cluster Labels": "Show or hide name labels on plotted systems.",
-  Links: "Draw guide lines from each system to its nearest point on the X/Z plane.",
-  Axes: "Show X/Y/Z reference axes.",
-  "Range/Bearing Grid": "Show or hide distance rings and degree bearings on the X/Z plane.",
-  "Bearing Units": "Switch bearing labels between degrees (360) and mils (6400).",
-  Starfield: "Show a background field of distant stars.",
-  "Cluster Speed": "Auto-spin speed multiplier.",
-};
-
-const TUTORIAL_STEPS = [
-  {
-    title: "Getting Started",
-    body:
-      "The Visualiser shows your system in interactive 3D. Left-drag to pan, " +
-      "right-drag to rotate, scroll to zoom. Click a body to focus on it; " +
-      "double-click to zoom in.",
-  },
-  {
-    title: "Navigation",
-    body:
-      "Press Escape to release focus on a body. Press ? to see the full " +
-      "control reference. The view transitions smoothly between local cluster " +
-      "and system scales as you zoom.",
-  },
-  {
-    title: "Display Options",
-    body:
-      "Toggle orbits, habitable zone, frost line, debris disks, Lagrange " +
-      "points, and labels using the Controls panel. Switch between logarithmic " +
-      "and linear distance scaling.",
-  },
-  {
-    title: "Animation",
-    body:
-      "Play or pause orbital animation and adjust the speed multiplier. " +
-      "Bodies move along their actual orbits with correct relative periods.",
-  },
-  {
-    title: "Export",
-    body:
-      "Save a PNG snapshot of the current view, or record a GIF animation. " +
-      "Use the fullscreen button for a larger viewport.",
-  },
-];
 
 export function initVisualiserPage(root, options = {}) {
   root.innerHTML = `
@@ -500,6 +305,8 @@ export function initVisualiserPage(root, options = {}) {
   const vizLayout = root.querySelector(".viz-layout");
   const rngSpeed = root.querySelector("#rng-speed");
   const txtSpeed = root.querySelector("#txt-speed");
+  const rngBodyScale = root.querySelector("#rng-body-scale");
+  const txtBodyScale = root.querySelector("#txt-body-scale");
 
   /* Cluster-mode DOM elements */
   const vizTitle = root.querySelector("#viz-title");
@@ -526,6 +333,7 @@ export function initVisualiserPage(root, options = {}) {
   const helpClusterSection = root.querySelector("#viz-help-cluster");
   const btnHelp = root.querySelector("#btn-help-overlay");
   const btnHelpClose = root.querySelector("#viz-help-close");
+  const bodyScaleRow = root.querySelector("#body-scale-row");
 
   const DEFAULT_ZOOM = 1.18;
   const ZOOM_MIN = 0.1;
@@ -541,13 +349,6 @@ export function initVisualiserPage(root, options = {}) {
   const RESET_RATE = 6.0;
   const STAR_BURST_SIZE_SCALE = 0.3;
   const STAR_CME_RENDER_SCALE = 0.099;
-  const MAX_FLARES_PER_TICK = 48;
-  const MAX_CMES_PER_TICK = 48;
-  const MAX_SURFACE_FLARES_PER_TICK = 96;
-  const MAX_STAR_BURSTS = 48;
-  const STAR_BURST_INITIAL_AGE_SEC = 0.08;
-  const SURFACE_FLARE_EMIN_ERG = 1e30;
-  const SURFACE_FLARE_EMAX_ERG = FLARE_E0_ERG * 0.999;
   const DEFAULT_YAW = -0.6;
   const DEFAULT_PITCH = 1.24;
   const PITCH_MIN = 0.2;
@@ -666,564 +467,50 @@ export function initVisualiserPage(root, options = {}) {
     dbg(true, ...args);
   }
 
+  const starActivityRuntime = createStarActivityRuntime({
+    state,
+    debugLog: dbg,
+    debugLogThrottled: dbgThrottled,
+    isDebugEnabled: () => chkDebug?.checked === true,
+  });
+
   let rafId = null;
   let cameraRafId = null;
   let disposed = false;
   const disposers = [];
 
   /* ── 3D body mesh system ───────────────────────────────────── */
-  const bodyMeshCache = new Map();
-  let bodyMeshWarmGen = 0;
-  /** Minimum pixel radius before showing the 3D mesh (below this, use dot). */
-  const BODY_MESH_MIN_PX = 4;
+  const bodyMeshService = createBodyMeshService({
+    getNativeThree: () => nativeThree,
+    getCameraState: () => ({ pitch: state.pitch, yaw: state.yaw }),
+    hashUnit,
+    isDisposed: () => disposed,
+  });
 
-  /**
-   * Atmosphere Fresnel material for orthographic cameras.
-   * Uses the camera's forward direction (from viewMatrix) instead of
-   * per-fragment cameraPosition, which gives wrong results with parallel rays.
-   */
-  function createOrthoAtmosphereMaterial(THREE) {
-    if (typeof THREE.ShaderMaterial !== "function") {
-      return new THREE.MeshBasicMaterial({
-        transparent: true,
-        opacity: 0.12,
-        color: 0x9cc2ff,
-        side: THREE.FrontSide,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-    }
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: new THREE.Color(0x9cc2ff) },
-        uOpacity: { value: 0.12 },
-        uPower: { value: 2.15 },
-        uFalloff: { value: 0.66 },
-      },
-      vertexShader: `
-        varying vec3 vNormalWorld;
-        varying vec3 vViewDir;
-        void main() {
-          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vNormalWorld = normalize(mat3(modelMatrix) * normal);
-          /* Orthographic: constant view direction from viewMatrix Z column */
-          vViewDir = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
-          gl_Position = projectionMatrix * viewMatrix * worldPos;
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 uColor;
-        uniform float uOpacity;
-        uniform float uPower;
-        uniform float uFalloff;
-        varying vec3 vNormalWorld;
-        varying vec3 vViewDir;
-        void main() {
-          float ndv = clamp(dot(normalize(vNormalWorld), normalize(vViewDir)), 0.0, 1.0);
-          float rim = pow(max(0.0, 1.0 - ndv), uPower);
-          float alpha = clamp(rim * uOpacity, 0.0, 1.0);
-          if (alpha < 0.001) discard;
-          vec3 color = uColor * mix(uFalloff, 1.0, rim);
-          gl_FragColor = vec4(color, alpha);
-        }
-      `,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.FrontSide,
-    });
+  function warmBodyMeshes(snapshot) {
+    return bodyMeshService.warmBodyMeshes(snapshot);
   }
 
-  /* Shared geometries — created lazily, disposed on teardown. */
-  let sharedGeo = null;
-  function ensureSharedGeo() {
-    if (sharedGeo || !nativeThree) return;
-    const THREE = nativeThree.THREE;
-    sharedGeo = {
-      bodyLow: new THREE.SphereGeometry(1, 32, 24),
-      bodyHigh: new THREE.SphereGeometry(1, 112, 84),
-      cloudLow: new THREE.SphereGeometry(1.03, 24, 16),
-      cloudHigh: new THREE.SphereGeometry(1.03, 90, 64),
-      hazeLow: new THREE.SphereGeometry(1.08, 24, 16),
-      hazeHigh: new THREE.SphereGeometry(1.08, 90, 64),
-    };
-  }
-  function disposeSharedGeo() {
-    if (!sharedGeo) return;
-    for (const g of Object.values(sharedGeo)) {
-      try {
-        g?.dispose?.();
-      } catch {}
-    }
-    sharedGeo = null;
-  }
-
-  function vizBodyCacheKey(type, body) {
-    /* Each body needs its own persistent 3D mesh group (unlike the old sprite
-       cache which shared bitmaps by appearance). Include body.id so every
-       instance gets a unique entry even when two bodies share a visual style. */
-    const id = body?.id || "";
-    if (type === "rocky") return `rocky:${id}`;
-    if (type === "gas") return `gas:${id}`;
-    if (type === "moon") return `moon:${id}`;
-    return id;
-  }
-
-  /**
-   * Create a persistent 3D mesh entry for a celestial body.
-   * Returns the entry immediately with a fallback colour; textures load async.
-   */
-  function createBodyMeshEntry(model, key) {
-    if (!nativeThree || !sharedGeo) return null;
-    const THREE = nativeThree.THREE;
-    const descriptor = composeCelestialDescriptor(model, { lod: "low" });
-    const group = new THREE.Group();
-    group.visible = false;
-
-    /* Body sphere */
-    const bodyMat = previewPbrMaterial(THREE);
-    /* Fallback colour from descriptor's first gradient layer */
-    const baseLayers = descriptor?.layers || [];
-    const baseGrad = baseLayers.find((l) => l?.id === "base-gradient");
-    if (baseGrad?.params?.c1) bodyMat.color.set(baseGrad.params.c1);
-    const body = new THREE.Mesh(sharedGeo.bodyLow, bodyMat);
-    body.renderOrder = 0;
-    group.add(body);
-
-    /* Cloud shell */
-    const flattenMaps = shouldFlattenStyleMaps(descriptor);
-    const showCloudShell =
-      !flattenMaps && descriptor.bodyType !== "gasGiant" && !!descriptor.clouds?.enabled;
-    const cloudMat = new THREE.MeshStandardMaterial({
-      map: null,
-      alphaMap: null,
-      transparent: true,
-      opacity: showCloudShell ? clamp(Number(descriptor.clouds?.opacity) || 0.2, 0.04, 0.9) : 0,
-      depthWrite: false,
-    });
-    const clouds = new THREE.Mesh(sharedGeo.cloudLow, cloudMat);
-    clouds.renderOrder = 2;
-    clouds.visible = showCloudShell;
-    clouds.scale.setScalar(showCloudShell ? Number(descriptor.clouds?.scale) || 1.03 : 1.03);
-    group.add(clouds);
-
-    /* Atmosphere haze */
-    const showHaze = !!descriptor.atmosphere?.enabled;
-    const hazeMat = createOrthoAtmosphereMaterial(THREE);
-    const haze = new THREE.Mesh(sharedGeo.hazeLow, hazeMat);
-    haze.renderOrder = 3;
-    haze.visible = showHaze;
-    haze.scale.setScalar(showHaze ? Number(descriptor.atmosphere?.scale) || 1.06 : 1.06);
-    /* Set haze uniforms from descriptor */
-    const hazeColour = descriptor.atmosphere?.colour || "#90b4ec";
-    const hazeOpacity = showHaze
-      ? clamp(Number(descriptor.atmosphere?.opacity) || 0.12, 0.03, 0.4)
-      : 0;
-    const hazeScale = clamp(Number(descriptor.atmosphere?.scale) || 1.06, 1, 1.6);
-    if (hazeMat.uniforms?.uColor) {
-      hazeMat.uniforms.uColor.value.set(hazeColour);
-      hazeMat.uniforms.uOpacity.value = hazeOpacity;
-      const powerBase =
-        descriptor.bodyType === "gasGiant" ? 1.85 : descriptor.bodyType === "moon" ? 2.45 : 2.15;
-      hazeMat.uniforms.uPower.value = clamp(powerBase - (hazeScale - 1) * 1.05, 1.35, 2.8);
-      hazeMat.uniforms.uFalloff.value =
-        descriptor.bodyType === "gasGiant" ? 0.72 : descriptor.bodyType === "moon" ? 0.62 : 0.66;
-    } else {
-      hazeMat.color?.set?.(hazeColour);
-      hazeMat.opacity = hazeOpacity;
-    }
-    group.add(haze);
-
-    /* Ring (created if descriptor says so) */
-    let ring = null;
-    let ringMat = null;
-    if (descriptor.ring?.enabled) {
-      const inner = clamp(Number(descriptor.ring.inner) || 1.22, 1.1, 2.5);
-      const outer = clamp(Number(descriptor.ring.outer) || 1.95, inner + 0.05, 3.2);
-      const ringGeom = new THREE.RingGeometry(inner, outer, 128);
-      /* Procedural ring alpha: 1×64 gradient canvas */
-      const alphaCanvas = document.createElement("canvas");
-      alphaCanvas.width = 1;
-      alphaCanvas.height = 64;
-      const rCtx = alphaCanvas.getContext("2d");
-      const rImg = rCtx.createImageData(1, 64);
-      for (let i = 0; i < 64; i++) {
-        const t = i / 63;
-        const fadeIn = Math.min(1, t / 0.18);
-        const fadeOut = Math.min(1, (1 - t) / 0.18);
-        const v = Math.round(Math.min(fadeIn, fadeOut) * 255);
-        rImg.data[i * 4] = v;
-        rImg.data[i * 4 + 1] = v;
-        rImg.data[i * 4 + 2] = v;
-        rImg.data[i * 4 + 3] = 255;
-      }
-      rCtx.putImageData(rImg, 0, 0);
-      const ringAlpha = new THREE.CanvasTexture(alphaCanvas);
-      ringAlpha.minFilter = THREE.LinearFilter;
-      ringAlpha.magFilter = THREE.LinearFilter;
-      ringAlpha.generateMipmaps = false;
-      ringAlpha.premultiplyAlpha = false;
-
-      ringMat = new THREE.MeshBasicMaterial({
-        color: descriptor.ring.colour || "#d8c7a8",
-        transparent: true,
-        opacity: clamp(Number(descriptor.ring.opacity) || 0.35, 0.05, 0.8),
-        depthWrite: false,
-        depthTest: true,
-        side: THREE.DoubleSide,
-        alphaMap: ringAlpha,
-        toneMapped: false,
-      });
-      ring = new THREE.Mesh(ringGeom, ringMat);
-      ring.renderOrder = 1;
-      ring.rotation.x = THREE.MathUtils.degToRad(Number(descriptor.ring.tiltDeg) || 100);
-      ring.rotation.z = THREE.MathUtils.degToRad(Number(descriptor.ring.yawDeg) || 20);
-      group.add(ring);
-    }
-
-    nativeThree.bodyGroup.add(group);
-    const entry = {
-      group,
-      body,
-      clouds,
-      haze,
-      ring,
-      ringMat,
-      bodyMat,
-      cloudMat,
-      hazeMat,
-      descriptor,
-      model,
-      texturesReady: false,
-      lod: "low",
-    };
-    bodyMeshCache.set(key, entry);
-    generateBodyTextures(entry);
-    return entry;
-  }
-
-  /** Swap LOD geometry on an existing mesh entry. */
-  function swapBodyLod(entry, lod) {
-    if (!sharedGeo || entry.lod === lod) return;
-    entry.lod = lod;
-    entry.body.geometry = lod === "high" ? sharedGeo.bodyHigh : sharedGeo.bodyLow;
-    entry.clouds.geometry = lod === "high" ? sharedGeo.cloudHigh : sharedGeo.cloudLow;
-    entry.haze.geometry = lod === "high" ? sharedGeo.hazeHigh : sharedGeo.hazeLow;
-  }
-
-  /** Apply a set of texture maps to a mesh entry's materials. */
-  function applyMapsToEntry(THREE, entry, maps, descriptor) {
-    if (!nativeThree || disposed) return;
-    const textureSize = maps.surface?.width || descriptor.textureSize || 128;
-    const normalCanvas =
-      maps.normal || makeFlatMapCanvas(textureSize, textureSize, [128, 128, 255, 255]);
-    const roughnessCanvas =
-      maps.roughness || makeFlatMapCanvas(textureSize, textureSize, [180, 180, 180, 255]);
-    const emissiveCanvas =
-      maps.emissive || makeFlatMapCanvas(textureSize, textureSize, [0, 0, 0, 255]);
-    const maxAniso = nativeThree.renderer?.capabilities?.getMaxAnisotropy?.() || 1;
-    const aniso = clamp(Math.round(maxAniso), 1, 8);
-
-    /* Dispose previous textures before creating new ones */
-    if (entry._textures) {
-      for (const t of entry._textures) {
-        try {
-          t?.dispose?.();
-        } catch {}
-      }
-    }
-
-    const surfTex = createCanvasTexture(THREE, maps.surface, { srgb: true });
-    const cloudTex = createCanvasTexture(THREE, maps.cloud, { srgb: true });
-    const normTex = createCanvasTexture(THREE, normalCanvas);
-    const roughTex = createCanvasTexture(THREE, roughnessCanvas);
-    const emisTex = createCanvasTexture(THREE, emissiveCanvas, { srgb: true });
-    for (const t of [surfTex, cloudTex, normTex, roughTex, emisTex]) {
-      t.anisotropy = aniso;
-      t.premultiplyAlpha = false;
-    }
-
-    entry._textures = [surfTex, cloudTex, normTex, roughTex, emisTex];
-
-    const mat = entry.bodyMat;
-    mat.color.set(0xffffff);
-    mat.map = surfTex;
-    mat.normalMap = normTex;
-    mat.roughnessMap = roughTex;
-    mat.emissiveMap = emisTex;
-    mat.emissive?.set?.("#ffffff");
-    mat.needsUpdate = true;
-
-    const hasOcean = hasLayer(
-      descriptor,
-      "ocean-fill",
-      (layer) => !layer?.params?.frozen && Number(layer?.params?.coverage || 0) > 0.12,
-    );
-    const warmEmissive =
-      hasLayer(descriptor, "molten-fissures") ||
-      hasLayer(descriptor, "volcanic-system") ||
-      descriptor.profileId === "lava-world" ||
-      descriptor.profileId === "molten-companion" ||
-      descriptor.profileId === "io";
-    const coolEmissive =
-      hasLayer(descriptor, "fractures") ||
-      hasLayer(descriptor, "plume-haze") ||
-      descriptor.profileId === "europa" ||
-      descriptor.profileId === "enceladus" ||
-      descriptor.profileId === "triton";
-
-    if (descriptor.bodyType === "gasGiant") {
-      mat.roughness = 0.82;
-      mat.metalness = 0.03;
-      if (mat.normalScale?.set) mat.normalScale.set(0.4, 0.4);
-      if ("clearcoat" in mat) mat.clearcoat = 0.02;
-      if ("clearcoatRoughness" in mat) mat.clearcoatRoughness = 0.36;
-    } else if (descriptor.bodyType === "moon") {
-      mat.roughness = 0.82;
-      mat.metalness = 0.01;
-      if (mat.normalScale?.set) mat.normalScale.set(0.9, 0.9);
-      if ("clearcoat" in mat) mat.clearcoat = 0.03;
-      if ("clearcoatRoughness" in mat) mat.clearcoatRoughness = 0.58;
-    } else {
-      mat.roughness = hasOcean ? 0.88 : 0.82;
-      mat.metalness = 0.02;
-      if (mat.normalScale?.set) {
-        const ts = hasOcean ? 0.62 : 0.78;
-        mat.normalScale.set(ts, ts);
-      }
-      if ("clearcoat" in mat) mat.clearcoat = 0.02;
-      if ("clearcoatRoughness" in mat) mat.clearcoatRoughness = hasOcean ? 0.3 : 0.48;
-    }
-    mat.emissiveIntensity = warmEmissive ? 0.72 : coolEmissive ? 0.48 : 0.08;
-
-    entry.cloudMat.map = cloudTex;
-    entry.cloudMat.alphaMap = cloudTex;
-    entry.cloudMat.needsUpdate = true;
-
-    entry.texturesReady = true;
-  }
-
-  /** Generate textures for a body with progressive LOD and worker offloading. */
-  async function generateBodyTextures(entry) {
-    if (!nativeThree || disposed) return;
-    const THREE = nativeThree.THREE;
-    const descriptor = entry.descriptor;
-    const textureSize = descriptor.textureSize || 128;
-    const signature = buildDescriptorSignature(descriptor, textureSize);
-
-    /* 1. Memory cache hit — apply immediately */
-    let maps = getCachedTextures(signature);
-    if (maps) {
-      applyMapsToEntry(THREE, entry, maps, descriptor);
-      return;
-    }
-
-    /* 2. IDB cache — restore to memory and apply */
-    if (await loadFromIDBToCache(signature)) {
-      if (!nativeThree || disposed) return;
-      maps = getCachedTextures(signature);
-      if (maps) {
-        applyMapsToEntry(THREE, entry, maps, descriptor);
-        return;
-      }
-    }
-
-    /* 3. Progressive: tiny placeholder (64px, ~10ms) */
-    const tinyDesc = composeCelestialDescriptor(entry.model, { lod: "tiny" });
-    const tinySig = buildDescriptorSignature(tinyDesc, tinyDesc.textureSize || 64);
-    let tinyMaps = getCachedTextures(tinySig);
-    if (!tinyMaps) {
-      tinyMaps = generateCelestialTextureCanvasesLocal(tinyDesc, tinyDesc.textureSize || 64);
-      cacheTextures(tinySig, tinyMaps);
-    }
-    if (!nativeThree || disposed) return;
-    applyMapsToEntry(THREE, entry, tinyMaps, descriptor);
-
-    /* 4. Full quality via worker — upgrade when ready */
-    if (supportsCelestialTextureWorker()) {
-      try {
-        const result = await requestCelestialTextureBundle({
-          signature,
-          descriptor,
-          textureSize,
-        });
-        if (!nativeThree || disposed) return;
-        const wm = {
-          surface: canvasFromMapPayload(result?.maps?.surface),
-          cloud: canvasFromMapPayload(result?.maps?.cloud),
-          normal: canvasFromMapPayload(result?.maps?.normal),
-          roughness: canvasFromMapPayload(result?.maps?.roughness),
-          emissive: canvasFromMapPayload(result?.maps?.emissive),
-        };
-        if (wm.surface && wm.cloud && wm.normal) {
-          cacheTextures(signature, wm);
-          applyMapsToEntry(THREE, entry, wm, descriptor);
-          return;
-        }
-      } catch {
-        /* fall through to local */
-      }
-    }
-
-    /* 5. Local fallback */
-    if (!nativeThree || disposed) return;
-    maps = generateCelestialTextureCanvasesLocal(descriptor, textureSize);
-    cacheTextures(signature, maps);
-    applyMapsToEntry(THREE, entry, maps, descriptor);
-  }
-
-  /** Warm-up: ensure mesh entries exist for all bodies in the snapshot. */
-  async function warmBodyMeshes(snapshot) {
-    if (!nativeThree || disposed) return;
-    ensureSharedGeo();
-    const gen = ++bodyMeshWarmGen;
-    const needed = [];
-    for (const p of snapshot.planetNodes || []) {
-      if (!p.visualProfile) continue;
-      const key = vizBodyCacheKey("rocky", p);
-      if (!bodyMeshCache.has(key)) {
-        needed.push({
-          key,
-          model: {
-            bodyType: "rocky",
-            visualProfile: p.visualProfile,
-            axialTiltDeg: normalizeAxialTiltDeg(p.axialTiltDeg),
-          },
-        });
-      }
-    }
-    for (const g of snapshot.gasGiants || []) {
-      const key = vizBodyCacheKey("gas", g);
-      if (!bodyMeshCache.has(key)) {
-        needed.push({
-          key,
-          model: {
-            bodyType: "gasGiant",
-            styleId: g.style || "jupiter",
-            showRings: !!g.rings,
-            gasCalc: g.gasCalc,
-            axialTiltDeg: normalizeAxialTiltDeg(g.axialTiltDeg ?? 0),
-          },
-        });
-      }
-    }
-    for (const parent of [...(snapshot.planetNodes || []), ...(snapshot.gasGiants || [])]) {
-      for (const m of parent.moons || []) {
-        if (!m.moonCalc) continue;
-        const key = vizBodyCacheKey("moon", m);
-        if (!bodyMeshCache.has(key)) {
-          needed.push({
-            key,
-            model: {
-              bodyType: "moon",
-              moonCalc: m.moonCalc,
-              axialTiltDeg: normalizeAxialTiltDeg(m.axialTiltDeg),
-            },
-          });
-        }
-      }
-    }
-    for (const item of needed) {
-      if (gen !== bodyMeshWarmGen || disposed) return;
-      createBodyMeshEntry(item.model, item.key);
-    }
-  }
-
-  /** Dispose all body mesh cache entries (textures + materials). */
   function disposeBodyMeshCache() {
-    for (const [, entry] of bodyMeshCache) {
-      if (entry._textures) {
-        for (const t of entry._textures) {
-          try {
-            t?.dispose?.();
-          } catch {}
-        }
-      }
-      for (const mat of [entry.bodyMat, entry.cloudMat, entry.hazeMat, entry.ringMat]) {
-        try {
-          mat?.dispose?.();
-        } catch {}
-      }
-      if (entry.ring) {
-        try {
-          entry.ring.geometry?.dispose?.();
-        } catch {}
-      }
-      try {
-        entry.group?.parent?.remove?.(entry.group);
-      } catch {}
-    }
-    bodyMeshCache.clear();
+    return bodyMeshService.disposeBodyMeshCache();
   }
 
-  /**
-   * Position and orient a body mesh entry for the current frame.
-   * If the entry doesn't exist yet, creates it. Returns the entry (or null).
-   */
-  /* Reusable Three.js objects for positionBodyMesh (avoids per-frame allocation) */
-  const _yUp = { v: null };
-  const _axisVec = { v: null };
-  const _axisQuat = { q: null };
-  const _yawQ = { q: null };
-  const _pitchQ = { q: null };
-  function ensurePosHelpers(THREE) {
-    if (!_yUp.v) {
-      _yUp.v = new THREE.Vector3(0, 1, 0);
-      _axisVec.v = new THREE.Vector3();
-      _axisQuat.q = new THREE.Quaternion();
-      _yawQ.q = new THREE.Quaternion();
-      _pitchQ.q = new THREE.Quaternion();
-    }
+  function disposeSharedGeo() {
+    return bodyMeshService.disposeSharedGeo();
   }
 
   function positionBodyMesh(key, model, pos, bodyZ, pr, bodyId, axialTiltDeg, spinAngle, touched) {
-    if (!nativeThree || !sharedGeo) return null;
-    if (pr < BODY_MESH_MIN_PX) return null; // too small for 3D mesh
-    let entry = bodyMeshCache.get(key);
-    if (!entry) entry = createBodyMeshEntry(model, key);
-    if (!entry) return null;
-
-    const THREE = nativeThree.THREE;
-    ensurePosHelpers(THREE);
-
-    /* LOD swap */
-    const targetLod = pr >= 12 ? "high" : "low";
-    if (entry.lod !== targetLod) swapBodyLod(entry, targetLod);
-
-    /* Scale: pr = body pixel radius; rings extend beyond naturally */
-    entry.group.scale.setScalar(pr);
-
-    /* Position */
-    entry.group.position.set(pos.x, pos.y, bodyZ);
-
-    /* Orientation: true 3D rotation (camera yaw/pitch + axis alignment) */
-    const tilt = normalizeAxialTiltDeg(axialTiltDeg);
-    const retrograde = tilt > 90;
-    const obliquityRad = ((retrograde ? 180 - tilt : tilt) * Math.PI) / 180;
-    const azimuth = hashUnit(`${bodyId}:axis`) * Math.PI * 2;
-    const h = Math.sin(obliquityRad);
-    _axisVec.v
-      .set(
-        h * Math.cos(azimuth),
-        Math.cos(obliquityRad) * (retrograde ? -1 : 1),
-        h * Math.sin(azimuth),
-      )
-      .normalize();
-    _axisQuat.q.setFromUnitVectors(_yUp.v, _axisVec.v);
-    _yawQ.q.setFromAxisAngle(_yUp.v, state.yaw);
-    _pitchQ.q.setFromAxisAngle(_axisVec.v.set(1, 0, 0), state.pitch);
-    /* camQ = pitch * yaw  (reuses _pitchQ in place) */
-    _pitchQ.q.multiply(_yawQ.q);
-    entry.group.quaternion.multiplyQuaternions(_pitchQ.q, _axisQuat.q);
-
-    /* Spin */
-    entry.body.rotation.set(0, spinAngle, 0);
-    if (entry.clouds.visible) entry.clouds.rotation.set(0, spinAngle * 1.25, 0);
-    if (entry.haze.visible) entry.haze.rotation.set(0, spinAngle * 0.35, 0);
-
-    entry.group.visible = true;
-    touched.add(key);
-    return entry;
+    return bodyMeshService.positionBodyMesh({
+      axialTiltDeg,
+      bodyId,
+      bodyZ,
+      key,
+      model,
+      pos,
+      pr,
+      spinAngle,
+      touched,
+    });
   }
 
   function addDisposableListener(target, type, handler, options) {
@@ -1234,6 +521,10 @@ export function initVisualiserPage(root, options = {}) {
         target.removeEventListener(type, handler, options);
       } catch {}
     });
+  }
+
+  function addCleanup(cleanup) {
+    if (typeof cleanup === "function") disposers.push(cleanup);
   }
 
   function dispose() {
@@ -1286,6 +577,7 @@ export function initVisualiserPage(root, options = {}) {
     if (txtClusterSpeed) txtClusterSpeed.textContent = `${state.clusterSpinSpeed}x`;
   }
   updateClusterSpeedUI();
+  let inputBindings = null;
 
   /* ── Mode switching ────────────────────────────────────────── */
 
@@ -1315,6 +607,7 @@ export function initVisualiserPage(root, options = {}) {
     }
 
     syncExportButtons();
+    inputBindings?.syncModeUi?.();
   }
 
   /* Apply initial mode (if opened via #/cluster-viz) */
@@ -1365,57 +658,6 @@ export function initVisualiserPage(root, options = {}) {
     nativeTransitionEl.setAttribute("aria-hidden", "false");
     if (nativeTransitionLabelEl) nativeTransitionLabelEl.textContent = String(label || "");
     if (nativeTransitionFillEl) nativeTransitionFillEl.style.width = `${(t * 100).toFixed(1)}%`;
-  }
-
-  function formatAuLabel(au) {
-    const num = Number(au);
-    if (!Number.isFinite(num)) return "n/a";
-    return num.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  }
-
-  function formatAuRangeLabel(innerAu, outerAu) {
-    const inner = Number(innerAu);
-    const outer = Number(outerAu);
-    if (!Number.isFinite(inner) || !Number.isFinite(outer)) return "n/a";
-    return `${formatAuLabel(inner)}-${formatAuLabel(outer)}`;
-  }
-
-  function buildOffscaleZoneInfo(snapshot, coreMaxAu) {
-    const info = {
-      hideHz: false,
-      hideFrost: false,
-      lines: [],
-    };
-    if (isLogScale()) return info;
-    if (!(Number.isFinite(coreMaxAu) && coreMaxAu > 0)) return info;
-    const thresholdAu = Math.max(OFFSCALE_ZONE_MIN_AU, coreMaxAu * OFFSCALE_ZONE_RATIO);
-
-    const hzInnerRaw = Number(snapshot?.sys?.habitableZoneAu?.inner);
-    const hzOuterRaw = Number(snapshot?.sys?.habitableZoneAu?.outer);
-    if (
-      chkHz?.checked &&
-      Number.isFinite(hzInnerRaw) &&
-      Number.isFinite(hzOuterRaw) &&
-      hzOuterRaw > 0
-    ) {
-      const hzi = Math.max(0.000001, Math.min(hzInnerRaw, hzOuterRaw));
-      const hzo = Math.max(hzi, Math.max(hzInnerRaw, hzOuterRaw));
-      if (hzi > thresholdAu || hzo > thresholdAu * OFFSCALE_ZONE_RANGE_RATIO) {
-        info.hideHz = true;
-        info.lines.push(`Habitable zone: ${formatAuRangeLabel(hzi, hzo)} AU`);
-      }
-    }
-
-    const frostAu = Number(snapshot?.sys?.frostLineAu);
-    if (chkFrost?.checked && Number.isFinite(frostAu) && frostAu > thresholdAu) {
-      info.hideFrost = true;
-      info.lines.push(`H2O frost line: ${formatAuLabel(frostAu)} AU`);
-    }
-
-    return info;
   }
 
   function hideOffscaleZoneNotice() {
@@ -1486,11 +728,7 @@ export function initVisualiserPage(root, options = {}) {
       nativeThree.renderer?.dispose?.();
     } catch {}
     nativeThree = null;
-    _yUp.v = null;
-    _axisVec.v = null;
-    _axisQuat.q = null;
-    _yawQ.q = null;
-    _pitchQ.q = null;
+    bodyMeshService.resetPositionHelpers();
     nativeTextures.clear();
     nativeTextTextures.clear();
     nativeProceduralTextures.clear();
@@ -1540,14 +778,6 @@ export function initVisualiserPage(root, options = {}) {
     tex.needsUpdate = true;
     nativeProceduralTextures.set(key, tex);
     return tex;
-  }
-
-  function parseHexColorNumber(hex, fallback = 0xfff4dc) {
-    const raw = String(hex || "")
-      .trim()
-      .replace("#", "");
-    if (!/^[0-9a-fA-F]{6}$/.test(raw)) return fallback;
-    return Number.parseInt(raw, 16);
   }
 
   function threeCircle(radius, color, opacity = 1, segments = 128) {
@@ -1714,7 +944,6 @@ export function initVisualiserPage(root, options = {}) {
     const center = toThreeXY(metrics, cx, cy);
     const starR = metrics.starR;
     const THREE = nativeThree.THREE;
-    const pendingLabels = [];
     const screenToThree = (sx, sy, z = 0) => {
       const tp = toThreeXY(metrics, sx, sy);
       return new THREE.Vector3(tp.x, tp.y, z);
@@ -1732,308 +961,52 @@ export function initVisualiserPage(root, options = {}) {
       });
       nativeThree.systemGroup.add(new THREE.Line(g, m));
     };
-    const addPositionIndicatorNative = (sx, sy, color = 0x9ec4ff, z = 3.8) => {
-      const arm = 4;
-      addScreenLine(sx - arm, sy, sx + arm, sy, color, 0.82, z);
-      addScreenLine(sx, sy - arm, sx, sy + arm, color, 0.82, z);
-      const cGeom = new THREE.CircleGeometry(1.2, 16);
-      const cMat = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.88,
-        depthWrite: false,
-      });
-      const c = new THREE.Mesh(cGeom, cMat);
-      const tp = toThreeXY(metrics, sx, sy);
-      c.position.set(tp.x, tp.y, z + 0.01);
-      nativeThree.systemGroup.add(c);
-    };
-    const addAxialTiltOverlayNative = (sx, sy, r, bodyId, axialTiltDeg, z = 4.6) => {
-      if (!(Number.isFinite(r) && r >= 3.5)) return;
-      const axis = computeAxisDirection(bodyId, axialTiltDeg);
-      if (!axis) return;
-      const f = axis.foreshorten;
-      const axisHalf = r * 0.95 * f;
-      const poleOffset = r * 0.72 * f;
-      const poleR = Math.max(0.75, r * 0.09);
-      const tint = axis.retrograde ? 0xffaa82 : 0xa0dcff;
-      addScreenLine(
-        sx - axis.dx * axisHalf,
-        sy - axis.dy * axisHalf,
-        sx + axis.dx * axisHalf,
-        sy + axis.dy * axisHalf,
-        tint,
-        0.55,
-        z,
-      );
-      const frontGeom = new THREE.CircleGeometry(poleR, 16);
-      const frontMat = new THREE.MeshBasicMaterial({
-        color: tint,
-        transparent: true,
-        opacity: 0.8,
-        depthWrite: false,
-      });
-      const front = new THREE.Mesh(frontGeom, frontMat);
-      const frontPos = toThreeXY(metrics, sx + axis.dx * poleOffset, sy + axis.dy * poleOffset);
-      front.position.set(frontPos.x, frontPos.y, z + 0.02);
-      nativeThree.systemGroup.add(front);
-      const backGeom = new THREE.CircleGeometry(poleR * 0.85, 16);
-      const backMat = new THREE.MeshBasicMaterial({
-        color: tint,
-        transparent: true,
-        opacity: 0.5,
-        depthWrite: false,
-      });
-      const back = new THREE.Mesh(backGeom, backMat);
-      const backPos = toThreeXY(metrics, sx - axis.dx * poleOffset, sy - axis.dy * poleOffset);
-      back.position.set(backPos.x, backPos.y, z + 0.01);
-      nativeThree.systemGroup.add(back);
-    };
-    const addRotationOverlayNative = (sx, sy, r, bodyId, axialTiltDeg, spinAngleRad, z = 4.7) => {
-      if (!(Number.isFinite(r) && r >= 4.5)) return;
-      const axis = computeAxisDirection(bodyId, axialTiltDeg);
-      if (!axis) return;
-      const a = normalizeVec3({ x: axis.vx, y: axis.vy, z: axis.vz });
-      if (!a) return;
-      const refUp = Math.abs(a.y) < 0.92 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 };
-      const u = normalizeVec3(crossVec3(a, refUp));
-      if (!u) return;
-      const v = normalizeVec3(crossVec3(a, u));
-      if (!v) return;
-      const tint = axis.retrograde ? 0xffaa82 : 0xa0dcff;
-      const markerCount = 3;
-      for (let i = 0; i < markerCount; i += 1) {
-        const t = spinAngleRad + (i / markerCount) * Math.PI * 2;
-        const px3 = {
-          x: u.x * Math.cos(t) + v.x * Math.sin(t),
-          y: u.y * Math.cos(t) + v.y * Math.sin(t),
-          z: u.z * Math.cos(t) + v.z * Math.sin(t),
-        };
-        const proj = projectDirectionToScreen(px3.x, px3.z, px3.y);
-        const alpha = clamp(0.2 + 0.32 * (proj.depth + 1) * 0.5, 0.14, 0.58);
-        const mr = Math.max(0.75, r * (0.07 + 0.01 * i));
-        const marker = new THREE.Mesh(
-          new THREE.CircleGeometry(mr, 16),
-          new THREE.MeshBasicMaterial({
-            color: tint,
-            transparent: true,
-            opacity: alpha,
-            depthWrite: false,
-          }),
-        );
-        const mpos = toThreeXY(metrics, sx + proj.x * r * 0.82, sy - proj.y * r * 0.82);
-        marker.position.set(mpos.x, mpos.y, z + 0.01 * i);
-        nativeThree.systemGroup.add(marker);
-      }
-    };
+    const {
+      addApsisMarkersNative,
+      addAxialTiltOverlayNative,
+      addHillSphereMarkerNative,
+      addLagrangeMarkerNative,
+      addPositionIndicatorNative,
+      addRotationOverlayNative,
+      projectedDashedOrbitLine,
+      projectedEllipseOrbitLine,
+      projectedOrbitBand,
+      projectedOrbitLine,
+    } = createNativeSystemLayer({
+      THREE,
+      addScreenLine,
+      addToGroup: (node) => nativeThree.systemGroup.add(node),
+      addTextAtScreen: (text, sx, sy, z = 10, opts = {}) => {
+        const tp = screenToThree(sx, sy, z);
+        return threeText(text, tp.x, tp.y, z, opts);
+      },
+      circleFactory: threeCircle,
+      computeAxisDirection,
+      crossVec3,
+      labelsEnabled: !!chkLabels?.checked,
+      normalizeVec3,
+      orbitOffsetToScreen,
+      orbitPointToScreen,
+      projectDirectionToScreen,
+      screenToThree,
+      centerScreenX: cx,
+      centerScreenY: cy,
+    });
     // -- Deferred label system --------------------------------------------------
     // Labels are collected during draw, then sorted by priority and placed in a
     // single pass.  This ensures high-priority bodies (star, planets) claim the
     // best positions before low-priority ones (moons, debris).
-    const addDraggableLabelNative = ({
-      key = null,
-      line1 = "",
-      line2 = "",
-      anchorX = null,
-      anchorY = null,
-      defaultX = 0,
-      defaultY = 0,
-      z = 9,
-      leaderRadius = 0,
-      font1 = "12px system-ui, sans-serif",
-      color1 = "rgba(255,255,255,0.82)",
-      font2 = "11px system-ui, sans-serif",
-      color2 = "rgba(255,255,255,0.58)",
-      priority = 50,
-      opacity = 1,
-    } = {}) => {
-      if (!chkLabels?.checked) return null;
-      const text1 = String(line1 || "").trim();
-      const text2 = String(line2 || "").trim();
-      if (!text1) return null;
-      const tex1 = getNativeTextTexture(text1, { font: font1, color: color1 });
-      if (!tex1?.image) return null;
-      const w1 = Math.max(8, Number(tex1.image.width) || 8);
-      const h1 = Math.max(8, Number(tex1.image.height) || 8);
-      let w2 = 0;
-      let h2 = 0;
-      if (text2) {
-        const tex2 = getNativeTextTexture(text2, { font: font2, color: color2 });
-        w2 = Math.max(8, Number(tex2?.image?.width) || 8);
-        h2 = Math.max(8, Number(tex2?.image?.height) || 8);
-      }
-      const showDist = !!text2;
-      const boxW = (showDist ? Math.max(w1, w2) : w1) + 14;
-      const boxH = showDist ? 34 : 22;
-      pendingLabels.push({
-        key,
-        text1,
-        text2,
-        anchorX,
-        anchorY,
-        defaultX,
-        defaultY,
-        z,
-        leaderRadius,
-        font1,
-        color1,
-        font2,
-        color2,
-        priority,
-        opacity,
-        w1,
-        h1,
-        w2,
-        h2,
-        boxW,
-        boxH,
-        showDist,
-      });
-      return null;
-    };
-
-    const flushPendingLabels = () => {
-      pendingLabels.sort((a, b) => b.priority - a.priority);
-      const placed = [];
-      for (const entry of pendingLabels) {
-        const {
-          key,
-          text1,
-          text2,
-          anchorX,
-          anchorY,
-          defaultX,
-          defaultY,
-          z,
-          leaderRadius,
-          font1,
-          color1,
-          font2,
-          color2,
-          priority,
-          opacity,
-          w1,
-          h1,
-          w2,
-          h2,
-          boxW,
-          boxH,
-          showDist,
-        } = entry;
-        const userOffset = key ? state.labelOverrides.get(key) : null;
-        let rect;
-        let movedByUser = false;
-        if (userOffset && Number.isFinite(userOffset.dx) && Number.isFinite(userOffset.dy)) {
-          const ax = Number.isFinite(anchorX) ? anchorX : defaultX;
-          const ay = Number.isFinite(anchorY) ? anchorY : defaultY;
-          rect = { x: ax + userOffset.dx, y: ay + userOffset.dy, w: boxW, h: boxH };
-          placed.push(rect);
-          movedByUser = true;
-        } else {
-          rect = placeLabel8(
-            placed,
-            anchorX,
-            anchorY,
-            defaultX,
-            defaultY,
-            boxW,
-            boxH,
-            leaderRadius,
-          );
-          if (!rect && priority >= 60) {
-            // High-priority labels accept overlap rather than vanishing.
-            rect = { x: defaultX, y: defaultY, w: boxW, h: boxH };
-            placed.push(rect);
-          }
-          if (!rect) continue;
-        }
-
-        if (key) {
-          state.labelHitRegions.push({
-            kind: "label",
-            key,
-            x: rect.x,
-            y: rect.y,
-            w: rect.w,
-            h: rect.h,
-            bodyX: Number.isFinite(anchorX) ? anchorX : null,
-            bodyY: Number.isFinite(anchorY) ? anchorY : null,
-          });
-        }
-
-        const op = Number.isFinite(opacity) ? opacity : 1;
-        if (chkLabelLeaders?.checked && Number.isFinite(anchorX) && Number.isFinite(anchorY)) {
-          const pinX = clamp(anchorX, rect.x, rect.x + rect.w);
-          const pinY = clamp(anchorY, rect.y, rect.y + rect.h);
-          const vx = pinX - anchorX;
-          const vy = pinY - anchorY;
-          const vlen = Math.hypot(vx, vy) || 1;
-          const ux = vx / vlen;
-          const uy = vy / vlen;
-          const lineStartX = anchorX + ux * Math.max(2, Number(leaderRadius) * 0.75);
-          const lineStartY = anchorY + uy * Math.max(2, Number(leaderRadius) * 0.75);
-          const lineEndX = pinX - ux * 1.5;
-          const lineEndY = pinY - uy * 1.5;
-          if (Math.hypot(lineEndX - lineStartX, lineEndY - lineStartY) > 3) {
-            addScreenLine(
-              lineStartX,
-              lineStartY,
-              lineEndX,
-              lineEndY,
-              0xb9c5df,
-              0.42 * op,
-              z - 0.04,
-            );
-          }
-        }
-
-        const lbl1 = threeText(
-          text1,
-          toThreeXY(metrics, rect.x + 8 + w1 * 0.5, rect.y + (showDist ? 6 : 4) + h1 * 0.5).x,
-          toThreeXY(metrics, rect.x + 8 + w1 * 0.5, rect.y + (showDist ? 6 : 4) + h1 * 0.5).y,
-          z,
-          { font: font1, color: color1, opacity: op },
-        );
-        if (lbl1) nativeThree.systemGroup.add(lbl1);
-
-        if (showDist) {
-          const lbl2 = threeText(
-            text2,
-            toThreeXY(metrics, rect.x + 8 + w2 * 0.5, rect.y + 18 + h2 * 0.5).x,
-            toThreeXY(metrics, rect.x + 8 + w2 * 0.5, rect.y + 18 + h2 * 0.5).y,
-            z,
-            { font: font2, color: color2, opacity: op },
-          );
-          if (lbl2) nativeThree.systemGroup.add(lbl2);
-        }
-
-        if (movedByUser && key) {
-          const resetW = 12;
-          const resetH = 12;
-          const resetX = rect.x + rect.w + 2;
-          const resetY = rect.y - 8;
-          const resetLabel = threeText(
-            "x",
-            toThreeXY(metrics, resetX + resetW * 0.5, resetY + resetH * 0.5).x,
-            toThreeXY(metrics, resetX + resetW * 0.5, resetY + resetH * 0.5).y,
-            z + 0.03,
-            {
-              font: "bold 12px system-ui, sans-serif",
-              color: "rgba(255,170,170,0.95)",
-            },
-          );
-          if (resetLabel) nativeThree.systemGroup.add(resetLabel);
-          state.labelHitRegions.push({
-            kind: "label-reset",
-            key,
-            x: resetX,
-            y: resetY,
-            w: resetW,
-            h: resetH,
-          });
-        }
-      }
-    };
+    const { addDraggableLabelNative, flushPendingLabels } = createNativeLabelLayer({
+      addScreenLine,
+      addToGroup: (node) => nativeThree.systemGroup.add(node),
+      getNativeTextTexture,
+      labelHitRegions: state.labelHitRegions,
+      labelOverrides: state.labelOverrides,
+      labelsEnabled: !!chkLabels?.checked,
+      leadersEnabled: !!chkLabelLeaders?.checked,
+      screenToGroup: (sx, sy) => toThreeXY(metrics, sx, sy),
+      threeText,
+    });
 
     const addBodyLabelNative = (
       name,
@@ -2059,339 +1032,6 @@ export function initVisualiserPage(root, options = {}) {
         priority,
         opacity,
       });
-    const projectedOrbitLine = (
-      radiusPx,
-      color,
-      opacity = 1,
-      segments = 220,
-      inclinationDeg = 0,
-      z = -6,
-      centerScreenX = cx,
-      centerScreenY = cy,
-    ) => {
-      const pts = [];
-      const incRad = (Number(inclinationDeg) * Math.PI) / 180;
-      const cosI = Math.cos(incRad);
-      const sinI = Math.sin(incRad);
-      for (let i = 0; i <= segments; i += 1) {
-        const a = (i / segments) * Math.PI * 2;
-        const ox = Math.cos(a) * radiusPx;
-        const oy = Math.sin(a) * radiusPx;
-        const proj = orbitOffsetToScreen(ox, oy * cosI, centerScreenX, centerScreenY, oy * sinI);
-        const tp = toThreeXY(metrics, proj.x, proj.y);
-        pts.push(new THREE.Vector3(tp.x, tp.y, z));
-      }
-      const g = new THREE.BufferGeometry().setFromPoints(pts);
-      const m = new THREE.LineBasicMaterial({
-        color,
-        transparent: opacity < 1,
-        opacity,
-        depthWrite: false,
-      });
-      return new THREE.Line(g, m);
-    };
-    const projectedDashedOrbitLine = (
-      radiusPx,
-      color,
-      opacity = 1,
-      segments = 240,
-      inclinationDeg = 0,
-      z = -6,
-      dashSteps = 6,
-      gapSteps = 6,
-      centerScreenX = cx,
-      centerScreenY = cy,
-    ) => {
-      const pts = [];
-      const incRad = (Number(inclinationDeg) * Math.PI) / 180;
-      const cosI = Math.cos(incRad);
-      const sinI = Math.sin(incRad);
-      const cycle = Math.max(1, dashSteps + gapSteps);
-      for (let i = 0; i < segments; i += 1) {
-        if (i % cycle >= dashSteps) continue;
-        const a0 = (i / segments) * Math.PI * 2;
-        const a1 = ((i + 1) / segments) * Math.PI * 2;
-        const p0 = orbitOffsetToScreen(
-          Math.cos(a0) * radiusPx,
-          Math.sin(a0) * radiusPx * cosI,
-          centerScreenX,
-          centerScreenY,
-          Math.sin(a0) * radiusPx * sinI,
-        );
-        const p1 = orbitOffsetToScreen(
-          Math.cos(a1) * radiusPx,
-          Math.sin(a1) * radiusPx * cosI,
-          centerScreenX,
-          centerScreenY,
-          Math.sin(a1) * radiusPx * sinI,
-        );
-        const t0 = toThreeXY(metrics, p0.x, p0.y);
-        const t1 = toThreeXY(metrics, p1.x, p1.y);
-        pts.push(new THREE.Vector3(t0.x, t0.y, z), new THREE.Vector3(t1.x, t1.y, z));
-      }
-      if (!pts.length) return null;
-      const g = new THREE.BufferGeometry().setFromPoints(pts);
-      const m = new THREE.LineBasicMaterial({
-        color,
-        transparent: opacity < 1,
-        opacity,
-        depthWrite: false,
-      });
-      return new THREE.LineSegments(g, m);
-    };
-    const projectedEllipseOrbitLine = (
-      semiMajorPx,
-      eccentricity,
-      argPeriapsisDeg,
-      inclinationDeg = 0,
-      color = 0x5f6c8a,
-      opacity = 0.34,
-      segments = 220,
-      z = -6,
-      centerScreenX = cx,
-      centerScreenY = cy,
-    ) => {
-      const e = clamp(eccentricity, 0, 0.99);
-      const a = semiMajorPx;
-      const b = a * Math.sqrt(1 - e * e);
-      const cFocus = a * e;
-      const omega = ((argPeriapsisDeg || 0) * Math.PI) / 180;
-      const cosW = Math.cos(omega);
-      const sinW = Math.sin(omega);
-      const incRad = (Number(inclinationDeg) * Math.PI) / 180;
-      const cosI = Math.cos(incRad);
-      const sinI = Math.sin(incRad);
-      const pts = [];
-      for (let i = 0; i <= segments; i += 1) {
-        const E = (i / segments) * Math.PI * 2;
-        const xf = a * Math.cos(E) - cFocus;
-        const zf = b * Math.sin(E);
-        const xr = xf * cosW - zf * sinW;
-        const zr = xf * sinW + zf * cosW;
-        const pt = orbitOffsetToScreen(xr, zr * cosI, centerScreenX, centerScreenY, zr * sinI);
-        const tp = toThreeXY(metrics, pt.x, pt.y);
-        pts.push(new THREE.Vector3(tp.x, tp.y, z));
-      }
-      const g = new THREE.BufferGeometry().setFromPoints(pts);
-      const m = new THREE.LineBasicMaterial({
-        color,
-        transparent: opacity < 1,
-        opacity,
-        depthWrite: false,
-      });
-      return new THREE.Line(g, m);
-    };
-    const addApsisMarkersNative = (
-      semiMajorPx,
-      eccentricity,
-      argPeriapsisDeg,
-      inclinationDeg,
-      showLabels,
-      centerScreenX = cx,
-      centerScreenY = cy,
-    ) => {
-      const e = clamp(eccentricity, 0, 0.99);
-      if (e < 0.01) return;
-      const pePt = orbitPointToScreen(
-        centerScreenX,
-        centerScreenY,
-        semiMajorPx,
-        e,
-        argPeriapsisDeg,
-        inclinationDeg,
-        0,
-      );
-      const apPt = orbitPointToScreen(
-        centerScreenX,
-        centerScreenY,
-        semiMajorPx,
-        e,
-        argPeriapsisDeg,
-        inclinationDeg,
-        Math.PI,
-      );
-      const markers = [
-        { pt: pePt, label: "Pe", color: 0xffb43c },
-        { pt: apPt, label: "Ap", color: 0x64b4ff },
-      ];
-      for (const mk of markers) {
-        const stemH = 18;
-        const triW = 7;
-        const triH = 5;
-        const topY = mk.pt.y - stemH;
-        addScreenLine(mk.pt.x, mk.pt.y, mk.pt.x, topY + triH, mk.color, 0.6, 9);
-        const tri = new THREE.BufferGeometry().setFromPoints([
-          screenToThree(mk.pt.x, topY + triH, 9.2),
-          screenToThree(mk.pt.x - triW / 2, topY, 9.2),
-          screenToThree(mk.pt.x + triW / 2, topY, 9.2),
-          screenToThree(mk.pt.x, topY + triH, 9.2),
-        ]);
-        const triMat = new THREE.LineBasicMaterial({
-          color: mk.color,
-          transparent: true,
-          opacity: 0.9,
-          depthWrite: false,
-        });
-        nativeThree.systemGroup.add(new THREE.Line(tri, triMat));
-        if (showLabels) {
-          const lbl = threeText(
-            mk.label,
-            screenToThree(mk.pt.x, topY - 5).x,
-            screenToThree(mk.pt.x, topY - 5).y,
-            10,
-            {
-              font: "bold 10px system-ui, sans-serif",
-              color: mk.color === 0xffb43c ? "rgba(255,180,60,0.95)" : "rgba(100,180,255,0.95)",
-            },
-          );
-          if (lbl) nativeThree.systemGroup.add(lbl);
-        }
-      }
-    };
-    const addHillSphereMarkerNative = (sx, sy, hillPx, showLabels, showDistances, hillAu) => {
-      const r = Math.max(6, hillPx);
-      const ring = threeCircle(r, 0xb48cff, 0.35, 120);
-      const p = toThreeXY(metrics, sx, sy);
-      ring.position.set(p.x, p.y, 8);
-      nativeThree.systemGroup.add(ring);
-      if (showLabels) {
-        const hLbl = threeText("Hill", p.x, p.y - r - 18, 10, {
-          font: "bold 10px system-ui, sans-serif",
-          color: "rgba(180,140,255,0.9)",
-        });
-        if (hLbl) nativeThree.systemGroup.add(hLbl);
-        if (showDistances && Number.isFinite(hillAu)) {
-          const dLbl = threeText(`${hillAu.toFixed(3)} AU`, p.x, p.y - r - 30, 10, {
-            font: "9px system-ui, sans-serif",
-            color: "rgba(180,140,255,0.72)",
-          });
-          if (dLbl) nativeThree.systemGroup.add(dLbl);
-        }
-      }
-    };
-    const addLagrangeMarkerNative = (screenX, screenY, label, mode) => {
-      const p = toThreeXY(metrics, screenX, screenY);
-      if (mode === "trojan-unstable") {
-        const s = 4;
-        const geom = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(p.x, p.y - s, 9.5),
-          new THREE.Vector3(p.x + s, p.y, 9.5),
-          new THREE.Vector3(p.x, p.y + s, 9.5),
-          new THREE.Vector3(p.x - s, p.y, 9.5),
-          new THREE.Vector3(p.x, p.y - s, 9.5),
-        ]);
-        const mat = new THREE.LineBasicMaterial({
-          color: 0xffd37c,
-          transparent: true,
-          opacity: 0.3,
-          depthWrite: false,
-        });
-        nativeThree.systemGroup.add(new THREE.Line(geom, mat));
-        return;
-      }
-      if (mode === "trojan") {
-        const s = 4;
-        const geom = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(p.x, p.y - s, 9.5),
-          new THREE.Vector3(p.x + s, p.y, 9.5),
-          new THREE.Vector3(p.x, p.y + s, 9.5),
-          new THREE.Vector3(p.x - s, p.y, 9.5),
-          new THREE.Vector3(p.x, p.y - s, 9.5),
-        ]);
-        const mat = new THREE.LineBasicMaterial({
-          color: 0x50c8c8,
-          transparent: true,
-          opacity: 0.72,
-          depthWrite: false,
-        });
-        nativeThree.systemGroup.add(new THREE.Line(geom, mat));
-        return;
-      }
-      const s = 6;
-      addScreenLine(screenX - s, screenY, screenX + s, screenY, 0x50c8c8, 0.75, 9.5);
-      addScreenLine(screenX, screenY - s, screenX, screenY + s, 0x50c8c8, 0.75, 9.5);
-      const dotGeom = new THREE.CircleGeometry(1.8, 20);
-      const dotMat = new THREE.MeshBasicMaterial({
-        color: 0x50c8c8,
-        transparent: true,
-        opacity: 0.9,
-        depthWrite: false,
-      });
-      const dot = new THREE.Mesh(dotGeom, dotMat);
-      dot.position.set(p.x, p.y, 9.6);
-      nativeThree.systemGroup.add(dot);
-      if (chkLabels?.checked) {
-        const lbl = threeText(label, p.x + 10, p.y - 6, 10, {
-          font: "bold 10px system-ui, sans-serif",
-          color: "rgba(80,200,200,0.92)",
-        });
-        if (lbl) nativeThree.systemGroup.add(lbl);
-      }
-    };
-    const projectedOrbitBand = (
-      innerPx,
-      outerPx,
-      color,
-      opacity = 0.12,
-      segments = 220,
-      inclinationDeg = 0,
-      z = -8,
-    ) => {
-      const THREE = nativeThree.THREE;
-      const incRad = (Number(inclinationDeg) * Math.PI) / 180;
-      const cosI = Math.cos(incRad);
-      const sinI = Math.sin(incRad);
-      const vCount = (segments + 1) * 2;
-      const positions = new Float32Array(vCount * 3);
-      const indices = [];
-      for (let i = 0; i <= segments; i += 1) {
-        const a = (i / segments) * Math.PI * 2;
-        const c = Math.cos(a);
-        const s = Math.sin(a);
-
-        const outerProj = orbitOffsetToScreen(
-          c * outerPx,
-          s * outerPx * cosI,
-          cx,
-          cy,
-          s * outerPx * sinI,
-        );
-        const innerProj = orbitOffsetToScreen(
-          c * innerPx,
-          s * innerPx * cosI,
-          cx,
-          cy,
-          s * innerPx * sinI,
-        );
-        const outerTp = toThreeXY(metrics, outerProj.x, outerProj.y);
-        const innerTp = toThreeXY(metrics, innerProj.x, innerProj.y);
-
-        const base = i * 2;
-        positions[(base + 0) * 3 + 0] = outerTp.x;
-        positions[(base + 0) * 3 + 1] = outerTp.y;
-        positions[(base + 0) * 3 + 2] = z;
-        positions[(base + 1) * 3 + 0] = innerTp.x;
-        positions[(base + 1) * 3 + 1] = innerTp.y;
-        positions[(base + 1) * 3 + 2] = z;
-
-        if (i < segments) {
-          const next = base + 2;
-          indices.push(base, base + 1, next);
-          indices.push(base + 1, next + 1, next);
-        }
-      }
-      const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      g.setIndex(indices);
-      const m = new THREE.MeshBasicMaterial({
-        color,
-        transparent: opacity < 1,
-        opacity,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-      return new THREE.Mesh(g, m);
-    };
 
     if (chkGrid?.checked) {
       const niceSteps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
@@ -4098,102 +2738,12 @@ export function initVisualiserPage(root, options = {}) {
     }
 
     /* Hide body meshes that were not touched this frame */
-    for (const [k, e] of bodyMeshCache) {
-      if (!bodyMeshTouched.has(k)) e.group.visible = false;
-    }
+    bodyMeshService.hideUntouched(bodyMeshTouched);
 
     nativeThree.renderer.setClearColor(0x050916, 1);
     nativeThree.renderer.render(nativeThree.scene, nativeThree.cameraSystem);
     return true;
   }
-
-  /* ── Cluster 2D overlay helpers (star dots + labels) ─────── */
-
-  function drawStarDot(ctx, cx, cy, radius, color, alpha) {
-    const h = String(color || "#ffffff").replace("#", "");
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    const cr = Math.min(255, Math.round(r * 0.5 + 255 * 0.5));
-    const cg = Math.min(255, Math.round(g * 0.5 + 255 * 0.5));
-    const cb = Math.min(255, Math.round(b * 0.5 + 255 * 0.5));
-    const outerR = Math.max(radius * 2.6, 2);
-    const grad = ctx.createRadialGradient(cx, cy, radius * 0.12, cx, cy, outerR);
-    grad.addColorStop(0, `rgba(${cr},${cg},${cb},${alpha})`);
-    grad.addColorStop(0.42, `rgba(${r},${g},${b},${(alpha * 0.78).toFixed(2)})`);
-    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 0.62, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha})`;
-    ctx.fill();
-  }
-
-  function drawClusterCompanions(ctx, px, py, primaryRadius, components, perspective) {
-    const companionCount = components.length - 1;
-    if (companionCount <= 0) return;
-    const cRadius = clamp(primaryRadius * 0.55, 1.0, 5.5);
-    const spacing = cRadius * 2.4;
-    const startX = px + primaryRadius * 1.15;
-    const startY = py - primaryRadius * 0.85;
-    const p = clamp(perspective, 0.35, 2.3);
-    const alpha = clamp(0.38 + p * 0.2, 0.28, 0.78);
-    for (let i = 0; i < companionCount; i++) {
-      const comp = components[i + 1];
-      const compVisual = getClusterObjectVisual(comp.objectClassKey);
-      drawStarDot(ctx, startX + i * spacing, startY, cRadius, compVisual.color, alpha);
-    }
-  }
-
-  function clusterClassLabel(system) {
-    if (!Array.isArray(system.components) || system.components.length <= 1) {
-      const k = system.objectClassKey;
-      return k === "LTY" ? "L/T/Y" : k === "OTHER" ? "Other" : k;
-    }
-    return system.components
-      .map((c) => {
-        const k = normalizeClusterObjectKey(c.objectClassKey);
-        return k === "LTY" ? "L/T/Y" : k === "OTHER" ? "Other" : k;
-      })
-      .join(" + ");
-  }
-
-  /* Static starfield cache — seeded once, redrawn each frame at fixed screen positions */
-  let _starfieldCache = null;
-  function ensureStarfield(count = 400) {
-    if (_starfieldCache && _starfieldCache.length === count) return _starfieldCache;
-    const stars = [];
-    let seed = 48271;
-    const rng = () => {
-      seed = (seed * 16807) % 2147483647;
-      return (seed - 1) / 2147483646;
-    };
-    for (let i = 0; i < count; i++) {
-      stars.push({
-        u: rng(),
-        v: rng(),
-        radius: 0.3 + rng() * 0.7,
-        alpha: 0.15 + rng() * 0.35,
-      });
-    }
-    _starfieldCache = stars;
-    return stars;
-  }
-  function drawClusterStarfield(ctx, W, H) {
-    const stars = ensureStarfield();
-    for (const s of stars) {
-      const x = s.u * W;
-      const y = s.v * H;
-      ctx.beginPath();
-      ctx.arc(x, y, s.radius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(200,210,240,${s.alpha.toFixed(2)})`;
-      ctx.fill();
-    }
-  }
-
   function syncOverlaySize() {
     if (!overlayCanvas || !canvas) return;
     const pw = canvas.width;
@@ -4590,43 +3140,6 @@ export function initVisualiserPage(root, options = {}) {
   if (vizWrap) wrapResizeObserver.observe(vizWrap);
   disposers.push(() => wrapResizeObserver.disconnect());
 
-  function rectsOverlap(a, b) {
-    return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
-  }
-
-  // Try 8 cardinal/diagonal positions around the anchor; return null if all collide.
-  function placeLabel8(placed, anchorX, anchorY, defaultX, defaultY, boxW, boxH, bodyR) {
-    const gap = Math.max(4, bodyR * 0.15);
-    const r = Math.max(8, bodyR + gap);
-    const ax = Number.isFinite(anchorX) ? anchorX : defaultX;
-    const ay = Number.isFinite(anchorY) ? anchorY : defaultY;
-    const candidates = [
-      { x: defaultX, y: defaultY },
-      { x: ax + r, y: ay - boxH * 0.5 },
-      { x: ax + r, y: ay + gap },
-      { x: ax - boxW - gap, y: ay - boxH - gap },
-      { x: ax - boxW - gap, y: ay - boxH * 0.5 },
-      { x: ax - boxW * 0.5, y: ay - r - boxH },
-      { x: ax - boxW * 0.5, y: ay + r },
-      { x: ax - boxW - gap, y: ay + gap },
-    ];
-    for (const c of candidates) {
-      const rect = { x: c.x, y: c.y, w: boxW, h: boxH };
-      let hit = false;
-      for (const p of placed) {
-        if (rectsOverlap(rect, p)) {
-          hit = true;
-          break;
-        }
-      }
-      if (!hit) {
-        placed.push(rect);
-        return rect;
-      }
-    }
-    return null;
-  }
-
   const SPEED_STEPS = [0.1, 0.5, 1, 5, 20];
 
   function updateSpeedUI() {
@@ -4646,863 +3159,73 @@ export function initVisualiserPage(root, options = {}) {
     disposeBodyMeshCache();
   }
 
-  function buildSnapshot(w) {
-    const starName = String(w.star?.name || "").trim() || "Star";
-    const starMassRaw =
-      Number.isFinite(Number(w.star?.massMsol)) && Number(w.star?.massMsol) > 0
-        ? Number(w.star.massMsol)
-        : Number(w.system?.starMassMsol);
-    const starMassMsol = Number.isFinite(starMassRaw) && starMassRaw > 0 ? starMassRaw : 0.8653;
-    const starAgeRaw = Number(w.star?.ageGyr);
-    const starAgeGyr = Number.isFinite(starAgeRaw) && starAgeRaw >= 0 ? starAgeRaw : 6.254;
-    const starMetallicityRaw = Number(w.star?.metallicityFeH);
-    const starMetallicityFeH = Number.isFinite(starMetallicityRaw) ? starMetallicityRaw : 0;
-    const sov = getStarOverrides(w.star);
-    const starSeedRaw = w.star?.activitySeed ?? w.star?.seed ?? null;
-
-    // Mirror starPage.js getEffectiveOverrides() so the visualizer uses the same
-    // physics resolution as the Star page (Advanced mode R/L/T overrides).
-    const starPhysicsMode = w.star?.physicsMode ?? "simple";
-    const starDerivMode = w.star?.advancedDerivationMode ?? "rl";
-    let starRadiusOv = null;
-    let starLumOv = null;
-    let starTempOv = null;
-    if (starPhysicsMode === "advanced") {
-      const rOv =
-        Number.isFinite(Number(w.star?.radiusRsolOverride)) &&
-        Number(w.star?.radiusRsolOverride) > 0
-          ? Number(w.star.radiusRsolOverride)
-          : null;
-      const lOv =
-        Number.isFinite(Number(w.star?.luminosityLsolOverride)) &&
-        Number(w.star?.luminosityLsolOverride) > 0
-          ? Number(w.star.luminosityLsolOverride)
-          : null;
-      const tOv =
-        Number.isFinite(Number(w.star?.tempKOverride)) && Number(w.star?.tempKOverride) > 0
-          ? Number(w.star.tempKOverride)
-          : null;
-      if (starDerivMode === "rt") {
-        starRadiusOv = rOv;
-        starTempOv = tOv;
-      } else if (starDerivMode === "lt") {
-        starLumOv = lOv;
-        starTempOv = tOv;
-      } else {
-        // "rl" (default)
-        starRadiusOv = rOv;
-        starLumOv = lOv;
-      }
-    }
-    const starCalc = calcStar({
-      massMsol: starMassMsol,
-      ageGyr: starAgeGyr,
-      radiusRsolOverride: starRadiusOv,
-      luminosityLsolOverride: starLumOv,
-      tempKOverride: starTempOv,
-      metallicityFeH: starMetallicityFeH,
-      evolutionMode: sov?.ev || w.star?.evolutionMode || "zams",
-    });
-    const starTempK = Number(starCalc?.tempK);
-    const starLuminosityLsun = Number(starCalc?.luminosityLsol);
-    const starRadiusRsol = Math.max(0.01, Number(starCalc?.radiusRsol) || 1);
-    const starRadiusKmRaw = Number(starCalc?.metric?.radiusKm);
-    const starRadiusKm =
-      Number.isFinite(starRadiusKmRaw) && starRadiusKmRaw > 0
-        ? starRadiusKmRaw
-        : starRadiusRsol * SOL_RADIUS_KM;
-    const starColourHex = String(starCalc?.starColourHex || starColourHexFromTempK(starTempK));
-    const activityModelVersion = w.star?.activityModelVersion === "v1" ? "v1" : "v2";
-    const activityModel = computeStellarActivityModel(
-      {
-        teffK: starTempK,
-        ageGyr: starAgeGyr,
-        massMsun: starMassMsol,
-        luminosityLsun: starLuminosityLsun,
-      },
-      { activityCycle: 0.5 },
-    );
-    const flareParams = activityModel.activity;
-    const n32 = Math.max(0, Number(flareParams?.N32) || 0);
-    const starActivityLevel = clamp(Math.log10(1 + n32) / Math.log10(31), 0, 1);
-
-    const sys = calcSystem({
-      starMassMsol,
-      spacingFactor: Number(w.system?.spacingFactor),
-      orbit1Au: Number(w.system?.orbit1Au),
-      luminosityLsolOverride: starLuminosityLsun,
-      radiusRsolOverride: starRadiusRsol,
-    });
-    const debugOn = !!chkDebug?.checked;
-    dbgThrottled(debugOn, "flare:snapshot:model", 1000, "flare:snapshot:model", {
-      activityModelVersion,
-      starMassMsol,
-      starAgeGyr,
-      starTempK,
-      starLuminosityLsun,
-      starMetallicityFeH,
-      starEvolutionMode: sov?.ev || w.star?.evolutionMode || "zams",
-      teffBin: flareParams?.teffBin,
-      ageBand: flareParams?.ageBand,
-      N32: Number(flareParams?.N32) || 0,
-      energeticFlareRatePerDay: Number(flareParams?.energeticFlareRatePerDay) || 0,
-      cmeAssociatedRatePerDay: Number(flareParams?.cmeAssociatedRatePerDay) || 0,
-      cmeBackgroundRatePerDay: Number(flareParams?.cmeBackgroundRatePerDay) || 0,
-      cmeTotalRatePerDay: Number(flareParams?.cmeTotalRatePerDay) || 0,
-    });
-    dbg(debugOn, "system inputs", w.system);
-    dbg(debugOn, "calcSystem (inputs echoed)", sys.inputs);
-    dbg(debugOn, "calcSystem.orbitsAu[0..5]", (sys.orbitsAu || []).slice(0, 6));
-    const planets = listPlanets(w);
-    const moons = listMoons(w);
-
-    // Use slot AU when available
-    const orbitAuBySlot = sys.orbitsAu || [];
-    const planetNodes = planets
-      .filter((p) => p.slotIndex != null || Number(p.inputs?.semiMajorAxisAu) > 0)
-      .map((p) => {
-        const slot = Number(p.slotIndex);
-        const slotAuRaw = orbitAuBySlot[slot - 1];
-        const slotAu = Number(slotAuRaw);
-        const inputAu = Number(p.inputs?.semiMajorAxisAu);
-        const au =
-          Number.isFinite(slotAu) && slotAu > 0
-            ? slotAu
-            : Number.isFinite(inputAu) && inputAu > 0
-              ? inputAu
-              : 1.0;
-
-        // Compute orbital period from planet sheet logic (days)
-        let periodDays = null;
-        let radiusEarth = null;
-        let skyHighHex = null;
-        let skyHorizonHex = null;
-        let visualProfile = null;
-        const planetInputs = { ...p.inputs, semiMajorAxisAu: au };
-        try {
-          const planetCalc = calcPlanetExact({
-            starMassMsol,
-            starAgeGyr,
-            starRadiusRsolOverride: sov.r,
-            starLuminosityLsolOverride: sov.l,
-            starTempKOverride: sov.t,
-            starEvolutionMode: sov.ev,
-            planet: planetInputs,
-          });
-          periodDays = Number(planetCalc?.derived?.orbitalPeriodEarthDays);
-          if (!Number.isFinite(periodDays) || periodDays <= 0) periodDays = null;
-          radiusEarth = Number(planetCalc?.derived?.radiusEarth);
-          if (!Number.isFinite(radiusEarth) || radiusEarth <= 0) radiusEarth = null;
-
-          skyHighHex = String(planetCalc?.derived?.skyColourDayHex ?? "").trim();
-          skyHorizonHex = String(planetCalc?.derived?.skyColourHorizonHex ?? "").trim();
-          if (!/^#?[0-9a-fA-F]{6}$/.test(skyHighHex)) skyHighHex = null;
-          if (!/^#?[0-9a-fA-F]{6}$/.test(skyHorizonHex)) skyHorizonHex = null;
-          if (skyHighHex && !skyHighHex.startsWith("#")) skyHighHex = "#" + skyHighHex;
-          if (skyHorizonHex && !skyHorizonHex.startsWith("#")) skyHorizonHex = "#" + skyHorizonHex;
-
-          if (planetCalc?.derived) {
-            visualProfile = computeRockyVisualProfile(planetCalc.derived, p.inputs);
-          }
-        } catch {
-          periodDays = null;
-          radiusEarth = null;
-          skyHighHex = null;
-          skyHorizonHex = null;
-          visualProfile = null;
-        }
-
-        return {
-          id: p.id,
-          name: p.name || p.inputs?.name || p.id,
-          slot,
-          au,
-          periodDays,
-          radiusEarth,
-          massEarth: Number(p.inputs?.massEarth) || null,
-          rotationPeriodHours: Number(p.inputs?.rotationPeriodHours) || null,
-          axialTiltDeg: clamp(Number(p.inputs?.axialTiltDeg ?? 0), 0, 180),
-          skyHighHex,
-          skyHorizonHex,
-          visualProfile,
-          eccentricity: clamp(Number(p.inputs?.eccentricity ?? 0), 0, 0.99),
-          longitudeOfPeriapsisDeg: Number(p.inputs?.longitudeOfPeriapsisDeg ?? 0),
-          inclinationDeg: clamp(Number(p.inputs?.inclinationDeg ?? 0), 0, 180),
-          locked: !!p.locked,
-          moons: moons
-            .filter((m) => m.planetId === p.id)
-            .map((m) => {
-              const semiMajorAxisKm = Number(m.inputs?.semiMajorAxisKm);
-              let mPeriodDays = null;
-              let mRadiusKm = null;
-              let mRotationDays = null;
-              let mCalc = null;
-              try {
-                mCalc = calcMoonExact({
-                  starMassMsol,
-                  starAgeGyr,
-                  starRadiusRsolOverride: sov.r,
-                  starLuminosityLsolOverride: sov.l,
-                  starTempKOverride: sov.t,
-                  starEvolutionMode: sov.ev,
-                  planet: planetInputs,
-                  moon: { ...m.inputs },
-                });
-                mPeriodDays = Number(mCalc?.orbit?.orbitalPeriodSiderealDays);
-                if (!Number.isFinite(mPeriodDays) || mPeriodDays <= 0) mPeriodDays = null;
-                mRotationDays = Number(mCalc?.orbit?.rotationPeriodDays);
-                if (!Number.isFinite(mRotationDays) || mRotationDays <= 0) mRotationDays = null;
-                const moonRadiusMoon = Number(mCalc?.physical?.radiusMoon);
-                if (Number.isFinite(moonRadiusMoon) && moonRadiusMoon > 0) {
-                  mRadiusKm = moonRadiusMoon * MOON_RADIUS_KM;
-                }
-              } catch {
-                mPeriodDays = null;
-                mRadiusKm = null;
-                mRotationDays = null;
-                mCalc = null;
-              }
-              const mRotHoursInput = Number(m.inputs?.rotationPeriodHours);
-              const mRotDaysInput =
-                Number.isFinite(mRotHoursInput) && mRotHoursInput > 0 ? mRotHoursInput / 24 : null;
-              const mAxialTiltInput = Number(m.inputs?.axialTiltDeg);
-              const mAxialTiltProxy = Number(m.inputs?.inclinationDeg);
-              return {
-                id: m.id,
-                name: m.name || m.inputs?.name || m.id,
-                semiMajorAxisKm:
-                  Number.isFinite(semiMajorAxisKm) && semiMajorAxisKm > 0 ? semiMajorAxisKm : null,
-                periodDays: mPeriodDays,
-                rotationPeriodDays: mRotationDays ?? mRotDaysInput ?? mPeriodDays,
-                axialTiltDeg: Number.isFinite(mAxialTiltInput)
-                  ? clamp(mAxialTiltInput, 0, 180)
-                  : Number.isFinite(mAxialTiltProxy)
-                    ? clamp(mAxialTiltProxy, 0, 180)
-                    : 0,
-                radiusKm: mRadiusKm,
-                moonCalc: mCalc,
-                eccentricity: clamp(Number(m.inputs?.eccentricity ?? 0), 0, 0.99),
-                inclinationDeg: clamp(Number(m.inputs?.inclinationDeg ?? 0), 0, 180),
-                longitudeOfPeriapsisDeg: hashUnit(m.id) * 360,
-              };
-            })
-            .sort((a, b) => {
-              const aa = Number.isFinite(a.semiMajorAxisKm) ? a.semiMajorAxisKm : Infinity;
-              const bb = Number.isFinite(b.semiMajorAxisKm) ? b.semiMajorAxisKm : Infinity;
-              return aa - bb;
-            }),
-        };
-      })
-      .sort((a, b) => a.au - b.au);
-
-    let gasGiants = listSystemGasGiants(w)
-      .map((g, idx) => {
-        const ggNode = {
-          id: g.id || `gg${idx + 1}`,
-          name: g.name || `Gas giant ${idx + 1}`,
-          au: Number(g.au),
-          radiusRj: Number.isFinite(Number(g.radiusRj))
-            ? clamp(Number(g.radiusRj), GAS_GIANT_RADIUS_MIN_RJ, GAS_GIANT_RADIUS_MAX_RJ)
-            : 1,
-          style: g.style || "jupiter",
-          rings: !!g.rings,
-          massMjup: g.massMjup,
-          rotationPeriodHours: g.rotationPeriodHours,
-          metallicity: g.metallicity,
-        };
-        // Build parentOverride for moon calculations
-        let parentOverride = null;
-        try {
-          const ggModel = calcGasGiant({
-            massMjup: g.massMjup,
-            radiusRj: g.radiusRj,
-            orbitAu: ggNode.au || 5,
-            rotationPeriodHours: g.rotationPeriodHours,
-            metallicity: g.metallicity,
-            starMassMsol,
-            starLuminosityLsol: Number(w.star?.luminosityLsol) || 1,
-            starAgeGyr,
-            starRadiusRsol: Number(w.star?.radiusRsol) || 1,
-            stellarMetallicityFeH: Number(w.star?.metallicityFeH) || 0,
-          });
-          ggNode.gasCalc = ggModel;
-          parentOverride = {
-            inputs: {
-              massEarth: ggModel.physical.massEarth,
-              semiMajorAxisAu: ggModel.inputs.orbitAu,
-              eccentricity: 0,
-              rotationPeriodHours: ggModel.inputs.rotationPeriodHours,
-              cmfPct: 0,
-            },
-            derived: {
-              densityGcm3: ggModel.physical.densityGcm3,
-              radiusEarth: ggModel.physical.radiusEarth,
-              gravityG: ggModel.physical.gravityG,
-            },
-          };
-        } catch {
-          /* ignore — moons will render without physics */
-        }
-        ggNode.moons = moons
-          .filter((m) => m.planetId === ggNode.id)
-          .map((m) => {
-            const semiMajorAxisKm = Number(m.inputs?.semiMajorAxisKm);
-            let mPeriodDays = null;
-            let mRadiusKm = null;
-            let mRotationDays = null;
-            let mCalc = null;
-            if (parentOverride) {
-              try {
-                mCalc = calcMoonExact({
-                  starMassMsol,
-                  starAgeGyr,
-                  starRadiusRsolOverride: sov.r,
-                  starLuminosityLsolOverride: sov.l,
-                  starTempKOverride: sov.t,
-                  starEvolutionMode: sov.ev,
-                  moon: { ...m.inputs },
-                  parentOverride,
-                });
-                mPeriodDays = Number(mCalc?.orbit?.orbitalPeriodSiderealDays);
-                if (!Number.isFinite(mPeriodDays) || mPeriodDays <= 0) mPeriodDays = null;
-                mRotationDays = Number(mCalc?.orbit?.rotationPeriodDays);
-                if (!Number.isFinite(mRotationDays) || mRotationDays <= 0) mRotationDays = null;
-                const moonRadiusMoon = Number(mCalc?.physical?.radiusMoon);
-                if (Number.isFinite(moonRadiusMoon) && moonRadiusMoon > 0) {
-                  mRadiusKm = moonRadiusMoon * MOON_RADIUS_KM;
-                }
-              } catch {
-                mPeriodDays = null;
-                mRadiusKm = null;
-                mRotationDays = null;
-                mCalc = null;
-              }
-            }
-            const mRotHoursInput = Number(m.inputs?.rotationPeriodHours);
-            const mRotDaysInput =
-              Number.isFinite(mRotHoursInput) && mRotHoursInput > 0 ? mRotHoursInput / 24 : null;
-            const mAxialTiltInput = Number(m.inputs?.axialTiltDeg);
-            const mAxialTiltProxy = Number(m.inputs?.inclinationDeg);
-            return {
-              id: m.id,
-              name: m.name || m.inputs?.name || m.id,
-              semiMajorAxisKm:
-                Number.isFinite(semiMajorAxisKm) && semiMajorAxisKm > 0 ? semiMajorAxisKm : null,
-              periodDays: mPeriodDays,
-              rotationPeriodDays: mRotationDays ?? mRotDaysInput ?? mPeriodDays,
-              axialTiltDeg: Number.isFinite(mAxialTiltInput)
-                ? clamp(mAxialTiltInput, 0, 180)
-                : Number.isFinite(mAxialTiltProxy)
-                  ? clamp(mAxialTiltProxy, 0, 180)
-                  : 0,
-              radiusKm: mRadiusKm,
-              moonCalc: mCalc,
-              eccentricity: clamp(Number(m.inputs?.eccentricity ?? 0), 0, 0.99),
-              inclinationDeg: clamp(Number(m.inputs?.inclinationDeg ?? 0), 0, 180),
-              longitudeOfPeriapsisDeg: hashUnit(m.id) * 360,
-            };
-          })
-          .sort((a, b) => {
-            const aa = Number.isFinite(a.semiMajorAxisKm) ? a.semiMajorAxisKm : Infinity;
-            const bb = Number.isFinite(b.semiMajorAxisKm) ? b.semiMajorAxisKm : Infinity;
-            return aa - bb;
-          });
-        return ggNode;
-      })
-      .filter((g) => Number.isFinite(g.au) && g.au > 0)
-      .sort((a, b) => a.au - b.au);
-    const systemDisks = listSystemDebrisDisks(w);
-    const debrisDisks = [];
-    for (const sd of systemDisks) {
-      const inner = Number(sd.innerAu);
-      const outer = Number(sd.outerAu);
-      if (Number.isFinite(inner) && Number.isFinite(outer) && inner > 0 && outer > 0) {
-        debrisDisks.push({
-          id: sd.id || `dd${debrisDisks.length + 1}`,
-          name: sd.name || `Debris disk ${debrisDisks.length + 1}`,
-          inner: Math.min(inner, outer),
-          outer: Math.max(inner, outer),
-        });
-      }
-    }
-
-    dbg(debugOn, "debrisDisks", debrisDisks);
-    dbg(debugOn, "gasGiants", gasGiants);
-    dbg(
-      debugOn,
-      "planets (assigned)",
-      planetNodes.map((p) => ({ name: p.name, slot: p.slot, au: p.au })),
-    );
-    return {
-      sys,
-      planetNodes,
-      debrisDisks,
-      gasGiants,
-      starName,
-      starMassMsol,
-      starAgeGyr,
-      starTempK,
-      starLuminosityLsun,
-      starRadiusRsol,
-      starRadiusKm,
-      starColourHex,
-      starActivityLevel,
-      starSeed: starSeedRaw,
-      activityModelVersion,
-      starActivityModel: activityModel,
-    };
-  }
-
   function getSnapshot({ force = false } = {}) {
     if (!force && state.snapshotCache) return state.snapshotCache;
-    const snapshot = buildSnapshot(loadWorld());
+    const snapshot = buildVisualizerSnapshot(loadWorld(), {
+      debug: {
+        enabled: !!chkDebug?.checked,
+        log: dbg,
+        logThrottled: dbgThrottled,
+      },
+      hashUnit,
+    });
     state.snapshotCache = snapshot;
     warmBodyMeshes(snapshot);
     return snapshot;
   }
 
-  function hexToRgba(hex, a = 1) {
-    if (!hex) return `rgba(160,200,255,${a})`;
-    const h = hex.replace("#", "").trim();
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    return `rgba(${r},${g},${b},${a})`;
-  }
-
-  function hexToRgb(hex) {
-    const h = String(hex || "")
-      .trim()
-      .replace(/^#/, "");
-    const raw = h.length === 3 ? h.replace(/(.)/g, "$1$1") : h;
-    if (!/^[0-9a-fA-F]{6}$/.test(raw)) return { r: 255, g: 244, b: 220 };
-    return {
-      r: parseInt(raw.slice(0, 2), 16),
-      g: parseInt(raw.slice(2, 4), 16),
-      b: parseInt(raw.slice(4, 6), 16),
-    };
-  }
-
-  function mixHex(hexA, hexB, t = 0.5) {
-    const a = hexToRgb(hexA);
-    const b = hexToRgb(hexB);
-    const u = clamp(Number(t), 0, 1);
-    const r = Math.round(a.r + (b.r - a.r) * u);
-    const g = Math.round(a.g + (b.g - a.g) * u);
-    const bCh = Math.round(a.b + (b.b - a.b) * u);
-    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${bCh.toString(16).padStart(2, "0")}`;
-  }
-
-  function mixRgb(rgbA, rgbB, t = 0.5) {
-    const u = clamp(Number(t), 0, 1);
-    return {
-      r: Math.round(rgbA.r + (rgbB.r - rgbA.r) * u),
-      g: Math.round(rgbA.g + (rgbB.g - rgbA.g) * u),
-      b: Math.round(rgbA.b + (rgbB.b - rgbA.b) * u),
-    };
-  }
-
-  function rgbToCss(rgb, alpha = 1) {
-    const a = clamp(Number(alpha), 0, 1);
-    return `rgba(${clamp(Math.round(rgb.r), 0, 255)},${clamp(Math.round(rgb.g), 0, 255)},${clamp(Math.round(rgb.b), 0, 255)},${a})`;
-  }
-
-  function getStarSurfaceSeed(snapshot) {
-    const rawSeed =
-      snapshot?.starSeed ??
-      `${snapshot?.starName || "Star"}:${Number(snapshot?.starTempK || 5776).toFixed(0)}:${Number(
-        snapshot?.starAgeGyr || 4.6,
-      ).toFixed(2)}`;
-    return String(rawSeed);
-  }
-
-  function drawSoftBlob(cctx, x, y, r, rgb, alphaInner, alphaOuter = 0) {
-    if (!(r > 0)) return;
-    const g = cctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, rgbToCss(rgb, alphaInner));
-    g.addColorStop(1, rgbToCss(rgb, alphaOuter));
-    cctx.fillStyle = g;
-    cctx.beginPath();
-    cctx.arc(x, y, r, 0, Math.PI * 2);
-    cctx.fill();
-  }
-
-  function paintStarSurfaceTexture(
-    cctx,
-    size,
-    { baseHex = "#fff4dc", seed = "star", tempK = 5776, activity = 0.2 } = {},
-  ) {
-    const s = Math.max(64, Number(size) || 512);
-    const cx = s * 0.5;
-    const cy = s * 0.5;
-    const r = s * 0.48;
-    const baseRgb = hexToRgb(baseHex);
-    const coreRgb = hexToRgb(mixHex(baseHex, "#fff7e6", 0.42));
-    const limbRgb = hexToRgb(mixHex(baseHex, "#1d1410", 0.35));
-    const brightRgb = hexToRgb(mixHex(baseHex, "#fff3dc", 0.58));
-    const darkRgb = hexToRgb(mixHex(baseHex, "#130d0b", 0.62));
-    const faculaRgb = hexToRgb(mixHex(baseHex, "#ffd9ad", 0.54));
-    const tempNorm = clamp((Number(tempK) - 3000) / 7000, 0, 1);
-    const activityNorm = clamp(Number(activity), 0, 1);
-    const contrast = 1 - tempNorm * 0.28;
-    const rng = createSeededRng(
-      `${seed}:star-surface:${Math.round(tempK)}:${Math.round(activityNorm * 100)}`,
-    );
-
-    cctx.clearRect(0, 0, s, s);
-    cctx.save();
-    cctx.beginPath();
-    cctx.arc(cx, cy, r, 0, Math.PI * 2);
-    cctx.clip();
-
-    // Photosphere base with limb darkening.
-    const baseGrad = cctx.createRadialGradient(cx - r * 0.11, cy - r * 0.13, r * 0.04, cx, cy, r);
-    baseGrad.addColorStop(0.0, rgbToCss(coreRgb, 1));
-    baseGrad.addColorStop(0.56, rgbToCss(baseRgb, 1));
-    baseGrad.addColorStop(0.9, rgbToCss(limbRgb, 1));
-    baseGrad.addColorStop(1.0, rgbToCss(mixRgb(limbRgb, { r: 0, g: 0, b: 0 }, 0.15), 1));
-    cctx.fillStyle = baseGrad;
-    cctx.fillRect(0, 0, s, s);
-
-    // Fine granulation pattern.
-    const grainCount = Math.round(s * (4.2 + activityNorm * 3.4));
-    for (let i = 0; i < grainCount; i += 1) {
-      const rr = r * Math.sqrt(rng()) * 0.985;
-      const ang = rng() * Math.PI * 2;
-      const x = cx + Math.cos(ang) * rr;
-      const y = cy + Math.sin(ang) * rr;
-      const edge = clamp(1 - rr / r, 0, 1);
-      const radius = s * (0.0028 + rng() * 0.0105) * (0.45 + edge * 0.8);
-      const isBright = rng() > 0.43;
-      const alpha = (0.022 + rng() * 0.085) * (0.35 + edge * 0.75) * contrast;
-      const tone = isBright
-        ? mixRgb(brightRgb, coreRgb, rng() * 0.4)
-        : mixRgb(darkRgb, baseRgb, rng() * 0.32);
-      drawSoftBlob(cctx, x, y, radius, tone, alpha, 0);
-    }
-
-    // Broader convection cells and lanes.
-    const cellCount = Math.round(72 + activityNorm * 80);
-    for (let i = 0; i < cellCount; i += 1) {
-      const rr = r * (0.08 + rng() * 0.84);
-      const ang = rng() * Math.PI * 2;
-      const x = cx + Math.cos(ang) * rr;
-      const y = cy + Math.sin(ang) * rr;
-      const radius = s * (0.02 + rng() * 0.06);
-      const brightCell = rng() > 0.55;
-      const tone = brightCell
-        ? mixRgb(brightRgb, faculaRgb, rng() * 0.35)
-        : mixRgb(darkRgb, limbRgb, rng() * 0.25);
-      const alpha = (0.025 + rng() * 0.06) * contrast;
-      drawSoftBlob(cctx, x, y, radius, tone, alpha, 0);
-    }
-
-    // Starspots (umbra + penumbra), stronger on more active stars.
-    const spotCount = Math.round(1 + activityNorm * 7);
-    for (let i = 0; i < spotCount; i += 1) {
-      const rr = r * (0.12 + rng() * 0.74);
-      const ang = rng() * Math.PI * 2;
-      const x = cx + Math.cos(ang) * rr;
-      const y = cy + Math.sin(ang) * rr;
-      const spotR = s * (0.014 + rng() * 0.042) * (0.7 + activityNorm * 0.85);
-      const penumbraRgb = mixRgb(darkRgb, limbRgb, 0.18 + rng() * 0.18);
-      const umbraRgb = mixRgb(darkRgb, { r: 0, g: 0, b: 0 }, 0.35 + rng() * 0.25);
-      drawSoftBlob(cctx, x, y, spotR * 1.4, penumbraRgb, 0.24 + rng() * 0.16, 0);
-      drawSoftBlob(cctx, x, y, spotR * (0.52 + rng() * 0.16), umbraRgb, 0.45 + rng() * 0.2, 0);
-    }
-
-    // Faculae near the limb.
-    const faculaCount = Math.round(16 + activityNorm * 20);
-    for (let i = 0; i < faculaCount; i += 1) {
-      const rr = r * (0.72 + rng() * 0.25);
-      const ang = rng() * Math.PI * 2;
-      const x = cx + Math.cos(ang) * rr;
-      const y = cy + Math.sin(ang) * rr;
-      const facR = s * (0.005 + rng() * 0.017);
-      drawSoftBlob(cctx, x, y, facR, faculaRgb, (0.08 + rng() * 0.09) * contrast, 0);
-    }
-
-    cctx.restore();
-
-    // Bright chromosphere rim.
-    const rimGrad = cctx.createRadialGradient(cx, cy, r * 0.92, cx, cy, r * 1.03);
-    rimGrad.addColorStop(0, rgbToCss(faculaRgb, 0));
-    rimGrad.addColorStop(0.76, rgbToCss(faculaRgb, 0.5 + activityNorm * 0.2));
-    rimGrad.addColorStop(0.95, rgbToCss(mixRgb(faculaRgb, brightRgb, 0.4), 0.22));
-    rimGrad.addColorStop(1, rgbToCss(faculaRgb, 0));
-    cctx.fillStyle = rimGrad;
-    cctx.beginPath();
-    cctx.arc(cx, cy, r * 1.03, 0, Math.PI * 2);
-    cctx.fill();
-  }
   function mapAuToPx(au, minAu, maxAu, maxR) {
-    const maxSafe = Number.isFinite(maxAu) && maxAu > 0 ? maxAu : 1;
-    const auNum = Number(au);
-    const a = Number.isFinite(auNum) && auNum > 0 ? auNum : 0;
-    if (!maxR) return 0;
-
-    const useLogScale = isLogScale();
-    let t = 0;
-
-    if (useLogScale) {
-      const minSafe = Number.isFinite(minAu) && minAu > 0 ? minAu : maxSafe * 0.001;
-      const denom = Math.log10(maxSafe) - Math.log10(minSafe);
-      t = denom > 0 ? (Math.log10(Math.max(a, minSafe)) - Math.log10(minSafe)) / denom : 0;
-    } else {
-      t = maxSafe > 0 ? a / maxSafe : 0;
-    }
-
-    t = clamp(t, 0, 1);
-    return t * maxR;
+    return mapSnapshotAuToPx(au, minAu, maxAu, maxR, { logScale: isLogScale() });
   }
 
   function getFrameMetrics(snapshot) {
-    const dpr = state.canvasDpr || window.devicePixelRatio || 1;
-    const W = canvas.width / dpr;
-    const H = canvas.height / dpr;
-    const baseCx = W * 0.5;
-    const baseCy = H * 0.5;
-
-    const minAuCandidates = [];
-    const maxAuCandidates = [];
-
-    // Scale from actually rendered system features, not the full orbit-table tail.
-    // Some worlds have very distant generated slots that can exceed 10^4 AU and
-    // collapse linear rendering for inner-system objects.
-    if (snapshot.planetNodes?.length) {
-      const planetAus = snapshot.planetNodes
-        .map((p) => Number(p.au))
-        .filter((v) => Number.isFinite(v) && v > 0);
-      if (planetAus.length) {
-        minAuCandidates.push(Math.min(...planetAus));
-        maxAuCandidates.push(Math.max(...planetAus));
-      }
-    }
-    if (chkDebris?.checked && snapshot.debrisDisks?.length) {
-      snapshot.debrisDisks.forEach((d) => {
-        minAuCandidates.push(Number(d.inner), Number(d.outer));
-        maxAuCandidates.push(Number(d.inner), Number(d.outer));
-      });
-    }
-    if (snapshot.gasGiants?.length) {
-      snapshot.gasGiants.forEach((g) => {
-        minAuCandidates.push(Number(g.au));
-        maxAuCandidates.push(Number(g.au));
-      });
-    }
-    // Keep representative framing anchored to actual system bodies/features.
-    // For very massive/luminous stars, HZ and frost distances can explode by
-    // orders of magnitude and collapse the inner-system layout.
-    const coreScaleCandidates = maxAuCandidates.filter((v) => Number.isFinite(v) && v > 0);
-    const hasCoreScaleFeatures = coreScaleCandidates.length > 0;
-    const coreMaxAu = hasCoreScaleFeatures ? Math.max(...coreScaleCandidates) : null;
-    if (!hasCoreScaleFeatures) {
-      if (chkFrost?.checked) {
-        minAuCandidates.push(Number(snapshot.sys?.frostLineAu));
-        maxAuCandidates.push(Number(snapshot.sys?.frostLineAu));
-      }
-      if (chkHz?.checked) {
-        minAuCandidates.push(
-          Number(snapshot.sys?.habitableZoneAu?.inner),
-          Number(snapshot.sys?.habitableZoneAu?.outer),
-        );
-        maxAuCandidates.push(
-          Number(snapshot.sys?.habitableZoneAu?.inner),
-          Number(snapshot.sys?.habitableZoneAu?.outer),
-        );
-      }
-    }
-
-    const minFiniteCandidates = minAuCandidates.filter((v) => Number.isFinite(v) && v > 0);
-    const maxFiniteCandidates = maxAuCandidates.filter((v) => Number.isFinite(v) && v > 0);
-
-    const minSourceAu = minFiniteCandidates.length ? Math.min(...minFiniteCandidates) : 0.1;
-    // minAu is only used for log-scale lower bound — no artificial floor
-    const minAu = minSourceAu * 0.85;
-    const maxSourceAu = maxFiniteCandidates.length ? Math.max(...maxFiniteCandidates) : 1;
-    const maxAu = Math.max(maxSourceAu * 1.05, minAu * 5);
-
-    const maxR = Math.min(W, H) * 0.45 * state.zoom;
-    const usePhysical = isPhysicalScale();
-    const logScale = isLogScale();
-    const starRadiusRsol = Math.max(0.01, Number(snapshot?.starRadiusRsol) || 1);
-
-    // Compute the pixel radius of the innermost orbit for star-size capping
-    const innermostOrbitPx = mapAuToPx(minSourceAu, minAu, maxAu, maxR);
-
-    let starR;
-    if (usePhysical) {
-      // 1:1 size — derive from true physical ratio
-      const starRadiusAu = starRadiusRsol * 0.00465047;
-      const pixelsPerAu = logScale
-        ? (() => {
-            const logDenom = Math.log10(maxAu) - Math.log10(Math.max(minAu, 1e-9));
-            return logDenom > 0 ? maxR / (Math.LN10 * logDenom * Math.max(minAu, 1e-9)) : maxR;
-          })()
-        : maxR / Math.max(maxAu, 1e-6);
-      starR = Math.max(0.5, starRadiusAu * pixelsPerAu);
-    } else {
-      // Representative sizing — scale with star, but shrink if it would overlap the
-      // innermost orbit so orbits are always drawn at their true proportional distance.
-      const baseStarR = Math.max(5, maxR * 0.03);
-      // Use a compressed response curve so colour-testing hotter/larger stars
-      // does not overwhelm the inner-system layout in representative mode.
-      const scaledRadiusFactor = Math.pow(starRadiusRsol, 0.45);
-      const maxStarR = innermostOrbitPx > 0 ? innermostOrbitPx * 0.48 : maxR * 0.12;
-      starR = clamp(baseStarR * scaledRadiusFactor, 4, Math.max(4, maxStarR));
-    }
-    const starRadiusKm = Number(snapshot?.starRadiusKm);
-
-    // Representative mode body scale should track zoom approximately linearly
-    // to preserve apparent size ratios when zooming far out/in.
-    // (The previous zoom^0.4 curve caused oversized bodies at low zoom.)
-    const bodyZoom = usePhysical ? 1 : clamp(Math.pow(state.zoom, 0.5) * state.bodyScale, 0.06, 20);
-    let repBodyScale = 1;
-    let repBodyMinPx = 1.2;
-    if (!usePhysical) {
-      const bodyRadiusCandidates = [];
-      for (const p of snapshot.planetNodes || []) {
-        bodyRadiusCandidates.push(representativePlanetBaseRadiusPx(p, bodyZoom));
-      }
-      for (const g of snapshot.gasGiants || []) {
-        bodyRadiusCandidates.push(representativeGasBaseRadiusPx(g, bodyZoom));
-      }
-      const maxBodyRadiusPx = bodyRadiusCandidates.length ? Math.max(...bodyRadiusCandidates) : 0;
-      if (maxBodyRadiusPx > 0 && Number.isFinite(starR) && starR > 0) {
-        // Normalize all representative body sizes so the largest never exceeds the star.
-        repBodyScale = Math.min(1, starR / maxBodyRadiusPx);
-      }
-      // Keep tiny rocky worlds visible after proportional downscaling.
-      repBodyMinPx = clamp(starR * 0.12, 1.05, 1.8);
-    }
-    const offscaleZones = buildOffscaleZoneInfo(snapshot, coreMaxAu);
-
-    return {
-      W,
-      H,
-      baseCx,
-      baseCy,
-      minAu,
-      maxAu,
-      maxR,
-      starR,
-      starRadiusKm:
-        Number.isFinite(starRadiusKm) && starRadiusKm > 0 ? starRadiusKm : SOL_RADIUS_KM,
-      isPhysical: usePhysical,
-      bodyZoom,
-      repBodyScale,
-      repBodyMinPx,
-      offscaleZones,
-    };
+    return getSnapshotFrameMetrics(snapshot, {
+      bodyScale: state.bodyScale,
+      canvasHeight: canvas.height,
+      canvasWidth: canvas.width,
+      dpr: state.canvasDpr || window.devicePixelRatio || 1,
+      logScale: isLogScale(),
+      offscaleZoneMinAu: OFFSCALE_ZONE_MIN_AU,
+      offscaleZoneRangeRatio: OFFSCALE_ZONE_RANGE_RATIO,
+      offscaleZoneRatio: OFFSCALE_ZONE_RATIO,
+      physicalScale: isPhysicalScale(),
+      showDebris: !!chkDebris?.checked,
+      showFrost: !!chkFrost?.checked,
+      showHz: !!chkHz?.checked,
+      zoom: state.zoom,
+    });
   }
 
   function computePlanetPlacement(planetNode, metrics) {
-    const r = mapAuToPx(planetNode.au, metrics.minAu, metrics.maxAu, metrics.maxR);
-    const baseAngle = hashUnit(planetNode.id) * Math.PI * 2;
-    const auSafe = Math.max(planetNode.au, 0.05);
-    const period =
-      Number.isFinite(planetNode.periodDays) && planetNode.periodDays > 0
-        ? planetNode.periodDays
-        : null;
-    const meanMotion = period
-      ? (2 * Math.PI) / period
-      : (2 * Math.PI) / (40 * Math.pow(auSafe, 1.35));
-
-    const useEccentric = chkEccentric?.checked === true;
-    const ecc =
-      useEccentric && Number.isFinite(planetNode.eccentricity)
-        ? clamp(planetNode.eccentricity, 0, 0.99)
-        : 0;
-
-    let ox, oy, angle;
-    if (useEccentric && ecc > 0) {
-      const M = baseAngle + meanMotion * state.simTime;
-      const E = solveKeplerEquation(M, ecc);
-      const a = r;
-      const b = a * Math.sqrt(1 - ecc * ecc);
-      const cFocus = a * ecc;
-      const argW = ((Number(planetNode.longitudeOfPeriapsisDeg) || 0) * Math.PI) / 180;
-      const cosW = Math.cos(argW);
-      const sinW = Math.sin(argW);
-      const xf = a * Math.cos(E) - cFocus;
-      const zf = b * Math.sin(E);
-      ox = xf * cosW - zf * sinW;
-      oy = xf * sinW + zf * cosW;
-      angle = Math.atan2(oy, ox);
-    } else {
-      angle = baseAngle + meanMotion * state.simTime;
-      ox = Math.cos(angle) * r;
-      oy = Math.sin(angle) * r;
-    }
-
-    // Apply inclination tilt (lifts oy component into vertical)
-    const incDeg = useEccentric ? Number(planetNode.inclinationDeg) || 0 : 0;
-    const incRad = (incDeg * Math.PI) / 180;
-    const cosI = Math.cos(incRad);
-    const sinI = Math.sin(incRad);
-    const oyVert = oy * sinI; // vertical offset from inclination
-    const oyFlat = oy * cosI; // remaining in-plane component
-
-    const usePhysicalScale = isPhysicalScale();
-    const planetRadiusKm =
-      Number.isFinite(planetNode.radiusEarth) && planetNode.radiusEarth > 0
-        ? planetNode.radiusEarth * EARTH_RADIUS_KM
-        : null;
-    const pr = usePhysicalScale
-      ? physicalRadiusToPx(planetRadiusKm, metrics.starR, metrics.starRadiusKm, 0, Infinity)
-      : applyRepresentativeBodyRadiusConstraints(
-          representativePlanetBaseRadiusPx(planetNode, metrics.bodyZoom),
-          metrics,
-        );
-    return { r, baseAngle, angle, ox, oy: oyFlat, oyVert, pr };
+    return computeSystemPlanetPlacement(planetNode, metrics, {
+      applyRepresentativeBodyRadiusConstraints,
+      earthRadiusKm: EARTH_RADIUS_KM,
+      hashUnit,
+      mapAuToPx,
+      physicalRadiusToPx,
+      representativePlanetBaseRadiusPx,
+      simTime: state.simTime,
+      solveKeplerEquation,
+      useEccentric: chkEccentric?.checked === true,
+      usePhysicalScale: isPhysicalScale(),
+    });
   }
 
   function computeGasGiantPlacement(gasGiant, idx, metrics, starMassMsol) {
-    const r = mapAuToPx(gasGiant.au, metrics.minAu, metrics.maxAu, metrics.maxR);
-    const baseAngle = (0.15 + idx * 0.13) * Math.PI * 2;
-    const ggPeriod =
-      gasGiant.au && starMassMsol ? Math.sqrt(gasGiant.au ** 3 / starMassMsol) * 365.256 : 220;
-    const omega = (2 * Math.PI) / ggPeriod;
-    const angle = baseAngle + omega * state.simTime;
-    const ox = Math.cos(angle) * r;
-    const oy = Math.sin(angle) * r;
-    return { r, baseAngle, angle, ox, oy };
+    return computeSystemGasGiantPlacement(gasGiant, idx, metrics, starMassMsol, {
+      mapAuToPx,
+      simTime: state.simTime,
+    });
   }
 
   // Project a 3-D orbit-plane offset (ox, oy, oz) through the camera.
   // oy is the vertical offset (from inclination tilt); defaults to 0 for flat orbits.
   function projectOrbitOffset(ox, oz, oy = 0) {
-    const cosYaw = Math.cos(state.yaw);
-    const sinYaw = Math.sin(state.yaw);
-    const sp = Math.sin(state.pitch);
-    const cp = Math.cos(state.pitch);
-    const xr = ox * cosYaw - oz * sinYaw;
-    const zr = ox * sinYaw + oz * cosYaw;
-    return {
-      x: xr,
-      y: oy - zr * sp,
-      depth: zr * cp,
-    };
+    return projectOrbitOffsetForCamera(ox, oz, state.yaw, state.pitch, oy);
   }
 
   function orbitOffsetToScreen(ox, oz, cx, cy, oy = 0) {
-    const p = projectOrbitOffset(ox, oz, oy);
-    return {
-      x: cx + p.x,
-      y: cy - p.y,
-      depth: p.depth,
-    };
-  }
-
-  function solveKeplerEquation(Mraw, e) {
-    const M = ((Mraw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    let E = M;
-    for (let i = 0; i < 6; i++) {
-      const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-      E -= dE;
-      if (Math.abs(dE) < 1e-10) break;
-    }
-    return E;
+    return orbitOffsetToScreenForCamera(ox, oz, cx, cy, state.yaw, state.pitch, oy);
   }
 
   function orbitPointToScreen(
@@ -5514,191 +3237,70 @@ export function initVisualiserPage(root, options = {}) {
     inclinationDeg,
     trueAnomalyRad,
   ) {
-    const e = clamp(ecc, 0, 0.99);
-    const a = semiMajorPx;
-    const omega = ((argPeriapsisDeg || 0) * Math.PI) / 180;
-    const cosW = Math.cos(omega);
-    const sinW = Math.sin(omega);
-    const incRad = (inclinationDeg * Math.PI) / 180;
-    const cosI = Math.cos(incRad);
-    const sinI = Math.sin(incRad);
-    const r = (a * (1 - e * e)) / (1 + e * Math.cos(trueAnomalyRad));
-    const xOrb = r * Math.cos(trueAnomalyRad);
-    const zOrb = r * Math.sin(trueAnomalyRad);
-    const xr = xOrb * cosW - zOrb * sinW;
-    const zr = xOrb * sinW + zOrb * cosW;
-    const oy = zr * sinI;
-    const zTilted = zr * cosI;
-    return orbitOffsetToScreen(xr, zTilted, cx, cy, oy);
+    return orbitPointToScreenForCamera(
+      cx,
+      cy,
+      semiMajorPx,
+      ecc,
+      argPeriapsisDeg,
+      inclinationDeg,
+      trueAnomalyRad,
+      state.yaw,
+      state.pitch,
+    );
   }
 
   function projectDirectionToScreen(vx, vz, vy = 0) {
-    const cosYaw = Math.cos(state.yaw);
-    const sinYaw = Math.sin(state.yaw);
-    const sp = Math.sin(state.pitch);
-    const cp = Math.cos(state.pitch);
-    const xr = vx * cosYaw - vz * sinYaw;
-    const zr = vx * sinYaw + vz * cosYaw;
-    return {
-      x: xr,
-      y: vy - zr * sp,
-      depth: zr * cp,
-    };
-  }
-
-  function normalizeAxialTiltDeg(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return 0;
-    return clamp(n, 0, 180);
-  }
-
-  function normalizeVec3(v) {
-    const len = Math.hypot(v.x, v.y, v.z);
-    if (!Number.isFinite(len) || len < 1e-9) return null;
-    return { x: v.x / len, y: v.y / len, z: v.z / len };
-  }
-
-  function crossVec3(a, b) {
-    return {
-      x: a.y * b.z - a.z * b.y,
-      y: a.z * b.x - a.x * b.z,
-      z: a.x * b.y - a.y * b.x,
-    };
+    return projectDirectionToScreenForCamera(vx, vz, state.yaw, state.pitch, vy);
   }
 
   function computeSpinAngleRad(bodyId, rotationPeriodDays, axialTiltDeg) {
-    const phase = hashUnit(`${bodyId}:spin`) * Math.PI * 2;
-    const period = Number(rotationPeriodDays);
-    if (!Number.isFinite(period) || period <= 0) return phase;
-    const dir = normalizeAxialTiltDeg(axialTiltDeg) > 90 ? -1 : 1;
-    return phase + dir * state.simTime * ((2 * Math.PI) / period);
+    return computeSpinAngleRadForState(
+      bodyId,
+      rotationPeriodDays,
+      axialTiltDeg,
+      state.simTime,
+      hashUnit,
+    );
   }
 
   function computeAxisDirection(bodyId, axialTiltDeg) {
-    const tilt = normalizeAxialTiltDeg(axialTiltDeg);
-    const retrograde = tilt > 90;
-    const obliquityRad = ((retrograde ? 180 - tilt : tilt) * Math.PI) / 180;
-    const axisAzimuth = hashUnit(`${bodyId}:axis`) * Math.PI * 2;
-    const horizontal = Math.sin(obliquityRad);
-    const vx = horizontal * Math.cos(axisAzimuth);
-    const vz = horizontal * Math.sin(axisAzimuth);
-    const vy = Math.cos(obliquityRad) * (retrograde ? -1 : 1);
-    const projected = projectDirectionToScreen(vx, vz, vy);
-    const dx = projected.x;
-    const dy = -projected.y;
-    const len = Math.hypot(dx, dy);
-    if (!Number.isFinite(len) || len < 1e-6) return null;
-    return { dx: dx / len, dy: dy / len, foreshorten: len, retrograde, vx, vy, vz };
+    return computeAxisDirectionForCamera(bodyId, axialTiltDeg, state.yaw, state.pitch, hashUnit);
   }
   function clearFocusTarget() {
     state.focusTargetKind = null;
     state.focusTargetId = null;
     state.focusZoomTarget = null;
-    if (cameraRafId != null) {
-      try {
-        cancelAnimationFrame(cameraRafId);
-      } catch {}
-      cameraRafId = null;
-    }
-  }
-
-  function estimateMoonOrbitMaxPx(moons, parentRadiusPx) {
-    const parentR = Math.max(0, Number(parentRadiusPx) || 0);
-    const list = Array.isArray(moons) ? moons : [];
-    if (!list.length) return parentR;
-
-    const axes = list
-      .map((m) => Number(m?.semiMajorAxisKm))
-      .filter((v) => Number.isFinite(v) && v > 0);
-    const minAxis = axes.length ? Math.min(...axes) : null;
-    const maxAxis = axes.length ? Math.max(...axes) : null;
-    const moonBand = Math.max(parentR * 0.6, 8 * (list.length - 1), 12);
-    const orbitInner = parentR + Math.max(10, parentR * 0.2);
-
-    let maxOrbit = parentR;
-    for (let i = 0; i < list.length; i += 1) {
-      const axisKm = Number(list[i]?.semiMajorAxisKm);
-      let orbitR = orbitInner + i * 8;
-      if (
-        Number.isFinite(axisKm) &&
-        Number.isFinite(minAxis) &&
-        Number.isFinite(maxAxis) &&
-        maxAxis > minAxis
-      ) {
-        const t =
-          (Math.log10(axisKm) - Math.log10(minAxis)) / (Math.log10(maxAxis) - Math.log10(minAxis));
-        orbitR = orbitInner + t * moonBand;
-      }
-      if (orbitR > maxOrbit) maxOrbit = orbitR;
-    }
-    return maxOrbit;
+    stopCameraLoop();
   }
 
   function desiredFocusZoom(kind, id, snapshot) {
     const snap = snapshot || getSnapshot();
     const metrics = getFrameMetrics(snap);
-    const minDim = Math.min(metrics.W, metrics.H);
-    const currentZoom = Math.max(ZOOM_MIN, Number(state.zoom) || DEFAULT_ZOOM);
-
-    let currentExtentPx = 0;
-    let targetExtentPx = 0;
-
-    if (kind === "star") {
-      currentExtentPx = Math.max(1, metrics.starR);
-      targetExtentPx = minDim * 0.22;
-    } else if (kind === "planet") {
-      const p = snap.planetNodes?.find((node) => node.id === id);
-      if (!p)
-        return clamp(
-          Math.max(currentZoom * 1.28, FOCUS_MIN_ZOOM),
-          FOCUS_MIN_ZOOM,
-          getFocusMaxZoom(),
+    return computeDesiredFocusZoom({
+      currentZoom: state.zoom,
+      defaultZoom: DEFAULT_ZOOM,
+      focusMinZoom: FOCUS_MIN_ZOOM,
+      getFocusMaxZoom,
+      kind,
+      id,
+      metrics,
+      snapshot: snap,
+      zoomMin: ZOOM_MIN,
+      computeGasGiantPlacement,
+      computePlanetPlacement,
+      getGasGiantRadiusPx(g, metricsArg) {
+        return Math.max(
+          1,
+          isPhysicalScale()
+            ? physicalRadiusToPx(g.radiusKm, metricsArg.starR, metricsArg.starRadiusKm, 1, 48)
+            : applyRepresentativeBodyRadiusConstraints(
+                representativeGasBaseRadiusPx(g, metricsArg.bodyZoom),
+                metricsArg,
+              ),
         );
-      const placement = computePlanetPlacement(p, metrics);
-      const planetR = Math.max(1, Number(placement?.pr) || 1);
-      const moonOrbitMax = estimateMoonOrbitMaxPx(p.moons, planetR);
-      currentExtentPx = Math.max(planetR, moonOrbitMax);
-      // If moons exist, frame their orbit system; otherwise make planet large.
-      targetExtentPx = (Array.isArray(p.moons) && p.moons.length ? 0.34 : 0.18) * minDim;
-    } else if (kind === "gasGiant") {
-      const gasGiants = snap.gasGiants || [];
-      const idx = gasGiants.findIndex((g) => g.id === id);
-      if (idx < 0)
-        return clamp(
-          Math.max(currentZoom * 1.28, FOCUS_MIN_ZOOM),
-          FOCUS_MIN_ZOOM,
-          getFocusMaxZoom(),
-        );
-      const g = gasGiants[idx];
-      const placement = computeGasGiantPlacement(g, idx, metrics, snap.starMassMsol);
-      const gasR = Math.max(
-        1,
-        isPhysicalScale()
-          ? physicalRadiusToPx(g.radiusKm, metrics.starR, metrics.starRadiusKm, 1, 48)
-          : applyRepresentativeBodyRadiusConstraints(
-              representativeGasBaseRadiusPx(g, metrics.bodyZoom),
-              metrics,
-            ),
-      );
-      const moonOrbitMax = estimateMoonOrbitMaxPx(g.moons, gasR);
-      currentExtentPx = Math.max(
-        gasR,
-        moonOrbitMax,
-        Number(placement?.r) ? Math.min(placement.r, gasR * 3) : 0,
-      );
-      targetExtentPx = (Array.isArray(g.moons) && g.moons.length ? 0.3 : 0.2) * minDim;
-    } else {
-      return clamp(Math.max(currentZoom * 1.28, FOCUS_MIN_ZOOM), FOCUS_MIN_ZOOM, getFocusMaxZoom());
-    }
-
-    if (!(currentExtentPx > 0) || !(targetExtentPx > 0)) {
-      return clamp(Math.max(currentZoom * 1.28, FOCUS_MIN_ZOOM), FOCUS_MIN_ZOOM, getFocusMaxZoom());
-    }
-
-    const zoomRatio = targetExtentPx / currentExtentPx;
-    const desired = currentZoom * zoomRatio;
-    // Click focus should zoom in, not out.
-    return clamp(Math.max(desired, currentZoom), FOCUS_MIN_ZOOM, getFocusMaxZoom());
+      },
+    });
   }
 
   function setFocusTarget(kind, id, snapshotArg) {
@@ -5709,29 +3311,11 @@ export function initVisualiserPage(root, options = {}) {
   }
 
   function hitTestBody(x, y) {
-    let best = null;
-    let bestDist2 = Infinity;
-    for (const hit of state.bodyHitRegions || []) {
-      const dx = x - hit.x;
-      const dy = y - hit.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > hit.r * hit.r) continue;
-      if (d2 < bestDist2) {
-        bestDist2 = d2;
-        best = hit;
-      }
-    }
-    return best;
+    return hitTestBodyRegion(state.bodyHitRegions, x, y);
   }
 
   function hitTestLabelUi(x, y) {
-    for (let i = (state.labelHitRegions?.length || 0) - 1; i >= 0; i -= 1) {
-      const hit = state.labelHitRegions[i];
-      if (!hit) continue;
-      if (x < hit.x || x > hit.x + hit.w || y < hit.y || y > hit.y + hit.h) continue;
-      return hit;
-    }
-    return null;
+    return hitTestLabelRegion(state.labelHitRegions, x, y);
   }
 
   // Centre the focused body on screen.  Called at the top of every
@@ -5739,152 +3323,91 @@ export function initVisualiserPage(root, options = {}) {
   // projected position — the body stays centred BY CONSTRUCTION, not
   // by correction after the fact.
   function syncFocusPan(snapshot, metrics) {
-    if (!state.focusTargetId || !state.focusTargetKind) return;
-
-    if (state.focusTargetKind === "star") {
-      state.panX = 0;
-      state.panY = 0;
-      return;
-    }
-
-    let placement = null;
-
-    if (state.focusTargetKind === "planet") {
-      const p = snapshot.planetNodes?.find((node) => node.id === state.focusTargetId);
-      if (!p) {
-        clearFocusTarget();
-        return;
-      }
-      placement = computePlanetPlacement(p, metrics);
-    } else if (state.focusTargetKind === "gasGiant") {
-      const gasGiants = snapshot.gasGiants || [];
-      const idx = gasGiants.findIndex((g) => g.id === state.focusTargetId);
-      if (idx < 0) {
-        clearFocusTarget();
-        return;
-      }
-      placement = computeGasGiantPlacement(gasGiants[idx], idx, metrics, snapshot.starMassMsol);
-    } else {
-      clearFocusTarget();
-      return;
-    }
-
-    // Project through the camera rotation, including vertical offset
-    // from orbital inclination (oyVert) so the centering matches the
-    // draw path exactly.
-    const projected = projectOrbitOffset(placement.ox, placement.oy, placement.oyVert || 0);
-    state.panX = -projected.x;
-    state.panY = projected.y;
+    return syncFocusedPan({
+      clearFocusTarget,
+      computeGasGiantPlacement,
+      computePlanetPlacement,
+      metrics,
+      projectOrbitOffset,
+      snapshot,
+      state,
+    });
   }
 
   // Smooth zoom toward the focus target.  Only touches state.zoom —
   // pan is handled by syncFocusPan at draw time.
   function easeFocusZoom(dt) {
-    if (!state.focusTargetId) return false;
-    const targetZoom = clamp(
-      Number.isFinite(state.focusZoomTarget) ? state.focusZoomTarget : state.zoom,
-      ZOOM_MIN,
-      getZoomMax(),
-    );
-    if (Math.abs(targetZoom - state.zoom) < 0.002) return false;
-    const alpha = 1 - Math.exp(-CAMERA_ZOOM_RATE * Math.max(1 / 240, Math.min(0.2, dt)));
-    state.zoom += (targetZoom - state.zoom) * alpha;
-    state.zoomTarget = state.zoom;
-    return true;
+    return applyCameraFocusZoom({
+      state,
+      dt,
+      zoomMin: ZOOM_MIN,
+      getZoomMax,
+      cameraZoomRate: CAMERA_ZOOM_RATE,
+    });
   }
 
   function applyInertia(dt) {
-    const alpha = 1 - Math.exp(-INERTIA_DECAY_RATE * dt);
-    let moving = false;
-    if (
-      Math.abs(state.panVelX) > INERTIA_MIN_VEL_PX ||
-      Math.abs(state.panVelY) > INERTIA_MIN_VEL_PX
-    ) {
-      state.panX += state.panVelX * dt;
-      state.panY += state.panVelY * dt;
-      state.panVelX *= 1 - alpha;
-      state.panVelY *= 1 - alpha;
-      moving = true;
-    } else {
-      state.panVelX = 0;
-      state.panVelY = 0;
-    }
-    if (
-      Math.abs(state.yawVel) > INERTIA_MIN_VEL_RAD ||
-      Math.abs(state.pitchVel) > INERTIA_MIN_VEL_RAD
-    ) {
-      state.yaw += state.yawVel * dt;
-      const pitchMin = state.mode === "cluster" ? -1.45 : PITCH_MIN;
-      const pitchMax = state.mode === "cluster" ? 1.45 : PITCH_MAX;
-      state.pitch = clamp(state.pitch + state.pitchVel * dt, pitchMin, pitchMax);
-      state.yawVel *= 1 - alpha;
-      state.pitchVel *= 1 - alpha;
-      moving = true;
-    } else {
-      state.yawVel = 0;
-      state.pitchVel = 0;
-    }
-    return moving;
+    return applyCameraInertia({
+      state,
+      dt,
+      inertiaDecayRate: INERTIA_DECAY_RATE,
+      inertiaMinVelPx: INERTIA_MIN_VEL_PX,
+      inertiaMinVelRad: INERTIA_MIN_VEL_RAD,
+      systemPitchMin: PITCH_MIN,
+      systemPitchMax: PITCH_MAX,
+    });
   }
 
   function applyZoomInterpolation(dt) {
-    if (!Number.isFinite(state.zoomTarget)) {
-      state.zoomTarget = state.zoom;
-      return false;
-    }
-    const diff = Math.abs(state.zoomTarget - state.zoom);
-    if (diff < 0.001 * Math.max(0.01, Math.abs(state.zoom))) {
-      state.zoom = state.zoomTarget;
-      return false;
-    }
-    const alpha = 1 - Math.exp(-CAMERA_ZOOM_RATE * dt);
-    const oldZoom = state.zoom;
-    state.zoom += (state.zoomTarget - state.zoom) * alpha;
-    if (!state.focusTargetId && state.zoomCursorX != null) {
-      const dpr = state.canvasDpr || window.devicePixelRatio || 1;
-      const cx = canvas.width / dpr / 2 + state.panX;
-      const cy = canvas.height / dpr / 2 + state.panY;
-      const factor = state.zoom / oldZoom;
-      state.panX += (state.zoomCursorX - cx) * (1 - factor);
-      state.panY += (state.zoomCursorY - cy) * (1 - factor);
-    }
-    return true;
+    return applyCameraZoomInterpolation({
+      state,
+      dt,
+      cameraZoomRate: CAMERA_ZOOM_RATE,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      devicePixelRatio: state.canvasDpr || window.devicePixelRatio || 1,
+    });
   }
 
   function applyResetEasing(dt) {
-    if (!state.resetting || !state.resetTargets) return false;
-    const t = state.resetTargets;
-    const alpha = 1 - Math.exp(-RESET_RATE * dt);
-    state.panX += (t.panX - state.panX) * alpha;
-    state.panY += (t.panY - state.panY) * alpha;
-    state.yaw += (t.yaw - state.yaw) * alpha;
-    state.pitch += (t.pitch - state.pitch) * alpha;
-    state.zoom += (t.zoom - state.zoom) * alpha;
-    state.zoomTarget = state.zoom;
-    const moving =
-      Math.abs(t.panX - state.panX) > 0.3 ||
-      Math.abs(t.panY - state.panY) > 0.3 ||
-      Math.abs(t.yaw - state.yaw) > 0.002 ||
-      Math.abs(t.pitch - state.pitch) > 0.002 ||
-      Math.abs(t.zoom - state.zoom) > 0.002;
-    if (!moving) {
-      state.panX = t.panX;
-      state.panY = t.panY;
-      state.yaw = t.yaw;
-      state.pitch = t.pitch;
-      state.zoom = t.zoom;
-      state.zoomTarget = t.zoom;
-      state.resetting = false;
-      state.resetTargets = null;
-    }
-    return moving;
+    return applyCameraResetEasing({
+      state,
+      dt,
+      resetRate: RESET_RATE,
+    });
   }
 
   function killInertia() {
-    state.panVelX = 0;
-    state.panVelY = 0;
-    state.yawVel = 0;
-    state.pitchVel = 0;
+    stopCameraInertia(state);
+  }
+
+  function isLive() {
+    return !disposed && root.isConnected;
+  }
+
+  function isTickScheduled() {
+    return rafId != null;
+  }
+
+  function startTickLoop() {
+    if (rafId != null) return;
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function stopTickLoop() {
+    if (rafId == null) return;
+    try {
+      cancelAnimationFrame(rafId);
+    } catch {}
+    rafId = null;
+  }
+
+  function stopCameraLoop() {
+    if (cameraRafId == null) return;
+    try {
+      cancelAnimationFrame(cameraRafId);
+    } catch {}
+    cameraRafId = null;
   }
 
   function startCameraLoop() {
@@ -5920,597 +3443,12 @@ export function initVisualiserPage(root, options = {}) {
     cameraRafId = requestAnimationFrame(cameraTick);
   }
 
-  function buildFlareSignature(snapshot) {
-    const seedKey = snapshot.starSeed == null ? "" : String(snapshot.starSeed);
-    const m = Number(snapshot.starMassMsol);
-    const a = Number(snapshot.starAgeGyr);
-    const t = Number(snapshot.starTempK);
-    const l = Number(snapshot.starLuminosityLsun);
-    const activityModelVersion = snapshot?.activityModelVersion === "v1" ? "v1" : "v2";
-    return `${seedKey}|${m.toFixed(6)}|${a.toFixed(6)}|${t.toFixed(3)}|${l.toFixed(6)}|${activityModelVersion}`;
-  }
-
   function flareDebugEnabled() {
     return !!chkDebug?.checked;
   }
 
-  function cycleValueAt(simSec) {
-    const fs = state.flareState;
-    if (fs.params?.teffBin !== "FGK") return 0.5;
-    const phase = (simSec / fs.cyclePeriodSec) * Math.PI * 2 + fs.cyclePhase;
-    return 0.5 + 0.5 * Math.sin(phase);
-  }
-
-  function ensureFlareModel(snapshot, nowSimSec) {
-    const fs = state.flareState;
-    const signature = buildFlareSignature(snapshot);
-    if (fs.signature === signature && fs.params) return;
-    const activityModelVersion = snapshot?.activityModelVersion === "v1" ? "v1" : "v2";
-    const activityModel =
-      snapshot?.starActivityModel && typeof snapshot.starActivityModel === "object"
-        ? snapshot.starActivityModel
-        : computeStellarActivityModel(
-            {
-              massMsun: snapshot.starMassMsol,
-              ageGyr: snapshot.starAgeGyr,
-              teffK: snapshot.starTempK,
-              luminosityLsun: snapshot.starLuminosityLsun,
-            },
-            { activityCycle: 0.5 },
-          );
-    const activity =
-      activityModel?.activity && typeof activityModel.activity === "object"
-        ? activityModel.activity
-        : activityModel || {};
-    // Visualizer flare cadence follows the energetic (>1e32 erg) rate.
-    const energeticRatePerDay = Math.max(
-      0,
-      Number(activity?.energeticFlareRatePerDay) || Number(activity?.N32) || 0,
-    );
-    const associatedCmeRatePerDay =
-      activityModelVersion === "v2"
-        ? Math.max(0, Number(activity?.cmeAssociatedRatePerDay) || 0)
-        : 0;
-    const backgroundCmeRatePerDay =
-      activityModelVersion === "v2"
-        ? Math.max(0, Number(activity?.cmeBackgroundRatePerDay) || 0)
-        : 0;
-    const params = {
-      ...activity,
-      lambdaFlarePerDay: energeticRatePerDay,
-      EminErg: FLARE_E0_ERG,
-      activityModelVersion,
-      cmeAssociatedRatePerDay: associatedCmeRatePerDay,
-      cmeBackgroundRatePerDay: backgroundCmeRatePerDay,
-      cmeTotalRatePerDay: associatedCmeRatePerDay + backgroundCmeRatePerDay,
-    };
-    const totalFlareRatePerDay = Math.max(
-      0,
-      Number(activity?.totalFlareRatePerDay) || energeticRatePerDay,
-    );
-    const surfaceFlareRatePerDay = Math.max(0, totalFlareRatePerDay - energeticRatePerDay);
-    const surfaceParams = {
-      ...activity,
-      lambdaFlarePerDay: surfaceFlareRatePerDay,
-      EminErg: SURFACE_FLARE_EMIN_ERG,
-      EmaxErg: SURFACE_FLARE_EMAX_ERG,
-    };
-    const hasSeed = snapshot.starSeed != null && String(snapshot.starSeed).trim() !== "";
-    const rng = hasSeed ? createSeededRng(snapshot.starSeed) : Math.random;
-
-    fs.signature = signature;
-    fs.params = params;
-    fs.surfaceParams = surfaceParams;
-    fs.seeded = hasSeed;
-    fs.rng = rng;
-    fs.cmeTimes24hSec = [];
-    fs.cyclePhase = rng() * Math.PI * 2;
-    fs.cyclePeriodSec = (8 + rng() * 6) * 365.25 * 86400;
-    fs.loopToggle = rng() >= 0.5;
-    // Reset in-flight burst visuals when stellar inputs change so stale
-    // flares/CMEs do not remain frozen on screen after edits.
-    state.starBursts = [];
-
-    const next = scheduleNextFlare(nowSimSec, params, rng);
-    fs.nextFlareTimeSec = next.timeSec;
-    fs.nextFlareEnergyErg = next.energyErg;
-    const nextSurface = scheduleNextFlare(nowSimSec, surfaceParams, rng);
-    fs.nextSurfaceFlareTimeSec = nextSurface.timeSec;
-    fs.nextSurfaceFlareEnergyErg = nextSurface.energyErg;
-    fs.nextAssociatedCmeTimeSec =
-      activityModelVersion === "v2"
-        ? scheduleNextCme(nowSimSec, params.cmeAssociatedRatePerDay, rng)
-        : Infinity;
-    fs.nextBackgroundCmeTimeSec =
-      activityModelVersion === "v2"
-        ? scheduleNextCme(nowSimSec, params.cmeBackgroundRatePerDay, rng)
-        : Infinity;
-
-    dbg(flareDebugEnabled(), "flare:model:init", {
-      signature,
-      activityModelVersion,
-      starSeed: snapshot.starSeed ?? null,
-      starMassMsol: Number(snapshot.starMassMsol) || null,
-      starAgeGyr: Number(snapshot.starAgeGyr) || null,
-      starTempK: Number(snapshot.starTempK) || null,
-      starLuminosityLsun: Number(snapshot.starLuminosityLsun) || null,
-      teffBin: params.teffBin,
-      ageBand: params.ageBand,
-      N32: Number(params.N32),
-      lambdaFlarePerDay: Number(params.lambdaFlarePerDay),
-      EminErg: Number(params.EminErg),
-      totalFlareRatePerDay: Number(totalFlareRatePerDay) || 0,
-      surfaceFlareRatePerDay: Number(surfaceFlareRatePerDay) || 0,
-      cmeAssociatedRatePerDay: Number(params.cmeAssociatedRatePerDay) || 0,
-      cmeBackgroundRatePerDay: Number(params.cmeBackgroundRatePerDay) || 0,
-      cmeTotalRatePerDay: Number(params.cmeTotalRatePerDay) || 0,
-      nextFlareInSec: Number.isFinite(next.timeSec)
-        ? Number((next.timeSec - nowSimSec).toFixed(3))
-        : Infinity,
-      nextFlareEnergyErg: Number(next.energyErg) || null,
-      nextSurfaceFlareInSec: Number.isFinite(fs.nextSurfaceFlareTimeSec)
-        ? Number((fs.nextSurfaceFlareTimeSec - nowSimSec).toFixed(3))
-        : Infinity,
-      nextSurfaceFlareEnergyErg: Number(fs.nextSurfaceFlareEnergyErg) || null,
-      nextAssociatedCmeInSec: Number.isFinite(fs.nextAssociatedCmeTimeSec)
-        ? Number((fs.nextAssociatedCmeTimeSec - nowSimSec).toFixed(3))
-        : Infinity,
-      nextBackgroundCmeInSec: Number.isFinite(fs.nextBackgroundCmeTimeSec)
-        ? Number((fs.nextBackgroundCmeTimeSec - nowSimSec).toFixed(3))
-        : Infinity,
-    });
-  }
-
-  function flareVisualProfile(flareClass) {
-    switch (flareClass) {
-      case "super":
-        return { spread: 0.22, reach: 1.9, intensity: 0.34, ttl: 1.45 };
-      case "large":
-        return { spread: 0.17, reach: 1.45, intensity: 0.27, ttl: 1.1 };
-      case "medium":
-        return { spread: 0.13, reach: 1.1, intensity: 0.21, ttl: 0.86 };
-      case "small":
-        return { spread: 0.09, reach: 0.82, intensity: 0.16, ttl: 0.62 };
-      case "micro":
-      default:
-        return { spread: 0.06, reach: 0.58, intensity: 0.11, ttl: 0.42 };
-    }
-  }
-
-  function flareEnergyNorm(energyErg) {
-    const e = Math.max(1, Number(energyErg) || 1e30);
-    return clamp((Math.log10(e) - 30) / 5, 0, 1);
-  }
-
-  function pushStarBurst({ type, flareClass, energyErg, angle, activityCycle = 0.5 }) {
-    if (state.starBursts.length >= MAX_STAR_BURSTS) return false;
-
-    const fs = state.flareState;
-    const rng = fs.rng || Math.random;
-    const base = flareVisualProfile(flareClass);
-    const isCme = type === "cme";
-    const isSurface = type === "surface";
-    let hasLoops = false;
-    if (!isCme && !isSurface) {
-      hasLoops = fs.loopToggle !== false;
-      fs.loopToggle = !hasLoops;
-    }
-    const energyNorm = flareEnergyNorm(energyErg);
-    const n32 = Math.max(0, Number(fs.params?.N32) || 0);
-    const activityNorm = clamp(Math.log10(1 + n32) / Math.log10(31), 0, 1);
-    const cycleNorm = clamp(Number(activityCycle), 0, 1);
-
-    const jitter = (rng() - 0.5) * 0.25;
-    const spread = Math.max(
-      0.03,
-      base.spread *
-        (isCme ? 1.45 : isSurface ? 0.65 : 1.0) *
-        (1 + jitter) *
-        (0.88 + energyNorm * 0.42 + activityNorm * 0.18),
-    );
-    const reach = Math.max(
-      0.2,
-      base.reach *
-        (isCme ? 2.0 : isSurface ? 0.35 : 1.0) *
-        (1 + jitter) *
-        (0.9 + energyNorm * 0.8 + cycleNorm * 0.25),
-    );
-    const intensity = Math.max(
-      0.06,
-      base.intensity *
-        (isCme ? 0.86 : isSurface ? 0.72 : 1.0) *
-        (1 + jitter * 0.5) *
-        (0.84 + energyNorm * 0.82 + activityNorm * 0.32),
-    );
-    const ttl = Math.max(
-      0.2,
-      base.ttl *
-        (isCme ? 1.95 : isSurface ? 0.55 : 1.0) *
-        (1 + jitter * 0.2) *
-        (0.9 + energyNorm * 0.45),
-    );
-    const loopCount = clamp(
-      Math.round(
-        (isCme ? 2.2 : 1.2) +
-          energyNorm * (isCme ? 3.0 : 2.2) +
-          activityNorm * 1.4 +
-          cycleNorm * 0.9 +
-          (rng() - 0.5) * 1.2,
-      ),
-      1,
-      isCme ? 7 : 5,
-    );
-    const radialStartNorm = isCme
-      ? clamp(0.28 + rng() * 0.16 + energyNorm * 0.08, 0.22, 0.64)
-      : clamp(0.07 + rng() * 0.09 + energyNorm * 0.04, 0.05, 0.26);
-    const radialEndNorm = isCme
-      ? clamp(
-          1.15 + energyNorm * 0.9 + activityNorm * 0.25 + cycleNorm * 0.2 + rng() * 0.18,
-          1.08,
-          2.6,
-        )
-      : clamp(0.5 + energyNorm * 0.32 + cycleNorm * 0.15 + rng() * 0.08, 0.42, 1.15);
-    const frontThickness = isCme
-      ? clamp(0.16 + energyNorm * 0.09 + activityNorm * 0.04, 0.14, 0.42)
-      : clamp(0.06 + energyNorm * 0.03, 0.05, 0.16);
-    const streamers = isCme
-      ? clamp(Math.round(2 + energyNorm * 2.2 + activityNorm * 1.1 + rng() * 2.1), 2, 7)
-      : clamp(Math.round(1 + energyNorm * 1.8 + rng() * 1.6), 1, 4);
-    const shellRipple = isCme ? clamp(0.012 + rng() * 0.03, 0.012, 0.05) : 0;
-    const plumeStretch = isCme
-      ? clamp(1.2 + energyNorm * 0.65 + cycleNorm * 0.25, 1.1, 2.4)
-      : clamp(0.75 + energyNorm * 0.35, 0.72, 1.35);
-    const cmeLobes = isCme
-      ? clamp(Math.round(3 + energyNorm * 2.5 + activityNorm * 1.3 + rng() * 1.8), 3, 8)
-      : 0;
-    const plumeNoise = isCme ? rng() * Math.PI * 2 : 0;
-    const surfaceRadiusNorm = isSurface ? Math.pow(rng(), 0.62) * 0.9 : 0;
-    const surfaceSpotScale = isSurface
-      ? clamp(0.65 + energyNorm * 0.9 + rng() * 0.35, 0.5, 1.7)
-      : 1;
-
-    state.starBursts.push({
-      type: isCme ? "cme" : isSurface ? "surface" : "flare",
-      flareClass,
-      energyErg,
-      angle,
-      spread,
-      reach,
-      curl: (rng() - 0.5) * 0.45,
-      intensity,
-      ttl,
-      // Seed with a tiny age so the burst is visible on the very frame it spawns.
-      age: Math.min(STAR_BURST_INITIAL_AGE_SEC, ttl * 0.22),
-      loops: loopCount,
-      hasLoops,
-      loopRise: clamp(0.5 + energyNorm * 0.4 + (isCme ? 0.18 : 0), 0.45, 1.25),
-      energyNorm,
-      activityNorm,
-      cycleNorm,
-      radialStartNorm,
-      radialEndNorm,
-      frontThickness,
-      streamers,
-      shellRipple,
-      plumeStretch,
-      cmeLobes,
-      plumeNoise,
-      surfaceRadiusNorm,
-      surfaceSpotScale,
-      beads: isCme
-        ? clamp(Math.round(2 + energyNorm * 3 + activityNorm * 1.2 + rng() * 1.8), 2, 8)
-        : 0,
-    });
-    return true;
-  }
-
   function updateStarBursts(dtSec, snapshot, nowActivitySec) {
-    const fs = state.flareState;
-    const debugOn = flareDebugEnabled();
-    ensureFlareModel(snapshot, nowActivitySec);
-    const rng = fs.rng || Math.random;
-    const activityModelVersion = fs.params?.activityModelVersion === "v1" ? "v1" : "v2";
-    const useSplitCmeScheduler = activityModelVersion === "v2";
-
-    let changed = false;
-    const burstCountBefore = state.starBursts.length;
-    let expiredBursts = 0;
-    let spawnedFlares = 0;
-    let spawnedSurfaceFlares = 0;
-    let spawnedCmes = 0;
-    let spawnedAssociatedCmes = 0;
-    let spawnedBackgroundCmes = 0;
-
-    if (state.starBursts.length) {
-      changed = true;
-      for (const burst of state.starBursts) burst.age += dtSec;
-      const before = state.starBursts.length;
-      state.starBursts = state.starBursts.filter((b) => b.age < b.ttl);
-      expiredBursts = Math.max(0, before - state.starBursts.length);
-    }
-
-    fs.cmeTimes24hSec = fs.cmeTimes24hSec.filter((t) => t >= nowActivitySec - 86400);
-
-    let flareCountThisTick = 0;
-    let flareBacklogGuardTriggered = false;
-    let surfaceFlareIterations = 0;
-    let surfaceFlareBacklogGuardTriggered = false;
-    while (
-      Number.isFinite(fs.nextFlareTimeSec) &&
-      fs.nextFlareTimeSec <= nowActivitySec &&
-      flareCountThisTick < MAX_FLARES_PER_TICK &&
-      state.starBursts.length < MAX_STAR_BURSTS
-    ) {
-      const flareEnergy = Number(fs.nextFlareEnergyErg) || 1e30;
-      const flareClass = flareClassFromEnergy(flareEnergy);
-      const angle = (fs.rng || Math.random)() * Math.PI * 2;
-      const activityCycle = cycleValueAt(fs.nextFlareTimeSec);
-
-      const flareAdded = pushStarBurst({
-        type: "flare",
-        flareClass,
-        energyErg: flareEnergy,
-        angle,
-        activityCycle,
-      });
-      if (flareAdded) {
-        changed = true;
-        spawnedFlares += 1;
-      }
-
-      if (!useSplitCmeScheduler) {
-        const recentCMECount24h = fs.cmeTimes24hSec.length;
-        const spawnCME = maybeSpawnCME(
-          flareEnergy,
-          fs.params,
-          recentCMECount24h,
-          {
-            teffK: snapshot.starTempK,
-            ageGyr: snapshot.starAgeGyr,
-            massMsun: snapshot.starMassMsol,
-            luminosityLsun: snapshot.starLuminosityLsun,
-          },
-          { activityCycle, rng: fs.rng },
-        );
-        if (spawnCME && state.starBursts.length < MAX_STAR_BURSTS) {
-          const cmeAdded = pushStarBurst({
-            type: "cme",
-            flareClass,
-            energyErg: flareEnergy,
-            angle: angle + (rng() - 0.5) * 0.22,
-            activityCycle,
-          });
-          if (cmeAdded) {
-            fs.cmeTimes24hSec.push(fs.nextFlareTimeSec);
-            changed = true;
-            spawnedCmes += 1;
-          }
-        }
-      }
-
-      const next = scheduleNextFlare(fs.nextFlareTimeSec, fs.params, fs.rng);
-      fs.nextFlareTimeSec = next.timeSec;
-      fs.nextFlareEnergyErg = next.energyErg;
-      flareCountThisTick += 1;
-    }
-
-    while (
-      Number.isFinite(fs.nextSurfaceFlareTimeSec) &&
-      fs.nextSurfaceFlareTimeSec <= nowActivitySec &&
-      surfaceFlareIterations < MAX_SURFACE_FLARES_PER_TICK &&
-      state.starBursts.length < MAX_STAR_BURSTS
-    ) {
-      const flareEnergy = Number(fs.nextSurfaceFlareEnergyErg) || SURFACE_FLARE_EMIN_ERG;
-      const flareClass = flareClassFromEnergy(flareEnergy);
-      const activityCycle = cycleValueAt(fs.nextSurfaceFlareTimeSec);
-      const flareAdded = pushStarBurst({
-        type: "surface",
-        flareClass,
-        energyErg: flareEnergy,
-        angle: rng() * Math.PI * 2,
-        activityCycle,
-      });
-      if (flareAdded) {
-        changed = true;
-        spawnedSurfaceFlares += 1;
-      }
-      const nextSurface = scheduleNextFlare(
-        fs.nextSurfaceFlareTimeSec,
-        fs.surfaceParams || fs.params,
-        fs.rng,
-      );
-      fs.nextSurfaceFlareTimeSec = nextSurface.timeSec;
-      fs.nextSurfaceFlareEnergyErg = nextSurface.energyErg;
-      surfaceFlareIterations += 1;
-    }
-
-    // Backlog guard for very active stars at high simulation speeds.
-    if (
-      (flareCountThisTick >= MAX_FLARES_PER_TICK || state.starBursts.length >= MAX_STAR_BURSTS) &&
-      fs.nextFlareTimeSec <= nowActivitySec
-    ) {
-      const next = scheduleNextFlare(nowActivitySec, fs.params, fs.rng);
-      fs.nextFlareTimeSec = next.timeSec;
-      fs.nextFlareEnergyErg = next.energyErg;
-      flareBacklogGuardTriggered = true;
-    }
-    if (
-      (surfaceFlareIterations >= MAX_SURFACE_FLARES_PER_TICK ||
-        state.starBursts.length >= MAX_STAR_BURSTS) &&
-      fs.nextSurfaceFlareTimeSec <= nowActivitySec
-    ) {
-      const nextSurface = scheduleNextFlare(nowActivitySec, fs.surfaceParams || fs.params, fs.rng);
-      fs.nextSurfaceFlareTimeSec = nextSurface.timeSec;
-      fs.nextSurfaceFlareEnergyErg = nextSurface.energyErg;
-      surfaceFlareBacklogGuardTriggered = true;
-    }
-
-    let associatedCmeIterations = 0;
-    let backgroundCmeIterations = 0;
-    let associatedCmeBacklogGuardTriggered = false;
-    let backgroundCmeBacklogGuardTriggered = false;
-
-    if (useSplitCmeScheduler) {
-      const associatedRatePerDay = Math.max(0, Number(fs.params?.cmeAssociatedRatePerDay) || 0);
-      const backgroundRatePerDay = Math.max(0, Number(fs.params?.cmeBackgroundRatePerDay) || 0);
-
-      while (
-        Number.isFinite(fs.nextAssociatedCmeTimeSec) &&
-        fs.nextAssociatedCmeTimeSec <= nowActivitySec &&
-        associatedCmeIterations < MAX_CMES_PER_TICK &&
-        state.starBursts.length < MAX_STAR_BURSTS
-      ) {
-        const burstTime = fs.nextAssociatedCmeTimeSec;
-        const activityCycle = cycleValueAt(burstTime);
-        const activeFlares = state.starBursts.filter(
-          (burst) => burst.type === "flare" && burst.age < burst.ttl * 0.85,
-        );
-        let angle = rng() * Math.PI * 2;
-        let energyErg = FLARE_E0_ERG * (1 + rng() * 2.5);
-        if (activeFlares.length) {
-          const anchor = activeFlares[Math.floor(rng() * activeFlares.length)];
-          angle = anchor.angle + (rng() - 0.5) * 0.2;
-          energyErg = Math.max(FLARE_E0_ERG, Number(anchor.energyErg) || FLARE_E0_ERG);
-        }
-        const cmeAdded = pushStarBurst({
-          type: "cme",
-          flareClass: flareClassFromEnergy(energyErg),
-          energyErg,
-          angle,
-          activityCycle,
-        });
-        if (cmeAdded) {
-          fs.cmeTimes24hSec.push(burstTime);
-          changed = true;
-          spawnedCmes += 1;
-          spawnedAssociatedCmes += 1;
-        }
-        fs.nextAssociatedCmeTimeSec = scheduleNextCme(
-          fs.nextAssociatedCmeTimeSec,
-          associatedRatePerDay,
-          fs.rng,
-        );
-        associatedCmeIterations += 1;
-      }
-
-      if (
-        (associatedCmeIterations >= MAX_CMES_PER_TICK ||
-          state.starBursts.length >= MAX_STAR_BURSTS) &&
-        fs.nextAssociatedCmeTimeSec <= nowActivitySec
-      ) {
-        fs.nextAssociatedCmeTimeSec = scheduleNextCme(nowActivitySec, associatedRatePerDay, fs.rng);
-        associatedCmeBacklogGuardTriggered = true;
-      }
-
-      while (
-        Number.isFinite(fs.nextBackgroundCmeTimeSec) &&
-        fs.nextBackgroundCmeTimeSec <= nowActivitySec &&
-        backgroundCmeIterations < MAX_CMES_PER_TICK &&
-        state.starBursts.length < MAX_STAR_BURSTS
-      ) {
-        const burstTime = fs.nextBackgroundCmeTimeSec;
-        const activityCycle = cycleValueAt(burstTime);
-        const energyErg = FLARE_E0_ERG * (0.55 + rng() * 1.3);
-        const cmeAdded = pushStarBurst({
-          type: "cme",
-          flareClass: flareClassFromEnergy(energyErg),
-          energyErg,
-          angle: rng() * Math.PI * 2,
-          activityCycle,
-        });
-        if (cmeAdded) {
-          fs.cmeTimes24hSec.push(burstTime);
-          changed = true;
-          spawnedCmes += 1;
-          spawnedBackgroundCmes += 1;
-        }
-        fs.nextBackgroundCmeTimeSec = scheduleNextCme(
-          fs.nextBackgroundCmeTimeSec,
-          backgroundRatePerDay,
-          fs.rng,
-        );
-        backgroundCmeIterations += 1;
-      }
-
-      if (
-        (backgroundCmeIterations >= MAX_CMES_PER_TICK ||
-          state.starBursts.length >= MAX_STAR_BURSTS) &&
-        fs.nextBackgroundCmeTimeSec <= nowActivitySec
-      ) {
-        fs.nextBackgroundCmeTimeSec = scheduleNextCme(nowActivitySec, backgroundRatePerDay, fs.rng);
-        backgroundCmeBacklogGuardTriggered = true;
-      }
-    } else {
-      fs.nextAssociatedCmeTimeSec = Infinity;
-      fs.nextBackgroundCmeTimeSec = Infinity;
-    }
-
-    const tickSummary = {
-      dtSec: Number(dtSec.toFixed(4)),
-      speedDaysPerSec: Number(state.speed),
-      nowActivitySec: Number(nowActivitySec.toFixed(3)),
-      isPlaying: !!state.isPlaying,
-      exportingGif: !!state.exportingGif,
-      activityModelVersion,
-      burstCountBefore,
-      burstCountAfter: state.starBursts.length,
-      expiredBursts,
-      spawnedFlares,
-      spawnedSurfaceFlares,
-      spawnedCmes,
-      spawnedAssociatedCmes,
-      spawnedBackgroundCmes,
-      flareIterations: flareCountThisTick,
-      surfaceFlareIterations,
-      associatedCmeIterations,
-      backgroundCmeIterations,
-      flareBacklogGuardTriggered,
-      surfaceFlareBacklogGuardTriggered,
-      associatedCmeBacklogGuardTriggered,
-      backgroundCmeBacklogGuardTriggered,
-      reachedTickCap: flareCountThisTick >= MAX_FLARES_PER_TICK,
-      reachedBufferCap: state.starBursts.length >= MAX_STAR_BURSTS,
-      nextFlareInSec: Number.isFinite(fs.nextFlareTimeSec)
-        ? Number((fs.nextFlareTimeSec - nowActivitySec).toFixed(3))
-        : Infinity,
-      nextFlareEnergyErg: Number(fs.nextFlareEnergyErg) || null,
-      nextSurfaceFlareInSec: Number.isFinite(fs.nextSurfaceFlareTimeSec)
-        ? Number((fs.nextSurfaceFlareTimeSec - nowActivitySec).toFixed(3))
-        : Infinity,
-      nextSurfaceFlareEnergyErg: Number(fs.nextSurfaceFlareEnergyErg) || null,
-      nextAssociatedCmeInSec: Number.isFinite(fs.nextAssociatedCmeTimeSec)
-        ? Number((fs.nextAssociatedCmeTimeSec - nowActivitySec).toFixed(3))
-        : Infinity,
-      nextBackgroundCmeInSec: Number.isFinite(fs.nextBackgroundCmeTimeSec)
-        ? Number((fs.nextBackgroundCmeTimeSec - nowActivitySec).toFixed(3))
-        : Infinity,
-      teffBin: fs.params?.teffBin || null,
-      ageBand: fs.params?.ageBand || null,
-      N32: Number(fs.params?.N32) || 0,
-      lambdaFlarePerDay: Number(fs.params?.lambdaFlarePerDay) || 0,
-      lowEnergySurfaceRatePerDay: Number(fs.surfaceParams?.lambdaFlarePerDay) || 0,
-      cmeAssociatedRatePerDay: Number(fs.params?.cmeAssociatedRatePerDay) || 0,
-      cmeBackgroundRatePerDay: Number(fs.params?.cmeBackgroundRatePerDay) || 0,
-      cmeTotalRatePerDay: Number(fs.params?.cmeTotalRatePerDay) || 0,
-    };
-    const hasTickEvent =
-      spawnedFlares > 0 ||
-      spawnedSurfaceFlares > 0 ||
-      spawnedCmes > 0 ||
-      expiredBursts > 0 ||
-      flareCountThisTick > 0 ||
-      surfaceFlareIterations > 0 ||
-      associatedCmeIterations > 0 ||
-      backgroundCmeIterations > 0 ||
-      flareBacklogGuardTriggered ||
-      surfaceFlareBacklogGuardTriggered ||
-      associatedCmeBacklogGuardTriggered ||
-      backgroundCmeBacklogGuardTriggered ||
-      burstCountBefore !== state.starBursts.length;
-    if (hasTickEvent) dbg(debugOn, "flare:tick:event", tickSummary);
-    else dbgThrottled(debugOn, "flare:tick:idle", 2000, "flare:tick:idle", tickSummary);
-
-    return changed;
+    return starActivityRuntime.updateStarBursts(dtSec, snapshot, nowActivitySec);
   }
 
   /* ── Draw dispatcher ────────────────────────────────────────── */
@@ -6659,705 +3597,109 @@ export function initVisualiserPage(root, options = {}) {
     requestAnimationFrame(expandTick);
   }
 
-  // Camera controls:
-  // - Left mouse drag pans (or orbits when focused).
-  // - Right mouse drag rotates.
-  // - Inertia continues motion on release with exponential decay.
-  let dragMode = null; // "pan" | "rotate" | "label" | null
-  let draggedLabel = null;
-  let lastX = 0,
-    lastY = 0;
-  let lastMoveTime = 0;
-  let draggedDuringPointer = false;
-  let suppressPlanetClickUntilMs = 0;
-  addDisposableListener(canvas, "contextmenu", (e) => {
-    // Keep right-drag rotation usable without the browser context menu interrupting.
-    e.preventDefault();
-  });
-  addDisposableListener(canvas, "mousedown", (e) => {
-    killInertia();
-    state.resetting = false;
-    state.resetTargets = null;
-    if (state.mode === "system" && e.button === 0) {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const labelHit = hitTestLabelUi(x, y);
-      if (labelHit?.kind === "label-reset" && labelHit.key) {
-        state.labelOverrides.delete(labelHit.key);
-        draw();
-        e.preventDefault();
-        return;
-      }
-      if (labelHit?.kind === "label" && labelHit.key) {
-        dragMode = "label";
-        state.dragging = true;
-        canvas.style.cursor = "grabbing";
-        draggedLabel = {
-          key: labelHit.key,
-          pointerDx: x - labelHit.x,
-          pointerDy: y - labelHit.y,
-          bodyX: labelHit.bodyX ?? labelHit.x,
-          bodyY: labelHit.bodyY ?? labelHit.y,
-        };
-        draggedDuringPointer = false;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        lastMoveTime = performance.now() / 1000;
-        e.preventDefault();
-        return;
-      }
-    }
-    if (state.mode === "cluster") {
-      /* Cluster: any button rotates */
-      dragMode = "rotate";
-      state.dragging = true;
-    } else {
-      if (e.button === 0) dragMode = state.focusTargetId ? "rotate" : "pan";
-      else if (e.button === 2) dragMode = "rotate";
-      else return;
-    }
-    if (e.button === 2) e.preventDefault();
-    draggedDuringPointer = false;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    lastMoveTime = performance.now() / 1000;
-  });
-  addDisposableListener(window, "mouseup", () => {
-    if (!dragMode) return;
-    const wasDrag = dragMode;
-    dragMode = null;
-    draggedLabel = null;
-    state.dragging = false;
-    if (state.mode === "system") canvas.style.cursor = "grab";
-    if (draggedDuringPointer) suppressPlanetClickUntilMs = performance.now() + 140;
-    // Start inertia if velocities are above threshold
-    if (wasDrag === "pan" || wasDrag === "rotate") {
-      const hasPanInertia =
-        Math.abs(state.panVelX) > INERTIA_MIN_VEL_PX ||
-        Math.abs(state.panVelY) > INERTIA_MIN_VEL_PX;
-      const hasRotInertia =
-        Math.abs(state.yawVel) > INERTIA_MIN_VEL_RAD ||
-        Math.abs(state.pitchVel) > INERTIA_MIN_VEL_RAD;
-      if (hasPanInertia || hasRotInertia) startCameraLoop();
-    }
-  });
-  addDisposableListener(window, "mousemove", (e) => {
-    if (disposed || !root.isConnected) return;
-    if (!dragMode) return;
-    if (dragMode === "label") {
-      if (!draggedLabel?.key) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const nextRectX = x - draggedLabel.pointerDx;
-      const nextRectY = y - draggedLabel.pointerDy;
-      state.labelOverrides.set(draggedLabel.key, {
-        dx: nextRectX - draggedLabel.bodyX,
-        dy: nextRectY - draggedLabel.bodyY,
-      });
-      draggedDuringPointer = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      draw();
-      return;
-    }
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    const now = performance.now() / 1000;
-    const moveDt = now - lastMoveTime;
-    lastMoveTime = now;
-    if (!draggedDuringPointer && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
-      draggedDuringPointer = true;
-      // When focused, convert left-drag (pan) to orbit so lock is not broken.
-      if (state.mode === "system" && state.focusTargetId && dragMode === "pan") {
-        dragMode = "rotate";
-      }
-    }
-    if (state.mode === "cluster") {
-      /* Cluster: always rotate */
-      state.yaw -= dx * 0.006;
-      state.pitch = clamp(state.pitch + dy * 0.004, -1.45, 1.45);
-      if (moveDt > 0 && moveDt < 0.2) {
-        state.yawVel = (-dx * 0.006) / moveDt;
-        state.pitchVel = (dy * 0.004) / moveDt;
-      }
-    } else if (dragMode === "pan") {
-      state.panX += dx;
-      state.panY += dy;
-      if (moveDt > 0 && moveDt < 0.2) {
-        state.panVelX = dx / moveDt;
-        state.panVelY = dy / moveDt;
-      }
-    } else if (dragMode === "rotate") {
-      state.yaw -= dx * 0.006;
-      state.pitch = clamp(state.pitch + dy * 0.004, PITCH_MIN, PITCH_MAX);
-      if (moveDt > 0 && moveDt < 0.2) {
-        state.yawVel = (-dx * 0.006) / moveDt;
-        state.pitchVel = (dy * 0.004) / moveDt;
-      }
-    }
-    lastX = e.clientX;
-    lastY = e.clientY;
-    draw();
-  });
-
-  // Single-click centers body at current zoom; double-click zooms to fit.
-  let clickTimer = null;
-  let lastClickHit = null;
-
-  function handleSingleClickBody(hit) {
-    state.focusTargetKind = hit.kind;
-    state.focusTargetId = hit.id;
-    // Soft focus: keep current zoom level (centers without zooming)
-    state.focusZoomTarget = state.zoom;
-    draw();
-  }
-
-  function handleDoubleClickBody(hit) {
-    const snapshot = getSnapshot();
-    setFocusTarget(hit.kind, hit.id, snapshot);
-    draw();
-    startCameraLoop();
-  }
-
-  addDisposableListener(canvas, "click", (e) => {
-    if (disposed || !root.isConnected) return;
-    if (state.mode === "cluster") return; // no click handling in cluster mode
-    if (performance.now() < suppressPlanetClickUntilMs) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const labelHit = hitTestLabelUi(x, y);
-    if (labelHit?.kind === "label-reset" && labelHit.key) {
-      state.labelOverrides.delete(labelHit.key);
-      draw();
-      return;
-    }
-    if (labelHit) return;
-    const hit = hitTestBody(x, y);
-    if (!hit?.id || !hit?.kind) {
-      // Click on empty space breaks focus
-      if (state.focusTargetId) {
-        clearFocusTarget();
-        draw();
-      }
-      return;
-    }
-    const allowBodyFocus = chkClickFocusBodies?.checked !== false;
-    const allowStarFocus = chkClickFocusStar?.checked !== false;
-    if (hit.kind === "star" && !allowStarFocus) return;
-    if ((hit.kind === "planet" || hit.kind === "gasGiant") && !allowBodyFocus) return;
-    // Double-click detection: if a timer is pending for the same body, this is a double-click
-    if (clickTimer && lastClickHit?.id === hit.id && lastClickHit?.kind === hit.kind) {
-      clearTimeout(clickTimer);
-      clickTimer = null;
-      lastClickHit = null;
-      handleDoubleClickBody(hit);
-      return;
-    }
-    // Start single-click timer
-    if (clickTimer) clearTimeout(clickTimer);
-    lastClickHit = { id: hit.id, kind: hit.kind };
-    clickTimer = setTimeout(() => {
-      clickTimer = null;
-      if (lastClickHit) handleSingleClickBody(lastClickHit);
-      lastClickHit = null;
-    }, 250);
-  });
-
-  // Escape key releases focus lock and dismisses help overlay
-  addDisposableListener(window, "keydown", (e) => {
-    if (e.key === "Escape") {
-      if (helpOverlayVisible) {
-        hideHelpOverlay();
-        return;
-      }
-      if (state.focusTargetId) {
-        clearFocusTarget();
-        draw();
-      }
-    }
-  });
-
-  // zoom with wheel — sets a target and lets the camera loop interpolate
-  const wheelOptions = { passive: false };
-  addDisposableListener(
+  inputBindings = bindVisualizerInputBindings({
+    addCleanup,
+    addDisposableListener,
+    root,
     canvas,
-    "wheel",
-    (e) => {
-      if (disposed || !root.isConnected || state.transitioning) return;
-      e.preventDefault();
-      const delta = Math.sign(e.deltaY);
-
-      if (state.mode === "cluster") {
-        /* Cluster: target-based smooth zoom */
-        const base = Number.isFinite(state.zoomTarget) ? state.zoomTarget : state.zoom;
-        state.zoomTarget = clamp(
-          base * (delta > 0 ? 0.92 : 1.08),
-          CLUSTER_ZOOM_MIN,
-          CLUSTER_ZOOM_MAX,
-        );
-        startCameraLoop();
-        return;
-      }
-
-      /* System mode */
-      if (state.focusTargetId) {
-        // Compound on focusZoomTarget so rapid scrolling accumulates.
-        const focusBase = Number.isFinite(state.focusZoomTarget)
-          ? state.focusZoomTarget
-          : state.zoom;
-        state.focusZoomTarget = clamp(focusBase * (delta > 0 ? 0.9 : 1.1), ZOOM_MIN, getZoomMax());
-        state.zoomTarget = state.focusZoomTarget;
-        startCameraLoop();
-        return;
-      }
-      const base = Number.isFinite(state.zoomTarget) ? state.zoomTarget : state.zoom;
-      const nextTarget = clamp(base * (delta > 0 ? 0.9 : 1.1), ZOOM_MIN, getZoomMax());
-
-      // Zoom toward mouse cursor — store cursor for the interpolation loop
-      const rect = canvas.getBoundingClientRect();
-      state.zoomCursorX = e.clientX - rect.left;
-      state.zoomCursorY = e.clientY - rect.top;
-      state.zoomTarget = nextTarget;
-      startCameraLoop();
+    overlayCanvas,
+    vizLayout,
+    offscaleNoteEl,
+    state,
+    elements: {
+      chkLabels,
+      chkLabelLeaders,
+      chkMoons,
+      chkOrbits,
+      chkHz,
+      chkDebris,
+      chkEccentric,
+      chkPeAp,
+      chkHill,
+      chkLagrange,
+      chkFrost,
+      chkDistances,
+      chkGrid,
+      chkRotation,
+      chkAxialTilt,
+      chkClickFocusBodies,
+      chkClickFocusStar,
+      chkDebug,
+      btnRefresh,
+      btnPlay,
+      btnResetView,
+      btnControls,
+      vizDropdown,
+      btnFullscreen,
+      btnExportImage,
+      btnExportGif,
+      rngSpeed,
+      rngBodyScale,
+      txtBodyScale,
+      bodyScaleRow,
+      helpOverlay,
+      helpSystemSection,
+      helpClusterSection,
+      btnHelp,
+      btnHelpClose,
+      chkClusterLabels,
+      chkClusterLinks,
+      chkClusterAxes,
+      chkClusterGrid,
+      chkClusterStars,
+      btnClusterRefresh,
+      btnClusterPlay,
+      rngClusterSpeed,
+      vizToastClose,
     },
-    wheelOptions,
-  );
-
-  // ── Touch gesture support ──────────────────────────────────
-  // 1-finger: rotate.  2-finger: pinch-zoom + pan.
-  let activeTouches = [];
-  let touchMode = null; // "rotate" | "pinch-pan"
-  let lastTouchDist = 0;
-  let lastTouchMidX = 0;
-  let lastTouchMidY = 0;
-
-  addDisposableListener(
-    canvas,
-    "touchstart",
-    (e) => {
-      e.preventDefault();
-      killInertia();
-      state.resetting = false;
-      state.resetTargets = null;
-      activeTouches = Array.from(e.touches).map((t) => ({
-        id: t.identifier,
-        x: t.clientX,
-        y: t.clientY,
-      }));
-      lastMoveTime = performance.now() / 1000;
-      if (activeTouches.length === 1) {
-        touchMode = "rotate";
-      } else if (activeTouches.length >= 2) {
-        touchMode = "pinch-pan";
-        const t0 = activeTouches[0];
-        const t1 = activeTouches[1];
-        lastTouchDist = Math.hypot(t1.x - t0.x, t1.y - t0.y);
-        lastTouchMidX = (t0.x + t1.x) / 2;
-        lastTouchMidY = (t0.y + t1.y) / 2;
-      }
+    constants: {
+      defaultYaw: DEFAULT_YAW,
+      defaultPitch: DEFAULT_PITCH,
+      defaultZoom: DEFAULT_ZOOM,
+      pitchMin: PITCH_MIN,
+      pitchMax: PITCH_MAX,
+      zoomMin: ZOOM_MIN,
+      clusterDefaultYaw: CLUSTER_DEFAULT_YAW,
+      clusterDefaultPitch: CLUSTER_DEFAULT_PITCH,
+      clusterDefaultZoom: CLUSTER_DEFAULT_ZOOM,
+      clusterZoomMin: CLUSTER_ZOOM_MIN,
+      clusterZoomMax: CLUSTER_ZOOM_MAX,
+      inertiaMinVelPx: INERTIA_MIN_VEL_PX,
+      inertiaMinVelRad: INERTIA_MIN_VEL_RAD,
+      controlsTipHtml: tipIcon(TIP_LABEL["Controls"] || "") || "",
     },
-    { passive: false },
-  );
-
-  addDisposableListener(
-    canvas,
-    "touchmove",
-    (e) => {
-      e.preventDefault();
-      const touches = Array.from(e.touches);
-      const now = performance.now() / 1000;
-      const moveDt = now - lastMoveTime;
-      lastMoveTime = now;
-
-      if (touchMode === "rotate" && touches.length === 1) {
-        const prev = activeTouches[0];
-        const curr = touches[0];
-        if (!prev) {
-          activeTouches = touches.map((t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
-          return;
-        }
-        const dx = curr.clientX - prev.x;
-        const dy = curr.clientY - prev.y;
-        state.yaw -= dx * 0.006;
-        const pitchMin = state.mode === "cluster" ? -1.45 : PITCH_MIN;
-        const pitchMax = state.mode === "cluster" ? 1.45 : PITCH_MAX;
-        state.pitch = clamp(state.pitch + dy * 0.004, pitchMin, pitchMax);
-        if (moveDt > 0 && moveDt < 0.2) {
-          state.yawVel = (-dx * 0.006) / moveDt;
-          state.pitchVel = (dy * 0.004) / moveDt;
-        }
-        draw();
-      }
-
-      if (touchMode === "pinch-pan" && touches.length >= 2) {
-        const t0 = touches[0];
-        const t1 = touches[1];
-        const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-        const midX = (t0.clientX + t1.clientX) / 2;
-        const midY = (t0.clientY + t1.clientY) / 2;
-        // Pinch zoom
-        if (lastTouchDist > 0 && dist > 0) {
-          const scale = dist / lastTouchDist;
-          const zoomMin = state.mode === "cluster" ? CLUSTER_ZOOM_MIN : ZOOM_MIN;
-          const zoomMax = state.mode === "cluster" ? CLUSTER_ZOOM_MAX : getZoomMax();
-          state.zoom = clamp(state.zoom * scale, zoomMin, zoomMax);
-          state.zoomTarget = state.zoom;
-        }
-        // Two-finger pan (system mode only, not when focused)
-        if (state.mode === "system" && !state.focusTargetId) {
-          state.panX += midX - lastTouchMidX;
-          state.panY += midY - lastTouchMidY;
-        }
-        // Keep focus zoom in sync with the pinch gesture
-        if (state.focusTargetId) {
-          state.focusZoomTarget = state.zoom;
-        }
-        lastTouchDist = dist;
-        lastTouchMidX = midX;
-        lastTouchMidY = midY;
-        draw();
-      }
-
-      activeTouches = touches.map((t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+    helpers: {
+      clamp,
+      clearFocusTarget,
+      draw,
+      easeFocusZoom,
+      exportFileName,
+      getFocusMaxZoom,
+      getOffscaleNoticeTopPx,
+      getSnapshot,
+      getZoomMax,
+      hideToast,
+      hitTestBody,
+      hitTestLabelUi,
+      invalidateSnapshot,
+      isLive,
+      isPhysicalScale,
+      killInertia,
+      refreshClusterSnapshot,
+      setFocusTarget,
+      startCameraLoop,
+      syncExportButtons,
+      updateClusterSpeedUI,
+      updateSpeedUI,
+      updateStarBursts,
     },
-    { passive: false },
-  );
-
-  addDisposableListener(
-    canvas,
-    "touchend",
-    (e) => {
-      const remaining = e.touches.length;
-      if (remaining === 0) {
-        const hasInertia =
-          Math.abs(state.yawVel) > INERTIA_MIN_VEL_RAD ||
-          Math.abs(state.pitchVel) > INERTIA_MIN_VEL_RAD;
-        if (hasInertia) startCameraLoop();
-        touchMode = null;
-        activeTouches = [];
-      } else if (remaining === 1) {
-        touchMode = "rotate";
-        activeTouches = Array.from(e.touches).map((t) => ({
-          id: t.identifier,
-          x: t.clientX,
-          y: t.clientY,
-        }));
-      } else {
-        activeTouches = Array.from(e.touches).map((t) => ({
-          id: t.identifier,
-          x: t.clientX,
-          y: t.clientY,
-        }));
-        if (activeTouches.length >= 2) {
-          lastTouchDist = Math.hypot(
-            activeTouches[1].x - activeTouches[0].x,
-            activeTouches[1].y - activeTouches[0].y,
-          );
-          lastTouchMidX = (activeTouches[0].x + activeTouches[1].x) / 2;
-          lastTouchMidY = (activeTouches[0].y + activeTouches[1].y) / 2;
-        }
-      }
+    animation: {
+      isTickScheduled,
+      startTickLoop,
+      stopCameraLoop,
+      stopTickLoop,
     },
-    { passive: false },
-  );
-
-  addDisposableListener(btnRefresh, "click", () => {
-    invalidateSnapshot();
-    draw();
   });
-
-  updateSpeedUI();
-  syncExportButtons();
-  addDisposableListener(rngSpeed, "input", () => {
-    updateSpeedUI();
-    if (!state.isPlaying) draw();
-  });
-
-  const rngBodyScale = root.querySelector("#rng-body-scale");
-  const txtBodyScale = root.querySelector("#txt-body-scale");
-  const bodyScaleRow = root.querySelector("#body-scale-row");
-  addDisposableListener(rngBodyScale, "input", () => {
-    state.bodyScale = Number(rngBodyScale.value) / 100;
-    txtBodyScale.textContent = `${rngBodyScale.value}%`;
-    if (!state.isPlaying) draw();
-  });
-
-  addDisposableListener(btnExportImage, "click", async () => {
-    if (state.exportingGif) return;
-    try {
-      draw();
-      const target = state.mode === "cluster" ? overlayCanvas : canvas;
-      await downloadCanvasPng(target, exportFileName("png"));
-    } catch (err) {
-      console.error("[viz] Could not export PNG image.", err);
-    }
-  });
-
-  addDisposableListener(btnExportGif, "click", async () => {
-    const playing = state.mode === "cluster" ? state.clusterIsPlaying : state.isPlaying;
-    if (!playing || state.exportingGif) return;
-    state.exportingGif = true;
-    syncExportButtons();
-    const originalLabel = btnExportGif?.textContent || "Download GIF";
-    if (btnExportGif) btnExportGif.textContent = "Recording GIF...";
-
-    if (rafId != null) {
-      try {
-        cancelAnimationFrame(rafId);
-      } catch {}
-      rafId = null;
-    }
-
-    const gifTarget = state.mode === "cluster" ? overlayCanvas : canvas;
-    try {
-      await captureCanvasGif({
-        canvas: gifTarget,
-        filename: exportFileName("gif"),
-        fps: 12,
-        seconds: 4,
-        renderFrame: ({ frameIndex, deltaTimeSec }) => {
-          if (state.mode === "cluster") {
-            if (frameIndex > 0) state.yaw += deltaTimeSec * 0.2 * state.clusterSpinSpeed;
-            draw();
-          } else {
-            if (frameIndex > 0) {
-              state.simTime += deltaTimeSec * state.speed;
-              state.activityTime += deltaTimeSec * state.speed;
-              const snapshot = getSnapshot();
-              updateStarBursts(deltaTimeSec, snapshot, state.activityTime * 86400);
-            }
-            if (state.focusTargetId) easeFocusZoom(deltaTimeSec);
-            const snapshot = getSnapshot();
-            draw(snapshot);
-          }
-        },
-        onStatus: (status) => {
-          if (!btnExportGif) return;
-          if (status === "loading") btnExportGif.textContent = "Loading encoder...";
-          else if (status === "recording") btnExportGif.textContent = "Recording GIF...";
-          else if (status === "encoding") btnExportGif.textContent = "Encoding GIF...";
-        },
-      });
-    } catch (err) {
-      console.error("[viz] Could not export GIF animation.", err);
-    } finally {
-      state.exportingGif = false;
-      if (btnExportGif) btnExportGif.textContent = originalLabel;
-      syncExportButtons();
-      if (!disposed && root.isConnected) {
-        const p = state.mode === "cluster" ? state.clusterIsPlaying : state.isPlaying;
-        if (p && rafId == null) {
-          if (state.mode === "cluster") state.clusterLastTick = 0;
-          else state.lastTick = 0;
-          rafId = requestAnimationFrame(tick);
-        }
-      }
-      draw();
-    }
-  });
-
-  addDisposableListener(btnPlay, "click", () => {
-    state.isPlaying = !state.isPlaying;
-    btnPlay.textContent = state.isPlaying ? "Pause" : "Play";
-    state.lastTick = 0;
-    if (state.isPlaying) {
-      if (cameraRafId != null) {
-        try {
-          cancelAnimationFrame(cameraRafId);
-        } catch {}
-        cameraRafId = null;
-      }
-      rafId = requestAnimationFrame(tick);
-    } else {
-      if (rafId != null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-    }
-    syncExportButtons();
-  });
-
-  // Reset view — smooth animated transition back to defaults
-  addDisposableListener(btnResetView, "click", () => {
-    if (state.focusTargetId) clearFocusTarget();
-    killInertia();
-    state.resetting = true;
-    if (state.mode === "cluster") {
-      state.resetTargets = {
-        yaw: CLUSTER_DEFAULT_YAW,
-        pitch: CLUSTER_DEFAULT_PITCH,
-        zoom: CLUSTER_DEFAULT_ZOOM,
-        panX: 0,
-        panY: 0,
-      };
-    } else {
-      state.resetTargets = {
-        yaw: DEFAULT_YAW,
-        pitch: DEFAULT_PITCH,
-        zoom: DEFAULT_ZOOM,
-        panX: 0,
-        panY: 0,
-      };
-    }
-    state.zoomTarget = state.resetTargets.zoom;
-    startCameraLoop();
-  });
-
-  // Controls dropdown toggle
-  function setDropdownOpen(open) {
-    if (!vizDropdown || !btnControls) return;
-    vizDropdown.style.display = open ? "" : "none";
-    btnControls.innerHTML =
-      (tipIcon(TIP_LABEL["Controls"] || "") || "") + " Controls " + (open ? "\u25B4" : "\u25BE");
-    if (offscaleNoteEl?.style.display !== "none") {
-      offscaleNoteEl.style.top = `${getOffscaleNoticeTopPx()}px`;
-    }
-  }
-  addDisposableListener(btnControls, "click", (e) => {
-    e.stopPropagation();
-    const isOpen = vizDropdown.style.display !== "none";
-    setDropdownOpen(!isOpen);
-  });
-  // Click outside dropdown closes it
-  addDisposableListener(document, "mousedown", (e) => {
-    if (
-      vizDropdown.style.display !== "none" &&
-      !vizDropdown.contains(e.target) &&
-      e.target !== btnControls &&
-      !btnControls.contains(e.target)
-    ) {
-      setDropdownOpen(false);
-    }
-  });
-
-  // Browser Fullscreen API
-  addDisposableListener(btnFullscreen, "click", () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else if (vizLayout.requestFullscreen) {
-      vizLayout.requestFullscreen();
-    } else if (vizLayout.webkitRequestFullscreen) {
-      vizLayout.webkitRequestFullscreen();
-    }
-  });
-  function onFullscreenChange() {
-    const isFs = !!document.fullscreenElement;
-    btnFullscreen.textContent = isFs ? "Exit fullscreen" : "Fullscreen";
-  }
-  addDisposableListener(document, "fullscreenchange", onFullscreenChange);
-  addDisposableListener(document, "webkitfullscreenchange", onFullscreenChange);
-
-  // Controls help overlay ("?" button)
-  let helpOverlayVisible = false;
-  function showHelpOverlay() {
-    if (!helpOverlay) return;
-    helpOverlayVisible = true;
-    helpOverlay.style.display = "";
-    helpOverlay.setAttribute("aria-hidden", "false");
-    if (helpSystemSection) helpSystemSection.style.display = state.mode === "system" ? "" : "none";
-    if (helpClusterSection)
-      helpClusterSection.style.display = state.mode === "cluster" ? "" : "none";
-  }
-  function hideHelpOverlay() {
-    if (!helpOverlay) return;
-    helpOverlayVisible = false;
-    helpOverlay.style.display = "none";
-    helpOverlay.setAttribute("aria-hidden", "true");
-  }
-  addDisposableListener(btnHelp, "click", (e) => {
-    e.stopPropagation();
-    if (helpOverlayVisible) hideHelpOverlay();
-    else showHelpOverlay();
-  });
-  addDisposableListener(btnHelpClose, "click", hideHelpOverlay);
-  addDisposableListener(helpOverlay, "click", (e) => {
-    if (e.target === helpOverlay) hideHelpOverlay();
-  });
-
-  [
-    chkLabels,
-    chkLabelLeaders,
-    chkMoons,
-    chkOrbits,
-    chkHz,
-    chkDebris,
-    chkEccentric,
-    chkPeAp,
-    chkHill,
-    chkLagrange,
-    chkFrost,
-    chkDistances,
-    chkGrid,
-    chkRotation,
-    chkAxialTilt,
-    chkClickFocusBodies,
-    chkClickFocusStar,
-    chkDebug,
-  ].forEach((el) => {
-    addDisposableListener(el, "change", draw);
-  });
-  root.querySelectorAll('[name="vizDistanceScale"]').forEach((el) => {
-    addDisposableListener(el, "change", draw);
-  });
-  root.querySelectorAll('[name="vizSizeScale"]').forEach((el) => {
-    addDisposableListener(el, "change", () => {
-      state.zoom = clamp(state.zoom, ZOOM_MIN, getZoomMax());
-      if (Number.isFinite(state.focusZoomTarget)) {
-        state.focusZoomTarget = clamp(state.focusZoomTarget, ZOOM_MIN, getFocusMaxZoom());
-      }
-      if (bodyScaleRow) bodyScaleRow.style.display = isPhysicalScale() ? "none" : "";
-      draw();
-    });
-  });
-
-  /* ── Cluster-mode event listeners ──────────────────────────── */
-
-  // Track mouse position for cluster hover labels
-  addDisposableListener(canvas, "mousemove", (e) => {
-    if (state.mode !== "cluster") return;
-    const rect = canvas.getBoundingClientRect();
-    state.clusterMouseX = e.clientX - rect.left;
-    state.clusterMouseY = e.clientY - rect.top;
-    if (!state.clusterIsPlaying && !state.transitioning) draw();
-  });
-  addDisposableListener(canvas, "mouseleave", () => {
-    state.clusterMouseX = null;
-    state.clusterMouseY = null;
-    if (state.mode === "cluster" && !state.clusterIsPlaying && !state.transitioning) draw();
-  });
-
-  // Cluster controls
-  addDisposableListener(btnClusterRefresh, "click", () => {
-    refreshClusterSnapshot();
-    draw();
-  });
-  addDisposableListener(btnClusterPlay, "click", () => {
-    state.clusterIsPlaying = !state.clusterIsPlaying;
-    if (btnClusterPlay) btnClusterPlay.textContent = state.clusterIsPlaying ? "Pause" : "Play";
-    if (state.clusterIsPlaying) {
-      state.clusterLastTick = 0;
-      rafId = requestAnimationFrame(tick);
-    } else if (rafId != null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-    syncExportButtons();
-  });
-  addDisposableListener(rngClusterSpeed, "input", () => {
-    updateClusterSpeedUI();
-  });
-  [chkClusterLabels, chkClusterLinks, chkClusterAxes, chkClusterGrid, chkClusterStars]
-    .filter(Boolean)
-    .forEach((el) => addDisposableListener(el, "change", draw));
-  root.querySelectorAll('[name="clusterBearingUnit"]').forEach((el) => {
-    addDisposableListener(el, "change", draw);
-  });
-
-  // Toast close
-  addDisposableListener(vizToastClose, "click", hideToast);
 
   /* ── Tick / animation loop (both modes) ────────────────────── */
 
@@ -7407,22 +3749,6 @@ export function initVisualiserPage(root, options = {}) {
     draw(snapshot);
     rafId = requestAnimationFrame(tick);
   }
-
-  // Auto-refresh when data changes in other tabs
-  addDisposableListener(window, "worldsmith:worldChanged", () => {
-    invalidateSnapshot();
-    state.clusterSnapshot = null;
-    draw();
-    if (state.mode === "system") startCameraLoop();
-  });
-  addDisposableListener(window, "storage", (e) => {
-    if (e.key && e.key.includes("worldsmith")) {
-      invalidateSnapshot();
-      state.clusterSnapshot = null;
-      draw();
-      if (state.mode === "system") startCameraLoop();
-    }
-  });
 
   /* Window resize is handled by the ResizeObserver on vizWrap */
   /* Initialise based on start mode */
@@ -7490,6 +3816,8 @@ export function initVisualiserPage(root, options = {}) {
     await initialiseNativeRenderer();
   }
   initialiseRenderer();
+
+  return dispose;
 }
 
 // EOF

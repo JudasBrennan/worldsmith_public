@@ -9,7 +9,7 @@ export function initAboutPage(mountEl) {
       </div>
       <div class="panel__body">
         <p>
-          <b>WorldSmith Web 1.19.0</b> is a browser-based worldbuilding toolkit by <b>Judas Brennan</b>.
+          <b>WorldSmith Web 1.21.0</b> is a browser-based worldbuilding toolkit by <b>Judas Brennan</b>.
           Design stars, planetary systems, rocky worlds, gas giants, moons, and debris disks with
           real astrophysics. Model tectonics, climate zones, atmospheres, populations, and calendars.
           Explore your creations in an interactive 3D visualiser with procedural textures, or study
@@ -47,7 +47,7 @@ export function initAboutPage(mountEl) {
           <li>Switch between <b>light</b> and <b>dark</b> themes with the toggle at the bottom of the sidebar.</li>
           <li>Turn on <b>Atmospheric escape filter</b> on the Planet page to automatically remove gases the body is too small or warm to retain. The model includes non-thermal losses for H&#x2082; and He.</li>
           <li>Use the <b>Radioisotope Abundance</b> slider (or Per-Isotope mode) to model worlds with more or less internal heat than Earth, affecting volcanism, lithosphere thickness, and dynamo lifetime.</li>
-          <li>Your work is stored locally in your browser (localStorage). Use <b>Export</b> regularly to back up your world. Clearing site data will reset the tool.</li>
+          <li>Your work is stored locally in your browser storage (IndexedDB plus small browser settings keys). Use <b>Export</b> regularly to back up your world. Clearing site data will reset the tool.</li>
           <li>Click the <b>Tutorials</b> button in any page header for a step-by-step guide to that page&rsquo;s workflow. Your position is remembered across sessions.</li>
         </ul>
 
@@ -229,6 +229,22 @@ const RELEASE_SCIENTISTS = {
     summary:
       "Originated quantum theory by proposing that energy is emitted in discrete packets called quanta. His discovery of Planck\u2019s constant earned him the 1918 Nobel Prize in Physics.",
   },
+  "1.20.0": {
+    name: "Henri Poincar\u00e9",
+    born: 1854,
+    died: 1912,
+    country: "France",
+    summary:
+      "Made foundational contributions to topology and celestial mechanics, and helped establish the modern study of dynamical systems and orbital stability.",
+  },
+  "1.21.0": {
+    name: "Michael Faraday",
+    born: 1791,
+    died: 1867,
+    country: "England",
+    summary:
+      "Discovered electromagnetic induction and established the experimental foundations of field theory, shaping how modern physics connects invisible structure to observable behavior.",
+  },
 };
 function scientistCard(version) {
   const s = RELEASE_SCIENTISTS[version];
@@ -242,13 +258,13 @@ function scientistCard(version) {
         </div>`;
 }
 
-function release(version, note, items) {
-  const open = version === "1.19.0" ? " open" : "";
+function release(version, note, items, { open = false } = {}) {
+  const openAttr = open ? " open" : "";
   const lis = items.map((i) => `<li>${i}</li>`).join("\n          ");
   const s = RELEASE_SCIENTISTS[version];
   const surname = s ? ` \u2014 The ${s.name.split(" ").pop()} Release` : "";
   return `
-      <details class="changelog-release"${open}>
+      <details class="changelog-release"${openAttr}>
         <summary class="changelog-release__summary"><b>Version ${version}${surname}</b> <span class="changelog-release__note">${note}</span></summary>${scientistCard(version)}
         <ul>${lis}</ul>
       </details>`;
@@ -256,6 +272,26 @@ function release(version, note, items) {
 
 function changelogHTML() {
   return [
+    release(
+      "1.21.0",
+      "(from 1.20.0)",
+      [
+        "<b>Input Stability</b> &mdash; Text entry on the Star, Planet, and Moon pages no longer fights your typing. Draft numbers now stay in the field while you edit, making precise manual entry far more reliable on mobile keyboards.",
+        "<b>Save Recovery</b> &mdash; WorldSmith now detects unreadable saved data and shows a recovery flow instead of silently resetting to a blank world. You can clear only the broken current save while keeping backup worlds available for restore.",
+        "<b>Smarter Persistence</b> &mdash; Normal saves are now lighter and no longer rewrite the full backup history every time. Large worlds feel steadier during longer editing sessions, especially on slower browsers and devices.",
+        "<b>Navigation Lock</b> &mdash; The desktop sidebar now includes a padlock beside the theme toggle so you can keep navigation pinned open while you work. The lock is remembered between sessions and stays hidden when the nav is collapsed.",
+        "<b>UI Safety Pass</b> &mdash; Several remaining dynamic selectors, summaries, and detail panes were moved onto safer rendering paths. Edited and imported names with unusual text now behave more predictably across the affected pages.",
+      ],
+      { open: true },
+    ),
+    release("1.20.0", "(from 1.19.0)", [
+      "<b>Engine Foundations</b> &mdash; Added canonical fixture worlds, a world-level snapshot API, and snapshot-backed adapters so read-only pages now derive stars, systems, planets, gas giants, and moons from one consistent engine path.",
+      "<b>Engine Rework</b> &mdash; Split the largest body calculators into smaller internal modules and centralized shared radiative, orbital, escape, materials, and rotation helpers under a dedicated physics layer.",
+      "<b>Validation Expansion</b> &mdash; Added cross-model climate, moon-system, apparent, calendar, and snapshot-parity regression suites so scientific composition errors are caught before they reach the UI.",
+      "<b>Performance Pass</b> &mdash; Summary snapshot mode is now genuinely cheaper, import/export preview and Apparent selectors use explicit summary budgets, and guided System poster rendering no longer pays for a full-snapshot prepass.",
+      "<b>Methane Greenhouse Recalibration</b> &mdash; Corrected methane forcing so Earth-like CH&#8324;/CO&#8322; attribution and Titan-like raw optical depth land in realistic target ranges.",
+      "<b>WebGL Route Cleanup</b> &mdash; Fixed the System-page teardown path so moving from Planetary System into Local Cluster or System Visualiser no longer produces WebGL transition warnings in Brave.",
+    ]),
     release("1.19.0", "(from 1.18.1)", [
       "<b>Schweitzer M-dwarf Radius</b> &mdash; Replaced the Eker quadratic below 0.5 M&#9737; with the Schweitzer et al. (2019) linear relation (R&nbsp;=&nbsp;0.0282&nbsp;+&nbsp;0.935&thinsp;M), with a smooth blend over 0.5&ndash;0.7 M&#9737;. Improves low-mass radius accuracy against benchmark stars.",
       "<b>L4/L5 Stability</b> &mdash; Lagrange Trojan points now show whether they are stable or unstable via the Gascheau (1843) criterion (&mu;&nbsp;&lt;&nbsp;0.0385). Unstable Trojans appear as dimmed amber diamonds in the visualiser.",
@@ -431,18 +467,26 @@ function openChangelog() {
 
   document.body.appendChild(backdrop);
 
+  const closeBtn = backdrop.querySelector(".changelog-toast__close");
+
   function close() {
+    window.removeEventListener("keydown", onKey);
+    backdrop.removeEventListener("click", onBackdropClick);
+    closeBtn?.removeEventListener("click", close);
     backdrop.remove();
   }
 
-  backdrop.addEventListener("click", (e) => {
+  function onBackdropClick(e) {
     if (e.target === backdrop) close();
-  });
-  backdrop.querySelector(".changelog-toast__close").addEventListener("click", close);
-  window.addEventListener("keydown", function onKey(e) {
+  }
+
+  function onKey(e) {
     if (e.key === "Escape") {
       close();
-      window.removeEventListener("keydown", onKey);
     }
-  });
+  }
+
+  backdrop.addEventListener("click", onBackdropClick);
+  closeBtn?.addEventListener("click", close);
+  window.addEventListener("keydown", onKey);
 }

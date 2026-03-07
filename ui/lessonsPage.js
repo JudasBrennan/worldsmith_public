@@ -9,44 +9,9 @@
  */
 
 import { CURRICULUM } from "./lessons/curriculum.js";
+import { loadKaTeX, renderAllMath } from "./katexLoader.js";
 
 /* ── KaTeX lazy loader (shared pattern with sciencePage) ────── */
-
-let katexPromise = null;
-
-function loadKaTeX() {
-  if (window.katex) return Promise.resolve();
-  if (katexPromise) return katexPromise;
-  katexPromise = new Promise((resolve, reject) => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
-    link.integrity = "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+";
-    link.crossOrigin = "anonymous";
-    document.head.appendChild(link);
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js";
-    script.integrity = "sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg";
-    script.crossOrigin = "anonymous";
-    script.onload = () => resolve();
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-  return katexPromise;
-}
-
-function renderAllMath(root) {
-  if (!window.katex) return;
-  root.querySelectorAll(".sci-math").forEach((el) => {
-    const tex = el.textContent;
-    const displayMode = el.classList.contains("sci-math--block");
-    try {
-      window.katex.render(tex, el, { throwOnError: false, displayMode });
-    } catch {
-      /* leave raw LaTeX as fallback */
-    }
-  });
-}
 
 /* ── Persistence ──────────────────────────────────────────────── */
 
@@ -157,7 +122,7 @@ export function initLessonsPage(mountEl) {
     if (!body) return;
     body.innerHTML = lesson.build(mode);
     if (mode === "advanced") {
-      loadKaTeX().then(() => renderAllMath(body));
+      loadKaTeX().then((katex) => renderAllMath(body, katex));
     }
     if (lesson.wire) lesson.wire(body);
   }

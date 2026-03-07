@@ -16,10 +16,12 @@
 //          eclipse types, brightness ratios, angular sizes
 
 import { clamp, toFinite } from "./utils.js";
+import { auToKilometers } from "./physics/orbital.js";
+import { calcInsolationEarthRatio } from "./physics/radiative.js";
 import { calcStar } from "./star.js";
 
 const PI = Math.PI;
-const AU_IN_KM = 149597870;
+const AU_IN_KM = auToKilometers(1);
 const ARCSEC_PER_RAD = 206264.806;
 const EARTH_SUN_APP_MAG = -26.762;
 const FULL_MOON_APP_MAG = -12.74;
@@ -197,10 +199,20 @@ export function calcStarAbsoluteMagnitude(luminosityLsol) {
  *            brightnessRelativeToEarthSun: number,
  *            apparentSizeRelativeToEarthSun: number}}
  */
-export function calcStarApparentAtOrbit({ starAbsoluteMagnitude, starRadiusRsol, orbitAu }) {
+export function calcStarApparentAtOrbit({
+  starAbsoluteMagnitude,
+  starRadiusRsol,
+  orbitAu,
+  starLuminosityLsol,
+}) {
   const orbit = Math.max(0.000001, toFinite(orbitAu, 1));
   const magnitude = starAbsoluteMagnitude + 5 * Math.log10(orbit / ARCSEC_PER_RAD) - 5;
-  const brightnessRelativeToEarthSun = 2.512 ** (EARTH_SUN_APP_MAG - magnitude);
+  const brightnessRelativeToEarthSun = Number.isFinite(Number(starLuminosityLsol))
+    ? calcInsolationEarthRatio({
+        starLuminosityLsol: Math.max(0.0000001, Number(starLuminosityLsol)),
+        orbitalDistanceAu: orbit,
+      })
+    : 2.512 ** (EARTH_SUN_APP_MAG - magnitude);
   const apparentSizeRelativeToEarthSun = toFinite(starRadiusRsol, 1) / orbit;
   const starAngSize = angularDiameter(
     toFinite(starRadiusRsol, 1) * SUN_RADIUS_KM,
@@ -481,6 +493,7 @@ export function calcApparentModel({
     starAbsoluteMagnitude,
     starRadiusRsol: star.radiusRsol,
     orbitAu: homeOrbit,
+    starLuminosityLsol: star.luminosityLsol,
   });
 
   const normalizedOrbits = (orbitSamples || []).map(normalizeOrbitSample);
@@ -496,6 +509,7 @@ export function calcApparentModel({
         starAbsoluteMagnitude,
         starRadiusRsol: star.radiusRsol,
         orbitAu: sample.orbitAu,
+        starLuminosityLsol: star.luminosityLsol,
       }),
     })),
   ];

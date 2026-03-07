@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' https://cdn.jsdelivr.net ws: wss:; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>WorldSmith — Worldbuilding Toolkit</title>
     <meta
@@ -41,40 +41,9 @@
       name="twitter:image"
       content="https://thebrokenwheel.co.uk/worldsmith/assets/worldsmith.png"
     />
-    <script>
-      /* Apply saved theme before first paint to prevent dark→light flash */
-      (function () {
-        var t = localStorage.getItem("worldsmith.theme");
-        if (!t && window.matchMedia("(prefers-color-scheme: light)").matches) t = "light";
-        if (t) document.documentElement.setAttribute("data-theme", t);
-      })();
-    </script>
-    <!-- Structured data -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "WorldSmith",
-        "url": "https://thebrokenwheel.co.uk/worldsmith/",
-        "description": "A free browser-based toolkit for worldbuilders. Design stars, planetary systems, moons, climates, calendars, and more with real astrophysics.",
-        "applicationCategory": "DesignApplication",
-        "operatingSystem": "Any",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        },
-        "author": {
-          "@type": "Person",
-          "name": "Judas Brennan"
-        }
-      }
-    </script>
-
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?release=1.19.0" />
-    <!-- Keep version in sync with ui/threeBridge2d.js THREE_VERSION -->
-    <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/+esm" />
+    <script src="./themeBoot.js?release=1.21.0"></script>
+    <link rel="stylesheet" href="./styles.css?release=1.21.0" />
   </head>
   <body>
     <noscript>
@@ -107,6 +76,7 @@
 
     <main class="app-main">
       <div class="nav-backdrop" id="navBackdrop"></div>
+      <div class="app-alerts" id="appAlerts" aria-live="polite"></div>
       <aside class="side-nav is-collapsed" aria-label="Sections">
         <div class="side-nav__brand">
           <div class="brand__mark">WS</div>
@@ -232,7 +202,19 @@
             <span class="theme-toggle__sun">&#9788;</span>
             <span class="theme-toggle__moon">&#9789;</span>
           </button>
-          <span id="versionTag" class="version-tag">1.19.0</span>
+          <button
+            class="nav-lock-toggle"
+            id="navLockToggle"
+            type="button"
+            aria-label="Lock navigation open"
+            aria-pressed="false"
+            title="Lock navigation open"
+            hidden
+          >
+            <span class="nav-lock-toggle__unlocked" aria-hidden="true">&#128275;</span>
+            <span class="nav-lock-toggle__locked" aria-hidden="true">&#128274;</span>
+          </button>
+          <span id="versionTag" class="version-tag">1.21.0</span>
         </div>
       </aside>
 
@@ -240,6 +222,6 @@
       <footer class="app-footer">Judas Brennan &middot; 2026</footer>
     </main>
 
-    <script type="module" src="./app.js?release=1.19.0"></script>
+    <script type="module" src="./app.js?release=1.21.0"></script>
   </body>
 </html>

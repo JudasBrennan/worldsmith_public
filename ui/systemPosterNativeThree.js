@@ -11,6 +11,7 @@ loadThreeCore().catch(() => {});
 const RUNTIME = new WeakMap();
 const TEXT_TEXTURES = new Map();
 const PENDING = new WeakMap();
+const ACTIVE_POSTER_RUNS = new WeakMap();
 const POSTER_CACHE = new Map();
 const POSTER_TEXTURES = new Set();
 let warned = false;
@@ -393,7 +394,8 @@ function starKey(star) {
   return `star:${star?.starColourHex || ""}:${Math.round(Number(star?.tempK) || 5778)}`;
 }
 
-async function ensureBodyCanvas(body) {
+async function ensureBodyCanvas(body, shouldContinue = null) {
+  if (typeof shouldContinue === "function" && !shouldContinue()) return null;
   const key = bodyKey(body);
   if (POSTER_CACHE.has(key)) return POSTER_CACHE.get(key);
   const canvas = document.createElement("canvas");
@@ -408,22 +410,29 @@ async function ensureBodyCanvas(body) {
           gasCalc: body.gasCalc,
         }
       : { bodyType: "rocky", visualProfile: body.visualProfile };
-  await renderCelestialRecipeSnapshot(canvas, model);
+  const ok = await renderCelestialRecipeSnapshot(canvas, model, { shouldContinue });
+  if (!ok || (typeof shouldContinue === "function" && !shouldContinue())) return null;
   POSTER_CACHE.set(key, canvas);
   return canvas;
 }
 
-async function ensureMoonCanvas(m) {
+async function ensureMoonCanvas(m, shouldContinue = null) {
+  if (typeof shouldContinue === "function" && !shouldContinue()) return null;
   const key = moonKey(m);
   if (POSTER_CACHE.has(key)) return POSTER_CACHE.get(key);
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;
-  await renderCelestialRecipeSnapshot(canvas, {
-    bodyType: "moon",
-    name: m.name || "",
-    moonCalc: m.moonCalc,
-  });
+  const ok = await renderCelestialRecipeSnapshot(
+    canvas,
+    {
+      bodyType: "moon",
+      name: m.name || "",
+      moonCalc: m.moonCalc,
+    },
+    { shouldContinue },
+  );
+  if (!ok || (typeof shouldContinue === "function" && !shouldContinue())) return null;
   POSTER_CACHE.set(key, canvas);
   return canvas;
 }
@@ -450,8 +459,10 @@ function ensureStarCanvas(star) {
 
 export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = null) {
   if (!canvas) return false;
+  const run = { cancelled: false };
+  ACTIVE_POSTER_RUNS.set(canvas, run);
 
-  /* HTML progress bar — appears instantly, before Three.js loads */
+  /* HTML progress bar - appears instantly, before Three.js loads */
   const wrap = canvas.parentElement;
   let barEl = wrap?.querySelector(".poster-progress");
   if (!barEl && wrap) {
@@ -476,11 +487,20 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
   setBar(0);
 
   const runtime = await ensureRuntime(canvas);
+  if (ACTIVE_POSTER_RUNS.get(canvas) !== run || run.cancelled || !canvas.isConnected) {
+    removeBar();
+    return false;
+  }
   if (!runtime) {
     removeBar();
     return false;
   }
   const gen = ++_drawGeneration;
+  const isCurrentRun = () =>
+    ACTIVE_POSTER_RUNS.get(canvas) === run &&
+    !run.cancelled &&
+    canvas.isConnected &&
+    gen === _drawGeneration;
 
   const { star, system, planets, gasGiants, moons, debrisDisks } = data;
   const showLabels = opts.labels !== false;
@@ -540,7 +560,7 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
     if (!m.parentId || !m.moonCalc || POSTER_CACHE.has(moonKey(m))) continue;
     warmModels.push({ bodyType: "moon", name: m.name || "", moonCalc: m.moonCalc });
   }
-  const warmPromise = preWarmTextures(warmModels, { lod: "low" });
+  const warmPromise = preWarmTextures(warmModels, { lod: "low", shouldContinue: isCurrentRun });
 
   const allAu = [];
   for (const b of allBodies) allAu.push(b.au);
@@ -568,6 +588,7 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
     runtime.renderer.setClearColor(0x050818, 1);
     runtime.renderer.render(runtime.scene, runtime.camera);
     removeBar();
+    if (ACTIVE_POSTER_RUNS.get(canvas) === run) ACTIVE_POSTER_RUNS.delete(canvas);
     try {
       onReady?.();
     } catch {}
@@ -951,6 +972,11 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
 
   /* Ensure pre-warmed textures are cached before the sequential loop */
   await warmPromise;
+  if (!isCurrentRun()) {
+    removeBar();
+    if (ACTIVE_POSTER_RUNS.get(canvas) === run) ACTIVE_POSTER_RUNS.delete(canvas);
+    return false;
+  }
 
   /* Progressive body + moon rendering */
   const moonsByParent = new Map();
@@ -966,7 +992,12 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
     const x = auToX(body.au);
     const bodyStagger = (labelEntries[i]?.yOffset || 0) * 1.8;
     const y = orbitY + bodyStagger;
-    const bodyCanvas = await ensureBodyCanvas(body);
+    const bodyCanvas = await ensureBodyCanvas(body, isCurrentRun);
+    if (!bodyCanvas || !isCurrentRun()) {
+      removeBar();
+      if (ACTIVE_POSTER_RUNS.get(canvas) === run) ACTIVE_POSTER_RUNS.delete(canvas);
+      return false;
+    }
     // Scale sprite up for ringed planets so the full ring system is visible.
     // doRecipeSnapshot stores cameraScale = cameraZ / 3.5 on the canvas.
     const cameraScale = parseFloat(bodyCanvas.dataset.cameraScale || "1");
@@ -984,7 +1015,12 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
       let moonY = y + baseSize * 0.52 + 8;
       for (const m of set) {
         if (gen !== _drawGeneration) return true;
-        const mCanvas = await ensureMoonCanvas(m);
+        const mCanvas = await ensureMoonCanvas(m, isCurrentRun);
+        if (!mCanvas || !isCurrentRun()) {
+          removeBar();
+          if (ACTIVE_POSTER_RUNS.get(canvas) === run) ACTIVE_POSTER_RUNS.delete(canvas);
+          return false;
+        }
         addCanvasSprite(runtime, mCanvas, x + 6, moonY, mSize, 2.5, 0.95);
         if (showLabels && m?.name) {
           addTextSprite(runtime, m.name, x + 6 + mSize * 0.5 + 4, moonY, 3.5, {
@@ -1002,6 +1038,7 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
   }
 
   removeBar();
+  if (ACTIVE_POSTER_RUNS.get(canvas) === run) ACTIVE_POSTER_RUNS.delete(canvas);
 
   try {
     onReady?.();
@@ -1011,6 +1048,12 @@ export async function drawSystemPosterNative(canvas, data, opts = {}, onReady = 
 
 export function disposeSystemPosterNative(canvas) {
   if (!canvas) return;
+  const run = ACTIVE_POSTER_RUNS.get(canvas);
+  if (run) {
+    run.cancelled = true;
+    ACTIVE_POSTER_RUNS.delete(canvas);
+  }
+  _drawGeneration += 1;
   const runtime = RUNTIME.get(canvas);
   if (!runtime) return;
   try {

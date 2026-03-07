@@ -1,15 +1,18 @@
-import { calcGasGiant } from "../engine/gasGiant.js";
-import { calcPlanetExact } from "../engine/planet.js";
 import { calcStar } from "../engine/star.js";
 import { calcSystem } from "../engine/system.js";
 import { fmt } from "../engine/utils.js";
+import { buildSystemPosterSnapshotInputs } from "../engine/worldAdapters.js";
 import { bindNumberAndSlider } from "./bind.js";
 import { downloadCanvasPng, makeTimestampToken } from "./canvasExport.js";
-import { styleLabel } from "./gasGiantStyles.js";
 import { computeRockyVisualProfile } from "./rockyPlanetStyles.js";
-import { calcMoonExact } from "../engine/moon.js";
 import { attachTooltips, tipIcon } from "./tooltip.js";
-import { escapeHtml } from "./uiHelpers.js";
+import {
+  renderManualBodyList,
+  renderOrbitSlots,
+  renderSystemKpis,
+  renderUnassignedMoons,
+  renderUnassignedPlanets,
+} from "./system/domRender.js";
 import { drawSystemPosterNative, disposeSystemPosterNative } from "./systemPosterNativeThree.js";
 import {
   loadWorld,
@@ -74,9 +77,6 @@ const TIP_LABEL = {
 };
 
 /* ── System Poster ────────────────────────────────────── */
-
-const EARTH_R_KM = 6371;
-const MOON_R_KM = 1737.4;
 
 function drawSystemPoster(canvas, data, opts = {}) {
   if (!canvas) return;
@@ -312,15 +312,33 @@ export function initSystemPage(mountEl) {
   const posterBody = wrap.querySelector("#posterBody");
   const posterPanel = wrap.querySelector("#posterPanel");
   let posterRendererReady = false;
+  let disposed = false;
+  const cleanupFns = [];
+
+  function disposePage() {
+    if (disposed) return;
+    disposed = true;
+    posterRendererReady = false;
+    cachedPosterData = null;
+    disposeSystemPosterNative(posterCanvas);
+    while (cleanupFns.length) {
+      const fn = cleanupFns.pop();
+      try {
+        fn?.();
+      } catch {}
+    }
+  }
 
   const posterUnmountObserver = new MutationObserver(() => {
     if (wrap.isConnected) return;
-    disposeSystemPosterNative(posterCanvas);
+    disposePage();
+  });
+  posterUnmountObserver.observe(document.body, { childList: true, subtree: true });
+  cleanupFns.push(() => {
     try {
       posterUnmountObserver.disconnect();
     } catch {}
   });
-  posterUnmountObserver.observe(document.body, { childList: true, subtree: true });
 
   // Poster display state
   const posterState = {
@@ -343,7 +361,7 @@ export function initSystemPage(mountEl) {
     if (e.target.closest("button") && e.target.closest("button") !== collapseBtn) return;
     posterState.collapsed = !posterState.collapsed;
     posterBody.style.display = posterState.collapsed ? "none" : "";
-    collapseBtn.innerHTML = posterState.collapsed ? "&#x25BC;" : "&#x25B2;";
+    collapseBtn.textContent = posterState.collapsed ? "\u25BC" : "\u25B2";
   });
 
   // Export PNG
@@ -383,6 +401,14 @@ export function initSystemPage(mountEl) {
   }
   document.addEventListener("fullscreenchange", onPosterFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onPosterFullscreenChange);
+  cleanupFns.push(() => {
+    try {
+      document.removeEventListener("fullscreenchange", onPosterFullscreenChange);
+    } catch {}
+    try {
+      document.removeEventListener("webkitfullscreenchange", onPosterFullscreenChange);
+    } catch {}
+  });
   onPosterFullscreenChange();
 
   // Checkbox toggles
@@ -515,19 +541,7 @@ export function initSystemPage(mountEl) {
         { label: "Star Radius", value: fmt(model.star.radiusRsol, 3), meta: "Rsol" },
       ];
 
-      kpisEl.innerHTML = items
-        .map(
-          (x) => `
-      <div class="kpi-wrap">
-        <div class="kpi">
-          <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.tipLabel] || TIP_LABEL[x.label] || "")}</div>
-          <div class="kpi__value">${x.value}</div>
-          <div class="kpi__meta">${x.meta}</div>
-        </div>
-      </div>
-    `,
-        )
-        .join("");
+      renderSystemKpis(kpisEl, items, TIP_LABEL);
 
       // ── Orbit mode UI toggle ──
       const orbitMode = w0.system.orbitMode || "guided";
@@ -613,74 +627,18 @@ export function initSystemPage(mountEl) {
       const renderCtx = { planetsById, moonsByPlanet, moonCountByPlanet };
 
       // Unassigned list
-      unassignedEl.innerHTML = "";
       const unassigned = planetsForUi.filter((p) => p.slotIndex == null);
-      if (!unassigned.length) {
-        unassignedEl.innerHTML = `<div class="hint">No unassigned planets.</div>`;
-      } else {
-        unassignedEl.innerHTML = unassigned
-          .map((p) => planetCardHtml(p, model, { moonCountByPlanet }))
-          .join("");
-      }
+      renderUnassignedPlanets(unassignedEl, unassigned, model, { moonCountByPlanet });
 
-      unassignedMoonsEl.innerHTML = "";
       const unassignedMoons = moonsForUi.filter((m) => m.planetId == null).sort(sortMoonsByOrbitKm);
-      if (!unassignedMoons.length) {
-        unassignedMoonsEl.innerHTML = `<div class="hint">No unassigned moons.</div>`;
-      } else {
-        unassignedMoonsEl.innerHTML = `<div class="moon-list moon-list--unassigned">${unassignedMoons.map((m) => moonCardHtml(m, { showParent: false, planetsById })).join("")}</div>`;
-      }
-
-      const starRow = `
-      <div class="slot-row">
-        <div class="slot-title">Star</div>
-        <div class="dropzone" style="cursor:default">
-          <div class="hint">${fmt(state.starMassMsol, 4)} Msol primary</div>
-        </div>
-      </div>
-    `;
-      const orbitRows = orbitItems
-        .map((it) => {
-          if (it.type === "slot") {
-            const slot = it.slot;
-            const au = it.au;
-            const occupant = planetsForUi.find((p) => p.slotIndex === slot);
-            const title = `Slot ${String(slot).padStart(2, "0")} (${fmt(au, 3)} AU)`;
-            return `
-          <div class="slot-row">
-            <div class="slot-title">${title}</div>
-            <div class="dropzone slot-drop" data-slot="${slot}">
-              ${occupant ? slotPlanetWithMoonsHtml(occupant, model, renderCtx) : `<div class="hint">Drop a planet here.</div>`}
-            </div>
-          </div>
-        `;
-          }
-
-          if (it.type === "gas") {
-            const g = it.giant;
-            const title = `${escapeHtml(g.name || "Gas giant")} (Slot ${String(it.slot).padStart(2, "0")} - ${fmt(Number(g.au) || it.au, 3)} AU)`;
-            return `
-          <div class="slot-row">
-            <div class="slot-title">${title}</div>
-            <div class="dropzone" style="cursor:default">
-              <div class="hint">Gas giant marker (${escapeHtml(styleLabel(g.style || "jupiter"))}).</div>
-            </div>
-          </div>
-        `;
-          }
-
-          const title = `${escapeHtml(it.name || "Debris disk")} (${fmt(it.inner, 2)} - ${fmt(it.outer, 2)} AU)`;
-          return `
-        <div class="slot-row">
-          <div class="slot-title">${title}</div>
-          <div class="dropzone" style="cursor:default">
-            <div class="hint">Asteroid belt / debris disk region.</div>
-          </div>
-        </div>
-      `;
-        })
-        .join("");
-      slotsUiEl.innerHTML = starRow + orbitRows;
+      renderUnassignedMoons(unassignedMoonsEl, unassignedMoons, { planetsById });
+      renderOrbitSlots(slotsUiEl, {
+        starMassMsol: state.starMassMsol,
+        orbitItems,
+        planets: planetsForUi,
+        sysModel: model,
+        renderCtx,
+      });
       // Attach DnD handlers
       setupDnD();
 
@@ -719,195 +677,30 @@ export function initSystemPage(mountEl) {
           });
         }
         allBodies.sort((a, b) => a.au - b.au);
-        manualBodyListEl.innerHTML = allBodies.length
-          ? allBodies
-              .map(
-                (b) => `
-            <div class="slot-row">
-              <div class="slot-title">${escapeHtml(b.name)} (${escapeHtml(b.auLabel)})</div>
-              <div class="dropzone" style="cursor:default">
-                <div class="hint">${escapeHtml(b.kind)}</div>
-              </div>
-            </div>`,
-              )
-              .join("")
-          : `<div class="hint">No bodies created yet.</div>`;
+        renderManualBodyList(manualBodyListEl, allBodies);
+      } else {
+        manualBodyListEl.replaceChildren();
       }
 
       // ── System Poster ──────────────────────────────
-      const posterPlanets = planetsForUi
-        .filter((p) => (isManual ? true : p.slotIndex != null))
-        .map((p) => {
-          const au = isManual
-            ? Number(p.inputs?.semiMajorAxisAu) || 0
-            : model.orbitsAu[p.slotIndex - 1];
-          let dayHex = "#9bbbe0";
-          let horizonHex = "#6a6a6a";
-          let radiusKm = EARTH_R_KM;
-          let visualProfile = null;
-          try {
-            const planetInputs = isManual ? p.inputs : { ...p.inputs, semiMajorAxisAu: au };
-            const pm = calcPlanetExact({
-              starMassMsol: state.starMassMsol,
-              starAgeGyr: Number(w.star.ageGyr) || 4.6,
-              starRadiusRsolOverride: sov.r,
-              starLuminosityLsolOverride: sov.l,
-              starTempKOverride: sov.t,
-              starEvolutionMode: sov.ev,
-              planet: planetInputs,
-            });
-            dayHex = pm.derived.skyColourDayHex || dayHex;
-            horizonHex = pm.derived.skyColourHorizonHex || horizonHex;
-            radiusKm = pm.derived.radiusKm || radiusKm;
-            visualProfile = computeRockyVisualProfile(pm.derived, p.inputs);
-          } catch {
-            /* use defaults */
-          }
-          return {
-            id: p.id,
-            name: p.name,
-            au,
-            radiusKm,
-            dayHex,
-            horizonHex,
-            visualProfile,
-          };
-        });
-
-      const posterGiants = gasGiants.map((g) => {
-        let radiusKm = (g.radiusRj || 1) * 69911;
-        let gasCalc = null;
-        try {
-          gasCalc = calcGasGiant({
-            massMjup: g.massMjup,
-            radiusRj: g.radiusRj,
-            orbitAu: g.au,
-            rotationPeriodHours: g.rotationPeriodHours || 10,
-            metallicity: g.metallicity,
-            starMassMsol: state.starMassMsol,
-            starLuminosityLsol: starModel.luminosityLsol,
-            starAgeGyr: Number(w.star.ageGyr) || 4.6,
-            starRadiusRsol: starModel.radiusRsol,
-            stellarMetallicityFeH: Number(w.star.metallicityFeH) || 0,
-          });
-          radiusKm = gasCalc.physical.radiusKm || radiusKm;
-        } catch {
-          /* use default */
-        }
-        return {
-          id: g.id,
-          name: g.name,
-          au: g.au,
-          radiusKm,
-          style: g.style,
-          rings: g.rings,
-          gasCalc,
-        };
-      });
-
-      const posterStarAge = Number(w.star.ageGyr) || 4.6;
-      const gasGiantsById = new Map(gasGiants.map((g) => [g.id, g]));
-      const correctedInputsByPlanetId = new Map();
-      if (!isManual) {
-        for (const p of planetsForUi) {
-          if (p.slotIndex != null) {
-            const slotAu = model.orbitsAu[p.slotIndex - 1];
-            correctedInputsByPlanetId.set(p.id, { ...p.inputs, semiMajorAxisAu: slotAu });
-          }
-        }
-      }
-      const posterMoons = moonsForUi
-        .filter((m) => m.planetId)
-        .map((m) => {
-          let radiusMoon = 0.1;
-          const densG = Number(m.inputs?.densityGcm3);
-          const massM = Number(m.inputs?.massMoon);
-          if (densG > 0 && massM > 0) {
-            const earthMoonMassKg = 7.342e22;
-            const massKg = massM * earthMoonMassKg;
-            radiusMoon = Math.cbrt((3 * massKg) / (4 * Math.PI * densG * 1000)) / MOON_R_KM;
-          }
-          let moonCalc = null;
-          try {
-            const parentPlanetInputs =
-              correctedInputsByPlanetId.get(m.planetId) || planetsById[m.planetId]?.inputs;
-            const parentGg = gasGiantsById.get(m.planetId);
-            if (parentPlanetInputs) {
-              moonCalc = calcMoonExact({
-                starMassMsol: state.starMassMsol,
-                starAgeGyr: posterStarAge,
-                starRadiusRsolOverride: sov.r,
-                starLuminosityLsolOverride: sov.l,
-                starTempKOverride: sov.t,
-                starEvolutionMode: sov.ev,
-                planet: parentPlanetInputs,
-                moon: { ...m.inputs },
-              });
-            } else if (parentGg) {
-              const gm = calcGasGiant({
-                massMjup: parentGg.massMjup,
-                radiusRj: parentGg.radiusRj,
-                orbitAu: parentGg.au,
-                rotationPeriodHours: parentGg.rotationPeriodHours || 10,
-                metallicity: parentGg.metallicity,
-                starMassMsol: state.starMassMsol,
-                starLuminosityLsol: starModel.luminosityLsol,
-                starAgeGyr: Number(w.star.ageGyr) || 4.6,
-                starRadiusRsol: starModel.radiusRsol,
-                stellarMetallicityFeH: Number(w.star.metallicityFeH) || 0,
-              });
-              moonCalc = calcMoonExact({
-                starMassMsol: state.starMassMsol,
-                starAgeGyr: posterStarAge,
-                starRadiusRsolOverride: sov.r,
-                starLuminosityLsolOverride: sov.l,
-                starTempKOverride: sov.t,
-                starEvolutionMode: sov.ev,
-                moon: { ...m.inputs },
-                parentOverride: {
-                  inputs: {
-                    massEarth: gm.physical.massEarth,
-                    semiMajorAxisAu: gm.inputs.orbitAu,
-                    eccentricity: 0,
-                    rotationPeriodHours: gm.inputs.rotationPeriodHours,
-                    cmfPct: 0,
-                  },
-                  derived: {
-                    densityGcm3: gm.physical.densityGcm3,
-                    radiusEarth: gm.physical.radiusEarth,
-                    gravityG: gm.physical.gravityG,
-                  },
-                },
-              });
-            }
-          } catch {
-            moonCalc = null;
-          }
-          if (moonCalc) {
-            const calcR = Number(moonCalc.physical?.radiusMoon);
-            if (Number.isFinite(calcR) && calcR > 0) radiusMoon = calcR;
-          }
-          return {
-            parentId: m.planetId,
-            name: m.name || m.inputs?.name || "",
-            radiusMoon,
-            moonCalc,
-          };
-        });
-
-      const posterDebris = debrisRows.map((d) => ({
-        innerAu: d.inner,
-        outerAu: d.outer,
-        name: d.name,
+      const posterSnapshot = buildSystemPosterSnapshotInputs(worldForUi, { orbitMode });
+      const posterPlanets = posterSnapshot.posterData.planets.map((planet) => ({
+        id: planet.id,
+        name: planet.name,
+        au: planet.au,
+        radiusKm: planet.radiusKm,
+        dayHex: planet.dayHex,
+        horizonHex: planet.horizonHex,
+        visualProfile: computeRockyVisualProfile(planet.model?.derived, planet.source?.inputs),
       }));
 
       cachedPosterData = {
-        star: starModel,
-        system: model,
+        star: posterSnapshot.posterData.star,
+        system: posterSnapshot.posterData.system,
         planets: posterPlanets,
-        gasGiants: posterGiants,
-        moons: posterMoons,
-        debrisDisks: posterDebris,
+        gasGiants: posterSnapshot.posterData.gasGiants,
+        moons: posterSnapshot.posterData.moons,
+        debrisDisks: posterSnapshot.posterData.debrisDisks,
       };
       drawPoster();
     } finally {
@@ -1001,76 +794,6 @@ export function initSystemPage(mountEl) {
     return av - bv;
   }
 
-  function moonCardHtml(m, { showParent = false, planetsById = null } = {}) {
-    const moonName = escapeHtml(m.name || m.inputs?.name || m.id);
-    const orbitKm = Number(m?.inputs?.semiMajorAxisKm);
-    const orbitText =
-      Number.isFinite(orbitKm) && orbitKm > 0 ? `${fmt(orbitKm, 0)} km` : "Orbit unknown";
-    const parent = m.planetId ? planetsById?.[m.planetId] : null;
-    const parentText = parent
-      ? `Planet: ${parent.name || parent.inputs?.name || parent.id}`
-      : "Unassigned";
-    const metaText = showParent ? `${orbitText} � ${parentText}` : orbitText;
-    const locked = !!m.locked;
-    const canLock = m.planetId != null;
-
-    return `
-      <div class="moon-mini moon-card ${locked ? "is-locked" : ""}" draggable="${locked ? "false" : "true"}" data-moon-id="${escapeHtml(m.id)}" title="${locked ? "Locked to planet" : "Drag to reassign"}">
-        <div>
-          <div class="moon-mini__name">${moonName}</div>
-          <div class="planet-card__meta">${escapeHtml(metaText)}</div>
-        </div>
-        <div class="moon-mini__actions">
-          <button class="small" type="button" data-action="lock-moon" data-moon-id="${escapeHtml(m.id)}" ${canLock ? "" : "disabled"}>${locked ? "Unlock" : "Lock"}</button>
-          <button class="small" type="button" data-action="edit-moon" data-moon-id="${escapeHtml(m.id)}">Edit</button>
-        </div>
-      </div>
-    `;
-  }
-
-  function slotPlanetWithMoonsHtml(p, sysModel, renderCtx) {
-    const moons = (renderCtx?.moonsByPlanet?.get(p.id) || []).slice().sort(sortMoonsByOrbitKm);
-    const moonRows = moons.length
-      ? moons.map((m) => moonCardHtml(m, { planetsById: renderCtx?.planetsById })).join("")
-      : `<div class="hint">No moons. Drop moons here.</div>`;
-    const moonHtml = `
-      <div class="moon-list moon-drop-target" data-moon-drop-planet-id="${escapeHtml(p.id)}">
-        ${moonRows}
-      </div>
-    `;
-
-    return `
-      ${planetCardHtml(p, sysModel, { showAu: false, moonCountByPlanet: renderCtx?.moonCountByPlanet })}
-      ${moonHtml}
-    `;
-  }
-
-  function planetCardHtml(p, sysModel, { showAu = true, moonCountByPlanet = null } = {}) {
-    // find slot AU for meta
-    let meta = "";
-    if (showAu && p.slotIndex != null) {
-      const au = sysModel.orbitsAu[p.slotIndex - 1];
-      if (au != null) meta = `${fmt(au, 3)} AU`;
-    }
-    const moonCount = Number(moonCountByPlanet?.get(p.id) || 0);
-    const slotText =
-      p.slotIndex != null ? `Slot ${String(p.slotIndex).padStart(2, "0")}` : "Unassigned";
-    const metaTextBase = meta ? `${slotText} � ${meta}` : slotText;
-    const metaText = `${metaTextBase} � Moons: ${moonCount}`;
-    const safeName = escapeHtml(p.name || p.inputs?.name || p.id);
-    return `
-      <div class="planet-card ${p.locked ? "is-locked" : ""} moon-drop-target" draggable="${p.locked ? "false" : "true"}" data-planet-id="${escapeHtml(p.id)}" data-moon-drop-planet-id="${escapeHtml(p.id)}" title="${p.locked ? "Locked" : "Drag to assign"}">
-        <div>
-          <div><b>${safeName}</b></div>
-          <div class="planet-card__meta">${escapeHtml(metaText)}</div>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center">
-          <button class="small" type="button" data-action="lock" data-planet-id="${escapeHtml(p.id)}">${p.locked ? "Unlock" : "Lock"}</button>
-          <button class="small" type="button" data-action="edit" data-planet-id="${escapeHtml(p.id)}">Edit</button>
-        </div>
-      </div>
-    `;
-  }
   function setupDnD() {
     // Ensure we don't double-bind
     if (wrap.__dndBound) return;
@@ -1271,8 +994,16 @@ export function initSystemPage(mountEl) {
 
   // Resize poster canvas on container resize
   if (posterWrap) {
-    new ResizeObserver(() => render()).observe(posterWrap);
+    const posterResizeObserver = new ResizeObserver(() => render());
+    posterResizeObserver.observe(posterWrap);
+    cleanupFns.push(() => {
+      try {
+        posterResizeObserver.disconnect();
+      } catch {}
+    });
   }
+
+  return disposePage;
 }
 
 function numWithSlider(id, label, unit, hint, min, max, step) {

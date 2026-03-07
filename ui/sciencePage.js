@@ -9,44 +9,14 @@ import { calcBodyAbsoluteMagnitude } from "../engine/apparent.js";
 import { computeFlareParams } from "../engine/stellarActivity.js";
 import { continuedFractionApproximants } from "../engine/calendar.js";
 import { maxPeakHeight, maxShieldHeight, airyRootDepth } from "../engine/tectonics.js";
+import {
+  renderScienceFlareResult,
+  renderScienceLeapCycles,
+  renderScienceText,
+} from "./science/domRender.js";
+import { loadKaTeX, renderAllMath } from "./katexLoader.js";
 
 /* ── KaTeX lazy loader ──────────────────────────────────────── */
-
-let katexPromise = null;
-
-function loadKaTeX() {
-  if (window.katex) return Promise.resolve();
-  if (katexPromise) return katexPromise;
-  katexPromise = new Promise((resolve, reject) => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css";
-    link.integrity = "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+";
-    link.crossOrigin = "anonymous";
-    document.head.appendChild(link);
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js";
-    script.integrity = "sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg";
-    script.crossOrigin = "anonymous";
-    script.onload = () => resolve();
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-  return katexPromise;
-}
-
-function renderAllMath(root) {
-  if (!window.katex) return;
-  root.querySelectorAll(".sci-math").forEach((el) => {
-    const tex = el.textContent;
-    const displayMode = el.classList.contains("sci-math--block");
-    try {
-      window.katex.render(tex, el, { throwOnError: false, displayMode });
-    } catch {
-      /* leave raw LaTeX as fallback */
-    }
-  });
-}
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 
@@ -1108,7 +1078,7 @@ function buildAtmosphereColour() {
       <div class="sci-formula__eq">${eq("\\text{pb} = P^{0.684}")}</div>
       <div class="sci-formula__eq">${eq("\\tau_{\\text{CO}_2} = 0.503 \\cdot \\ln\\!\\left(1 + \\frac{p_{\\text{CO}_2}}{p_{\\text{ref}}}\\right) \\cdot \\text{pb}")}</div>
       <div class="sci-formula__eq">${eq("\\tau_{\\text{H}_2\\text{O}} = 0.336 \\cdot \\ln\\!\\left(1 + \\frac{p_{\\text{H}_2\\text{O}}}{p_{\\text{ref}}}\\right) \\cdot \\text{pb} \\cdot \\omega")}</div>
-      <div class="sci-formula__eq">${eq("\\tau_{\\text{CH}_4} = 0.085 \\cdot \\sqrt{\\frac{p_{\\text{CH}_4}}{p_{\\text{ref}}}} \\cdot \\text{pb}")}</div>
+      <div class="sci-formula__eq">${eq("\\tau_{\\text{CH}_4} = 0.45 \\cdot \\sqrt{\\frac{p_{\\text{CH}_4}}{p_{\\text{ref}}}} \\cdot \\text{pb}")}</div>
       <div class="sci-formula__eq">${eq("\\tau = \\tau_{\\text{CO}_2} + \\tau_{\\text{H}_2\\text{O}} + \\tau_{\\text{CH}_4}")}</div>
       ${vars([
         ["P", "Total surface pressure (atm)"],
@@ -1121,7 +1091,7 @@ function buildAtmosphereColour() {
         ["\\omega", "CO&#8322;&ndash;H&#8322;O band overlap factor (see next formula)"],
       ])}
       <p><b>Functional forms.</b> CO&#8322; and H&#8322;O use logarithmic scaling (band saturation at high concentrations; Myhre 1998, Pierrehumbert 2010 ch. 4). CH&#8324; uses square-root scaling (weaker absorber; IPCC TAR Table 6.2). The ${iq("P^{0.684}")} exponent captures Lorentz pressure broadening of molecular absorption lines.</p>
-      <p><b>Calibration.</b> The numerical coefficients (0.503, 0.336, 0.085) are <em>WorldSmith-derived fits</em> calibrated against NASA Planetary Fact Sheet surface temperatures, not taken from a single published source. They reproduce:</p>
+      <p><b>Calibration.</b> The numerical coefficients (0.503, 0.336, 0.45) are <em>WorldSmith-derived fits</em> calibrated against NASA Planetary Fact Sheet surface temperatures, not taken from a single published source. They reproduce:</p>
       ${dataTable(
         [
           "Body",
@@ -2157,7 +2127,7 @@ function buildDivergences() {
 
     item(
       "Greenhouse Optical Depth Coefficients (WS-derived)",
-      `<p>The grey IR optical depth coefficients for CO&#8322; (0.503), H&#8322;O (0.336), and CH&#8324; (0.085) are
+      `<p>The grey IR optical depth coefficients for CO&#8322; (0.503), H&#8322;O (0.336), and CH&#8324; (0.45) are
       <em>not</em> taken from a single published radiative-transfer study. They are WorldSmith fits
       calibrated so that the energy-balance model reproduces NASA Planetary Fact Sheet surface
       temperatures for Earth (288 K), Venus (737 K), and Mars (211 K) simultaneously.</p>
@@ -2695,7 +2665,7 @@ function wireCalculators(root) {
       const L = massToLuminosity(m);
       const teff = estimateHabitableTeffKFromMass(m);
       const hz = calcHabitableZoneAu({ luminosityLsol: L, teffK: teff });
-      hzResult.innerHTML = `${fmt(hz.innerAu, 2)} &ndash; ${fmt(hz.outerAu, 2)} AU`;
+      renderScienceText(hzResult, `${fmt(hz.innerAu, 2)} – ${fmt(hz.outerAu, 2)} AU`);
     };
     bindNumberAndSlider({
       numberEl: hzMass,
@@ -2721,7 +2691,7 @@ function wireCalculators(root) {
   if (densMass && densMSlider && densCmf && densCSlider && densResult) {
     const update = () => {
       const { R, rho } = calcRadiusAndDensity(Number(densMass.value), Number(densCmf.value));
-      densResult.innerHTML = `${fmt(R, 3)} R&#8853; &mdash; ${fmt(rho, 2)} g/cm&sup3;`;
+      renderScienceText(densResult, `${fmt(R, 3)} R⊕ — ${fmt(rho, 2)} g/cm³`);
     };
     bindNumberAndSlider({
       numberEl: densMass,
@@ -2789,7 +2759,11 @@ function wireCalculators(root) {
         teffK: Number(flareTemp.value),
         ageGyr: Number(flareAge.value),
       });
-      flareResult.innerHTML = `N<sub>32</sub> = ${params.N32} &mdash; &alpha; = ${params.alpha}`;
+      renderScienceFlareResult(flareResult, {
+        countLabel: "32",
+        countValue: params.N32,
+        alphaValue: params.alpha,
+      });
     };
     if (flareTSlider)
       bindNumberAndSlider({
@@ -2838,7 +2812,7 @@ function wireCalculators(root) {
       const v = Number(leapLen.value);
       const frac = v - Math.floor(v);
       if (frac < 1e-9) {
-        leapResult.innerHTML = "No leap cycle needed (integer year)";
+        renderScienceLeapCycles(leapResult, [], "No leap cycle needed (integer year)");
         return;
       }
       const approx = continuedFractionApproximants(frac, 6);
@@ -2848,18 +2822,22 @@ function wireCalculators(root) {
         .map(toFraction)
         .filter((f) => f.q > 0);
       if (fractions.length === 0) {
-        leapResult.innerHTML = "No usable cycle found";
+        renderScienceLeapCycles(leapResult, [], "No usable cycle found");
         return;
       }
-      /* Show each cycle as a row with drift info */
-      const rows = fractions.map((f) => {
-        const error = Math.abs(f.p / f.q - frac);
-        const driftYears = error > 1e-12 ? Math.round(1 / error) : Infinity;
-        const driftStr =
-          driftYears === Infinity ? "exact" : `~1 day drift per ${fmt(driftYears, 0)} yr`;
-        return `<b>${f.p}/${f.q}</b> &mdash; ${f.p} leap day${f.p !== 1 ? "s" : ""} every ${f.q} years (${driftStr})`;
-      });
-      leapResult.innerHTML = rows.join("<br>");
+      renderScienceLeapCycles(
+        leapResult,
+        fractions.map((f) => {
+          const error = Math.abs(f.p / f.q - frac);
+          const driftYears = error > 1e-12 ? Math.round(1 / error) : Infinity;
+          const driftStr =
+            driftYears === Infinity ? "exact" : `~1 day drift per ${fmt(driftYears, 0)} yr`;
+          return {
+            fraction: `${f.p}/${f.q}`,
+            description: `${f.p} leap day${f.p !== 1 ? "s" : ""} every ${f.q} years (${driftStr})`,
+          };
+        }),
+      );
     };
     leapLen.addEventListener("input", update);
     update();
@@ -2877,7 +2855,7 @@ function wireCalculators(root) {
       const sigma = 0.1 * R;
       const p = Math.exp(-0.5 * Math.pow((r - peak) / sigma, 2));
       const inBand = r >= 0.47 * R && r <= 0.6 * R;
-      ghzResult.innerHTML = `${fmt(p * 100, 1)}%${inBand ? " (in hard band)" : ""}`;
+      renderScienceText(ghzResult, `${fmt(p * 100, 1)}%${inBand ? " (in hard band)" : ""}`);
     };
     [ghzR, ghzLoc].forEach((el) => el.addEventListener("input", update));
     update();
@@ -3027,5 +3005,5 @@ export function initSciencePage(mountEl) {
   wireCalculators(wrap);
 
   /* Load KaTeX and render equations */
-  loadKaTeX().then(() => renderAllMath(wrap));
+  loadKaTeX().then((katex) => renderAllMath(wrap, katex));
 }

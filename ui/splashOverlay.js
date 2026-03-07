@@ -1,31 +1,10 @@
 // 3D planet splash overlay — shows an animated Three.js planet on every page load.
-// Three.js + loaders loaded lazily from cdn.jsdelivr.net (ESM).
+// Three.js and its addons load from local package-backed modules so the source
+// app can run without CDN fetches and the production build can bundle them.
 
-const THREE_VER = "0.170.0";
-const CDN = `https://cdn.jsdelivr.net/npm/three@${THREE_VER}`;
-const THREE_URL = `${CDN}/+esm`;
-const GLTF_URL = `${CDN}/examples/jsm/loaders/GLTFLoader.js/+esm`;
-const DRACO_URL = `${CDN}/examples/jsm/loaders/DRACOLoader.js/+esm`;
-const ORBIT_URL = `${CDN}/examples/jsm/controls/OrbitControls.js/+esm`;
-const DRACO_DECODER_PATH = `${CDN}/examples/jsm/libs/draco/`;
+import { getDracoDecoderPath, loadThreeSplashDeps } from "./threeBridge2d.js";
 
 const SEA_LEVEL = 5.0;
-
-let threePromise = null;
-
-function loadThreeDeps() {
-  if (threePromise) return threePromise;
-  threePromise = Promise.all([
-    import(/* webpackIgnore: true */ THREE_URL),
-    import(/* webpackIgnore: true */ GLTF_URL),
-    import(/* webpackIgnore: true */ DRACO_URL),
-    import(/* webpackIgnore: true */ ORBIT_URL),
-  ]).catch((err) => {
-    threePromise = null;
-    throw err;
-  });
-  return threePromise;
-}
 
 /* ── Biome colouring from vertex position ──────────────── */
 
@@ -185,7 +164,7 @@ function buildScene(canvas, THREE, GLTFLoader, DRACOLoader, OrbitControls) {
   scene.add(nightFill);
 
   const dracoLoader = new DRACOLoader();
-  dracoLoader.setDecoderPath(DRACO_DECODER_PATH);
+  dracoLoader.setDecoderPath(getDracoDecoderPath());
   dracoLoader.setDecoderConfig({ type: "js" });
 
   const gltfLoader = new GLTFLoader();
@@ -296,7 +275,7 @@ export function showSplashOverlay() {
     enterBtn.addEventListener("click", dismiss);
     window.addEventListener("resize", onResize);
 
-    loadThreeDeps()
+    loadThreeSplashDeps()
       .then(([THREE, gltfMod, dracoMod, orbitMod]) => {
         if (cleaned) return;
         sceneHandle = buildScene(

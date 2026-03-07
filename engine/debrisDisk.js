@@ -28,6 +28,7 @@
 //     Asteroid belt: Jupiter @ 5.2 → 2.06–3.28 AU  ✓
 
 import { clamp, toFinite, round, fmt } from "./utils.js";
+import { auToMeters, calcOrbitalPeriodYearsKepler, earthMassToKg } from "./physics/orbital.js";
 
 /* ── Constants ───────────────────────────────────────────────────── */
 
@@ -39,8 +40,8 @@ const RES_1_4 = (1 / 4) ** (2 / 3); // ~0.3969
 const RES_1_8 = (1 / 8) ** (2 / 3); // ~0.2500
 
 const SILICATE_DENSITY_KGM3 = 2500; // typical grain density
-const AU_M = 1.496e11;
-const KG_PER_MEARTH = 5.972e24;
+const AU_M = auToMeters(1);
+const KG_PER_MEARTH = earthMassToKg(1);
 const YEAR_S = 3.1557e7;
 const FEH_MIN = -3;
 const FEH_MAX = 1;
@@ -472,7 +473,10 @@ export function calcDebrisDisk({
 
   /* ── Collisional lifetime ──────────────────────────────────────── */
 
-  const orbitalPeriodYears = Math.sqrt(midAu ** 3 / sMass);
+  const orbitalPeriodYears = calcOrbitalPeriodYearsKepler({
+    semiMajorAxisAu: midAu,
+    centralMassMsol: sMass,
+  });
   let collisionalYears = tau > 0 ? orbitalPeriodYears / (4 * Math.PI * tau) : Infinity;
   const dominantProcess =
     collisionalYears < prDragYears ? "Collision-dominated" : "PR-drag-dominated";

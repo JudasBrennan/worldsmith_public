@@ -3254,9 +3254,11 @@ async function ensureRecipeRuntime() {
   return _recipeRuntimeInit;
 }
 
-async function doRecipeSnapshot(targetCanvas, model) {
+async function doRecipeSnapshot(targetCanvas, model, { shouldContinue = null } = {}) {
+  if (!shouldContinueWork(shouldContinue)) return false;
   if (!targetCanvas) return false;
   const runtime = await ensureRecipeRuntime();
+  if (!shouldContinueWork(shouldContinue)) return false;
   if (!runtime || runtime.disposed) return false;
 
   const descriptor = composeCelestialDescriptor(model, { lod: "low" });
@@ -3269,6 +3271,7 @@ async function doRecipeSnapshot(targetCanvas, model) {
     cacheTextures(signature, maps);
   }
 
+  if (!shouldContinueWork(shouldContinue)) return false;
   applyDescriptorMapsToRuntime(runtime, descriptor, signature, maps);
   runtime.descriptor = descriptor;
   runtime.descriptorSignature = signature;
@@ -3325,6 +3328,7 @@ async function doRecipeSnapshot(targetCanvas, model) {
     if (runtime.haze.visible) runtime.haze.rotation.y = spin * 0.35;
   }
 
+  if (!shouldContinueWork(shouldContinue)) return false;
   runtime.renderer.render(runtime.scene, runtime.camera);
 
   // Store the camera-to-base-z ratio so callers can scale the sprite to
@@ -3350,7 +3354,11 @@ async function doRecipeSnapshot(targetCanvas, model) {
  * @returns {Promise<boolean>}
  */
 export function renderCelestialRecipeSnapshot(targetCanvas, model) {
-  const task = _recipeQueue.then(() => doRecipeSnapshot(targetCanvas, model)).catch(() => false);
+  const options =
+    arguments.length > 2 && arguments[2] && typeof arguments[2] === "object" ? arguments[2] : {};
+  const task = _recipeQueue
+    .then(() => doRecipeSnapshot(targetCanvas, model, options))
+    .catch(() => false);
   _recipeQueue = task;
   return task;
 }
@@ -3461,8 +3469,14 @@ async function loadFromIDBToCache(signature) {
 
 /* ── Batch pre-warm (worker + IDB aware) ───────────────────── */
 
-async function warmSingle(descriptor, textureSize, signature) {
+function shouldContinueWork(guard) {
+  return typeof guard !== "function" || guard();
+}
+
+async function warmSingle(descriptor, textureSize, signature, shouldContinue = null) {
+  if (!shouldContinueWork(shouldContinue)) return;
   if (await loadFromIDBToCache(signature)) return;
+  if (!shouldContinueWork(shouldContinue)) return;
   if (supportsCelestialTextureWorker()) {
     try {
       const result = await requestCelestialTextureBundle({
@@ -3470,6 +3484,7 @@ async function warmSingle(descriptor, textureSize, signature) {
         descriptor,
         textureSize,
       });
+      if (!shouldContinueWork(shouldContinue)) return;
       const maps = result?.maps;
       const wm = {
         surface: canvasFromMapPayload(maps?.surface),
@@ -3486,7 +3501,9 @@ async function warmSingle(descriptor, textureSize, signature) {
       /* fall through to local */
     }
   }
+  if (!shouldContinueWork(shouldContinue)) return;
   const localMaps = generateCelestialTextureCanvasesLocal(descriptor, textureSize);
+  if (!shouldContinueWork(shouldContinue)) return;
   cacheTextures(signature, localMaps);
 }
 
@@ -3502,13 +3519,15 @@ async function warmSingle(descriptor, textureSize, signature) {
 export async function preWarmTextures(models, opts = {}) {
   if (!models?.length) return;
   const lod = opts.lod || "low";
+  const shouldContinue = typeof opts.shouldContinue === "function" ? opts.shouldContinue : null;
   const tasks = [];
   for (const model of models) {
+    if (!shouldContinueWork(shouldContinue)) return;
     const descriptor = composeCelestialDescriptor(model, { lod });
     const textureSize = descriptor.textureSize || 128;
     const signature = buildDescriptorSignature(descriptor, textureSize);
     if (CELESTIAL_TEXTURE_CACHE.has(signature)) continue;
-    tasks.push(warmSingle(descriptor, textureSize, signature));
+    tasks.push(warmSingle(descriptor, textureSize, signature, shouldContinue));
   }
   await Promise.all(tasks);
 }

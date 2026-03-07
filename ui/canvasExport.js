@@ -1,6 +1,5 @@
 const GIF_JS_URL = "./assets/vendor/gif.js";
 const GIF_WORKER_URL = "./assets/vendor/gif.worker.js";
-const GIF_JS_CDN_FALLBACK = "https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js";
 
 let gifJsLoadPromise = null;
 
@@ -61,14 +60,15 @@ async function ensureGifCtor() {
   if (typeof ctorNow === "function") return ctorNow;
 
   if (!gifJsLoadPromise) {
-    gifJsLoadPromise = loadScript(GIF_JS_URL).catch(() =>
-      loadScript(GIF_JS_CDN_FALLBACK, { crossOrigin: "anonymous" }),
-    );
+    gifJsLoadPromise = loadScript(GIF_JS_URL).catch((error) => {
+      gifJsLoadPromise = null;
+      throw new Error(`Could not load local GIF encoder: ${error?.message || error}`);
+    });
   }
   await gifJsLoadPromise;
   const ctor = globalThis?.GIF;
   if (typeof ctor !== "function") {
-    throw new Error("GIF encoder did not initialize.");
+    throw new Error("Local GIF encoder did not initialize.");
   }
   return ctor;
 }

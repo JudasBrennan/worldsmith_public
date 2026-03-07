@@ -7,7 +7,13 @@ import {
   createCelestialVisualPreviewController,
   renderCelestialRecipeBatch,
 } from "./celestialVisualPreview.js";
-import { escapeHtml } from "./uiHelpers.js";
+import {
+  createMoonRecipePickerOverlay,
+  renderMoonKpis,
+  renderMoonLimits,
+  renderMoonParentSelector,
+  renderMoonSelector,
+} from "./moon/domRender.js";
 import {
   loadWorld,
   updateWorld,
@@ -337,6 +343,7 @@ export function initMoonPage(mountEl) {
   const kpisEl = wrap.querySelector("#kpis");
   const limitsEl = wrap.querySelector("#limits");
   let noticeTimer = null;
+  const pairBindings = {};
 
   bindPair("a", aEl, 10, 1e9, 100, "auto");
   bindPair("e", eEl, 0, 0.99, 0.001, "auto");
@@ -352,7 +359,22 @@ export function initMoonPage(mountEl) {
     const maxEl = wrap.querySelector(`#${id}_max`);
     minEl.textContent = String(min);
     maxEl.textContent = String(max);
-    bindNumberAndSlider({ numberEl, sliderEl, min, max, step, mode });
+    pairBindings[id] = bindNumberAndSlider({
+      numberEl,
+      sliderEl,
+      min,
+      max,
+      step,
+      mode,
+      commitOnInput: false,
+      onChange: () => applyFromInputs(),
+    });
+  }
+
+  function syncBoundPairs() {
+    for (const id of ["a", "e", "inc", "m", "density", "albedo", "initRot"]) {
+      pairBindings[id]?.syncFromNumber({ commit: false, normalize: true });
+    }
   }
 
   function syncFromWorld() {
@@ -426,40 +448,21 @@ export function initMoonPage(mountEl) {
     const w = loadWorld();
     const planets = listPlanets(w);
     const gasGiants = listSystemGasGiants(w);
-    moonPlanetSelectEl.innerHTML =
-      `<option value="">Unassigned</option>` +
-      `<optgroup label="Planets">` +
-      planets
-        .map(
-          (p) =>
-            `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.inputs?.name || p.id)}</option>`,
-        )
-        .join("") +
-      `</optgroup>` +
-      `<optgroup label="Gas Giants">` +
-      gasGiants
-        .map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name || g.id)}</option>`)
-        .join("") +
-      `</optgroup>`;
-    const selectedValue = state.moonPlanetId == null ? "" : String(state.moonPlanetId);
-    moonPlanetSelectEl.value = selectedValue;
-    if (moonPlanetSelectEl.value !== selectedValue) moonPlanetSelectEl.value = "";
-    moonPlanetSelectEl.disabled = !!state.moonLocked;
-    moonPlanetSelectEl.title = state.moonLocked
-      ? "This moon is locked to its current planet on the Planetary System tab."
-      : "";
+    renderMoonParentSelector(moonPlanetSelectEl, {
+      planets,
+      gasGiants,
+      selectedValue: state.moonPlanetId,
+      disabled: state.moonLocked,
+      title: state.moonLocked
+        ? "This moon is locked to its current planet on the Planetary System tab."
+        : "",
+    });
   }
 
   function populateMoonSelect() {
     const w = loadWorld();
     const moons = listMoons(w);
-    moonSelectEl.innerHTML = moons
-      .map(
-        (m) =>
-          `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name || m.inputs?.name || m.id)}</option>`,
-      )
-      .join("");
-    moonSelectEl.value = w.moons.selectedId;
+    renderMoonSelector(moonSelectEl, moons, w.moons.selectedId);
   }
 
   function buildParentOverride(gg) {
@@ -580,30 +583,28 @@ export function initMoonPage(mountEl) {
     ];
 
     const prevMoonCanvas = kpisEl.querySelector(".moon-preview-canvas");
-    kpisEl.innerHTML = items
-      .map((x) => {
-        if (x.isMoonPreview) {
-          return `
-      <div class="kpi-wrap"><div class="kpi kpi--preview">
-        <div class="kpi__label">${x.label}
-          <button type="button" class="small moon-recipe-btn">Recipes</button>
-          <button type="button" class="small moon-pause-btn">Pause</button>
-        </div>
-        <canvas class="moon-preview-canvas" width="180" height="180"></canvas>
-        <div class="kpi__meta">${x.value} \u2014 ${x.meta || ""}</div>
-      </div></div>`;
-        }
-        return `
-      <div class="kpi-wrap">
-        <div class="kpi">
-          <div class="kpi__label">${x.label} ${tipIcon(TIP_LABEL[x.label] || "")}</div>
-          <div class="kpi__value">${x.value}</div>
-          <div class="kpi__meta">${x.meta}</div>
-        </div>
-      </div>
-    `;
-      })
-      .join("");
+    renderMoonKpis(
+      kpisEl,
+      items.map((item) =>
+        item.isMoonPreview
+          ? {
+              kind: "preview",
+              label: item.label,
+              actions: [
+                { className: "small moon-recipe-btn", text: "Recipes" },
+                { className: "small moon-pause-btn", text: "Pause" },
+              ],
+              canvasClass: "moon-preview-canvas",
+              metaChildren: [item.value, " \u2014 ", item.meta || ""],
+            }
+          : {
+              label: item.label,
+              tip: TIP_LABEL[item.label] || "",
+              value: item.value,
+              meta: item.meta,
+            },
+      ),
+    );
 
     // Render moon preview canvas (animated native celestial controller)
     let moonCvs = kpisEl.querySelector(".moon-preview-canvas");
@@ -648,22 +649,32 @@ export function initMoonPage(mountEl) {
       });
     }
 
-    limitsEl.innerHTML = `
-      <div class="label">Orbital limits ${tipIcon(TIP_LABEL["Limits"] || "")}</div>
-      <div class="derived-readout">Moon Zone (Inner): ${model.display.zoneInner}
-Moon Zone (Outer): ${model.display.zoneOuter}
-Periapsis: ${model.display.peri}
-Apoapsis: ${model.display.apo}
-Orbital direction: ${model.orbit.orbitalDirection}</div>
-      <div style="margin-top:14px">
-        <div class="label">Tidal locking ${tipIcon(TIP_LABEL["Tidal locking"] || "")}</div>
-        <div class="derived-readout">Moon locked to Planet: ${model.display.moonLocked}
-Planet locked to Moon: ${model.display.planetLockedMoon}
-Planet locked to Star: ${model.display.planetLockedStar}
-Lock time (Moon\u2192Planet): ${model.display.tMoonLock}
-Lock time (Planet\u2192Moon): ${model.display.tPlanetMoon}
-Lock time (Planet\u2192Star): ${model.display.tPlanetStar}</div>
-      </div>`;
+    renderMoonLimits(limitsEl, [
+      {
+        title: "Orbital limits",
+        tip: TIP_LABEL.Limits || "",
+        style: "margin-top:0",
+        lines: [
+          `Moon Zone (Inner): ${model.display.zoneInner}`,
+          `Moon Zone (Outer): ${model.display.zoneOuter}`,
+          `Periapsis: ${model.display.peri}`,
+          `Apoapsis: ${model.display.apo}`,
+          `Orbital direction: ${model.orbit.orbitalDirection}`,
+        ],
+      },
+      {
+        title: "Tidal locking",
+        tip: TIP_LABEL["Tidal locking"] || "",
+        lines: [
+          `Moon locked to Planet: ${model.display.moonLocked}`,
+          `Planet locked to Moon: ${model.display.planetLockedMoon}`,
+          `Planet locked to Star: ${model.display.planetLockedStar}`,
+          `Lock time (Moon\u2192Planet): ${model.display.tMoonLock}`,
+          `Lock time (Planet\u2192Moon): ${model.display.tPlanetMoon}`,
+          `Lock time (Planet\u2192Star): ${model.display.tPlanetStar}`,
+        ],
+      },
+    ]);
   }
 
   function loadIntoInputs() {
@@ -680,10 +691,7 @@ Lock time (Planet\u2192Star): ${model.display.tPlanetStar}</div>
     albedoEl.value = state.moon.albedo;
     compOverrideEl.value = state.moon.compositionOverride || "";
     initRotEl.value = state.moon.initialRotationPeriodHours || 12;
-
-    ["a", "e", "inc", "m", "density", "albedo", "initRot"].forEach((id) => {
-      wrap.querySelector(`#${id}`).dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    syncBoundPairs();
   }
 
   let hydrating = false;
@@ -752,22 +760,12 @@ Lock time (Planet\u2192Star): ${model.display.tPlanetStar}</div>
     hydrating = false;
   }
 
-  // Live-update: apply on every input change
-  [nameEl, aEl, eEl, incEl, mEl, densityEl, albedoEl, initRotEl].forEach((el) =>
-    el.addEventListener("input", applyFromInputs),
-  );
+  nameEl.addEventListener("change", applyFromInputs);
+  compOverrideEl.addEventListener("change", applyFromInputs);
   moonPlanetSelectEl.addEventListener("change", applyFromInputs);
 
   moonSelectEl.addEventListener("change", () => {
     selectMoon(moonSelectEl.value);
-    loadIntoInputs();
-    render();
-  });
-
-  moonPlanetSelectEl.addEventListener("change", () => {
-    const w = loadWorld();
-    const mid = w.moons.selectedId;
-    assignMoonToPlanet(mid, moonPlanetSelectEl.value || null);
     loadIntoInputs();
     render();
   });
@@ -814,37 +812,7 @@ Lock time (Planet\u2192Star): ${model.display.tPlanetStar}</div>
   /* ── Moon recipe picker modal ──────────────────────────────────────── */
 
   function openMoonRecipePicker(onSelect) {
-    const categories = [...new Set(MOON_RECIPES.map((r) => r.category))];
-    const overlay = document.createElement("div");
-    overlay.className = "rp-picker-overlay";
-    overlay.innerHTML = `
-      <div class="rp-picker-dialog panel">
-        <div class="panel__header">
-          <h2>Select Moon Recipe</h2>
-          <button type="button" class="small rp-picker-close">Close</button>
-        </div>
-        <div class="rp-picker-progress"><span></span></div>
-        <div class="panel__body">
-          ${categories
-            .map(
-              (cat) => `
-            <div class="rp-picker-category">${cat}</div>
-            <div class="rp-picker-grid">
-              ${MOON_RECIPES.filter((r) => r.category === cat)
-                .map(
-                  (r) => `
-                <div class="rp-picker-card" data-recipe="${r.id}">
-                  <canvas width="90" height="90"></canvas>
-                  <div class="rp-picker-card__label">${r.label}</div>
-                </div>`,
-                )
-                .join("")}
-            </div>`,
-            )
-            .join("")}
-        </div>
-      </div>`;
-
+    const overlay = createMoonRecipePickerOverlay(MOON_RECIPES);
     document.body.appendChild(overlay);
 
     const progressBar = overlay.querySelector(".rp-picker-progress > span");

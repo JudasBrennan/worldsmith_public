@@ -28,6 +28,7 @@
 // access).  Units: AU, solar units.
 
 import { clamp, fmt } from "./utils.js";
+import { auToKilometers } from "./physics/orbital.js";
 import {
   estimateHabitableTeffKFromMass,
   calcHabitableZoneAu,
@@ -35,7 +36,8 @@ import {
   massToRadius,
 } from "./star.js";
 
-const AU_TO_MILLION_KM = 149.6;
+const AU_TO_KM = Math.round(auToKilometers(1) / 100000) * 100000;
+const AU_TO_MILLION_KM = AU_TO_KM / 1e6;
 
 /**
  * Computes the full orbital layout for a planetary system.
@@ -88,7 +90,7 @@ export function calcSystem({
   // System inner limit (AU):
   // =2.455*(Rsol*696340)*((Dsol*1408)/5400)^(1/3)/149600000
   const systemInnerLimitAu =
-    (2.455 * (radiusRsol * 696340) * ((densityDsol * 1408) / 5400) ** (1 / 3)) / 149600000;
+    (2.455 * (radiusRsol * 696340) * ((densityDsol * 1408) / 5400) ** (1 / 3)) / AU_TO_KM;
 
   // Orbit slots:
   // Orbit2 = Orbit1 + spacingFactor * 2^0

@@ -1,4 +1,5 @@
-const XLSX_ESM_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm";
+import { importXlsxModule } from "./runtimeDeps.js";
+import { assertImportFileWithinLimit, nextImportTurn } from "./importSafety.js";
 
 let xlsxModulePromise = null;
 
@@ -277,7 +278,7 @@ function buildMoons(moonSheets, planetOrder) {
 
 async function loadXlsxModule() {
   if (!xlsxModulePromise) {
-    xlsxModulePromise = import(XLSX_ESM_URL).catch((err) => {
+    xlsxModulePromise = importXlsxModule().catch((err) => {
       xlsxModulePromise = null;
       throw err;
     });
@@ -293,12 +294,14 @@ export function isXlsxFile(file) {
 
 export async function importLegacyWorldsmithWorkbook(file) {
   if (!file) throw new Error("No file selected.");
+  assertImportFileWithinLimit(file, "xlsx");
   const { read } = await loadXlsxModule().catch((err) => {
     throw new Error(`Could not load XLSX reader: ${err?.message || err}`);
   });
 
   let workbook;
   try {
+    await nextImportTurn();
     const buffer = await file.arrayBuffer();
     workbook = read(buffer, {
       type: "array",
