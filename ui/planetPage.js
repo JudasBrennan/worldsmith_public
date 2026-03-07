@@ -667,12 +667,12 @@ export function initPlanetPage(mountEl) {
 
     // CMF input (special: supports auto mode via cmfPct = -1)
     // Initial value: if auto, show 32 as placeholder (renderRockyOutputs will update)
-    if (cmfIsAuto) {
+    if (cmfEl && cmfIsAuto) {
       cmfEl.value = 32;
-    } else {
+    } else if (cmfEl) {
       cmfEl.value = p.cmfPct ?? 32;
     }
-    bindNumberAndSlider({
+    const cmfBinding = bindNumberAndSlider({
       numberEl: cmfEl,
       sliderEl: cmfSliderEl,
       min: 0,
@@ -691,18 +691,22 @@ export function initPlanetPage(mountEl) {
         scheduleRender(true);
       },
     });
-    cmfEl.dispatchEvent(new Event("input", { bubbles: true }));
+    if (cmfEl && cmfBinding.ready) {
+      cmfEl.dispatchEvent(new Event("input", { bubbles: true }));
+    }
     updateCmfAutoState();
 
-    cmfAutoBtn.addEventListener("click", () => {
-      cmfIsAuto = true;
-      updateCmfAutoState();
-      const w = loadWorld();
-      const pid = w.planets.selectedId;
-      updatePlanet(pid, { inputs: { cmfPct: -1 } });
-      updateWorld({ planet: { cmfPct: -1 } });
-      scheduleRender(true);
-    });
+    if (cmfAutoBtn) {
+      cmfAutoBtn.addEventListener("click", () => {
+        cmfIsAuto = true;
+        updateCmfAutoState();
+        const w = loadWorld();
+        const pid = w.planets.selectedId;
+        updatePlanet(pid, { inputs: { cmfPct: -1 } });
+        updateWorld({ planet: { cmfPct: -1 } });
+        scheduleRender(true);
+      });
+    }
 
     // Name change
     bodyInputsEl.querySelector("#planetName").addEventListener("change", () => {
@@ -956,11 +960,11 @@ export function initPlanetPage(mountEl) {
     vegDetailsBtn.textContent = "Details";
 
     // Update CMF input when in auto mode
-    if (d.cmfIsAuto && cmfEl) {
+    if (d.cmfIsAuto) {
       cmfIsAuto = true;
       const resolved = model.inputs.cmfPct;
-      cmfEl.value = Math.round(resolved * 10) / 10;
-      cmfSliderEl.value = resolved;
+      if (cmfEl) cmfEl.value = Math.round(resolved * 10) / 10;
+      if (cmfSliderEl) cmfSliderEl.value = resolved;
       updateCmfAutoState();
     }
 

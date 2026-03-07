@@ -20,6 +20,24 @@ export function bindNumberAndSlider({
   onChange,
   commitOnInput = true,
 }) {
+  if (!numberEl || !sliderEl) {
+    const numberLabel = numberEl?.id ? `#${numberEl.id}` : "missing number input";
+    const sliderLabel = sliderEl?.id ? `#${sliderEl.id}` : "missing slider input";
+    console.warn(
+      `[WorldSmith] Skipping number/slider bind because the control pair is incomplete (${numberLabel}, ${sliderLabel}).`,
+    );
+    return {
+      ready: false,
+      useLog: false,
+      syncFromNumber() {
+        return null;
+      },
+      syncFromSlider() {
+        return null;
+      },
+    };
+  }
+
   const span = max - min;
   const ratio = min > 0 ? max / min : Infinity;
   const clampValue = (value) => Math.min(max, Math.max(min, value));
@@ -118,7 +136,7 @@ export function bindNumberAndSlider({
 
     // initial
     syncFromNumber({ commit: false, normalize: false });
-    return { useLog: true, syncFromNumber, syncFromSlider };
+    return { ready: true, useLog: true, syncFromNumber, syncFromSlider };
   }
 
   // Linear slider
@@ -170,5 +188,5 @@ export function bindNumberAndSlider({
 
   // initial
   syncFromNumber({ commit: false, normalize: false });
-  return { useLog: false, syncFromNumber, syncFromSlider };
+  return { ready: true, useLog: false, syncFromNumber, syncFromSlider };
 }
